@@ -128,9 +128,9 @@ p {
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: minmax(220px, auto) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(205px, auto) auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: clamp(0.7rem, 2vw, 1.4rem);
+  gap: clamp(0.55rem, 1.4vw, 1.2rem);
   min-height: 76px;
   padding: 0 clamp(18px, 3vw, 34px);
   background:
@@ -143,6 +143,7 @@ p {
 .brand {
   display: inline-flex;
   align-items: center;
+  justify-self: start;
   gap: 0.75rem;
   min-width: 0;
   transition:
@@ -194,6 +195,41 @@ p {
   font-size: 0.72rem;
 }
 
+.btc-ticker {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 0.38rem;
+  min-width: max-content;
+  padding-top: 0.05rem;
+  color: var(--platinum-soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.btc-ticker-pair {
+  color: var(--platinum-soft);
+}
+
+.btc-ticker strong {
+  color: var(--platinum);
+  font-size: 0.86rem;
+}
+
+.btc-ticker-change {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.btc-ticker-change.positive {
+  color: var(--success);
+}
+
+.btc-ticker-change.negative {
+  color: var(--danger);
+}
+
 .primary-nav,
 .account-actions,
 .hero-actions,
@@ -208,6 +244,7 @@ p {
 }
 
 .primary-nav {
+  justify-self: center;
   justify-content: center;
   gap: 0.35rem;
 }
@@ -238,6 +275,7 @@ p {
 }
 
 .account-actions {
+  justify-self: end;
   justify-content: end;
   gap: 0.55rem;
 }
@@ -606,6 +644,8 @@ p {
 .section-panel,
 .module-card,
 .access-panel,
+.chart-card,
+.charts-learning-cta,
 .quiz-question-card,
 .quiz-recommendation-card,
 .quiz-result-panel,
@@ -625,6 +665,8 @@ p {
 .section-panel,
 .module-card,
 .access-panel,
+.chart-card,
+.charts-learning-cta,
 .quiz-question-card,
 .quiz-recommendation-card,
 .risk-band,
@@ -642,6 +684,8 @@ p {
 .section-panel::after,
 .module-card::after,
 .access-panel::after,
+.chart-card::after,
+.charts-learning-cta::after,
 .quiz-recommendation-card::after,
 .risk-band::after,
 .course-hero > div::after {
@@ -667,6 +711,8 @@ p {
 .section-panel:hover,
 .module-card:hover,
 .access-panel:hover,
+.chart-card:hover,
+.charts-learning-cta:hover,
 .quiz-recommendation-card:hover,
 .risk-band:hover,
 .course-hero > div:hover {
@@ -686,6 +732,8 @@ p {
 .section-panel:hover::after,
 .module-card:hover::after,
 .access-panel:hover::after,
+.chart-card:hover::after,
+.charts-learning-cta:hover::after,
 .quiz-recommendation-card:hover::after,
 .risk-band:hover::after,
 .course-hero > div:hover::after {
@@ -699,6 +747,8 @@ p {
 .section-panel > *,
 .module-card > *,
 .access-panel > *,
+.chart-card > *,
+.charts-learning-cta > *,
 .quiz-question-card > *,
 .quiz-recommendation-card > *,
 .quiz-result-panel > *,
@@ -713,6 +763,7 @@ p {
 .pricing-card,
 .section-panel,
 .module-card,
+.chart-card,
 .auth-panel {
   padding: 1.2rem;
 }
@@ -850,6 +901,178 @@ p {
 
 .status-pill {
   padding: 0 0.65rem;
+}
+
+.charts-page {
+  gap: 1.25rem;
+}
+
+.charts-title-row {
+  align-items: center;
+}
+
+.charts-title-row h1 {
+  max-width: 860px;
+  margin-bottom: 0.75rem;
+  font-size: clamp(2.2rem, 5vw, 4.4rem);
+}
+
+.charts-title-mark {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(229, 228, 226, 0.38);
+  border-radius: 8px;
+  background:
+    var(--crypto-gradient),
+    rgba(229, 228, 226, 0.08);
+  color: #eef3f6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem;
+}
+
+.charts-single-grid {
+  display: grid;
+}
+
+.chart-selector-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.04);
+}
+
+.chart-selector-panel h2,
+.chart-selector-panel p {
+  margin-bottom: 0;
+}
+
+.chart-selector {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.chart-card {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.chart-card-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.chart-card-heading h2 {
+  margin-bottom: 0.3rem;
+  font-size: 1.2rem;
+}
+
+.chart-card-heading span,
+.chart-card-heading a {
+  color: var(--platinum-soft);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.chart-card-heading a {
+  flex: 0 0 auto;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.chart-card-heading a:hover {
+  color: #f8fbfc;
+  transform: translateY(-1px);
+}
+
+.chart-widget-shell {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: var(--chart-height);
+  min-height: 500px;
+  border: 1px solid rgba(229, 228, 226, 0.16);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(229, 228, 226, 0.08), transparent 34rem),
+    #050607;
+}
+
+.chart-widget-host,
+.chart-widget-host > div,
+.chart-widget-host iframe {
+  width: 100%;
+  height: 100%;
+}
+
+.chart-widget-host {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+
+.chart-widget-loader,
+.chart-widget-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  text-align: center;
+}
+
+.chart-widget-loader {
+  z-index: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.chart-widget-error {
+  z-index: 2;
+  gap: 0.35rem;
+  align-content: center;
+  border: 1px solid rgba(255, 107, 107, 0.28);
+  background: rgba(5, 6, 7, 0.94);
+  color: var(--danger);
+}
+
+.chart-widget-error span {
+  color: var(--platinum-soft);
+}
+
+.charts-learning-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.charts-learning-cta h2 {
+  margin-bottom: 0.45rem;
+}
+
+.charts-learning-cta p {
+  margin-bottom: 0;
 }
 
 .quiz-page {
@@ -1702,10 +1925,26 @@ select:focus {
   .site-header {
     grid-template-columns: minmax(0, 1fr) auto;
     min-height: 68px;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+  }
+
+  .brand {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .btc-ticker {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: fit-content;
+    min-width: 0;
   }
 
   .icon-button.menu-button {
     display: inline-flex;
+    grid-column: 2;
+    grid-row: 1;
     justify-self: end;
   }
 
@@ -1763,6 +2002,7 @@ select:focus {
   .dashboard-grid,
   .dashboard-grid.three,
   .admin-grid,
+  .charts-grid,
   .quiz-status-grid,
   .quiz-recommendation-grid,
   .course-hero,
@@ -1777,7 +2017,7 @@ select:focus {
 
 @media (max-width: 680px) {
   .site-header {
-    padding: 0 16px;
+    padding: 0.65rem 16px;
   }
 
   .brand {
@@ -1834,6 +2074,7 @@ select:focus {
   .dashboard-grid,
   .dashboard-grid.three,
   .admin-grid,
+  .charts-grid,
   .quiz-status-grid,
   .quiz-option-list,
   .quiz-recommendation-grid,
@@ -1855,14 +2096,29 @@ select:focus {
 
   .hero-actions,
   .inline-actions,
+  .chart-selector-panel,
+  .charts-learning-cta,
   .quiz-actions,
   .quiz-carousel-controls {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .chart-selector {
+    justify-content: stretch;
+  }
+
+  .chart-selector .filter-pill {
+    flex: 1 1 45%;
+  }
+
   .quiz-question-nav {
     grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .chart-widget-shell {
+    height: 440px;
+    min-height: 420px;
   }
 
   .quiz-result-score {

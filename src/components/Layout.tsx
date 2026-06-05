@@ -9,10 +9,12 @@ import {
   Menu,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   X
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { BtcTicker } from "./BtcTicker";
 import { useAuth } from "../contexts/AuthContext";
 import { applyRandomHoverCharts } from "../utils/hoverCharts";
 
@@ -20,6 +22,7 @@ const navItems = [
   { to: "/", label: "Home", icon: Sparkles },
   { to: "/guides", label: "Guides", icon: BookOpen },
   { to: "/courses", label: "Courses", icon: GraduationCap },
+  { to: "/charts", label: "Charts", icon: TrendingUp },
   { to: "/quiz", label: "Quiz", icon: BrainCircuit },
   { to: "/premium", label: "Premium", icon: Crown },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }
@@ -50,6 +53,8 @@ export function Layout() {
             <small>Crypto Education</small>
           </span>
         </Link>
+
+        <BtcTicker />
 
         <button
           className="icon-button menu-button"

@@ -9,6 +9,8 @@ const hoverTargetSelector = [
   ".access-panel",
   ".quiz-option",
   ".quiz-recommendation-card",
+  ".chart-card",
+  ".charts-learning-cta",
   ".risk-band",
   ".course-hero > div",
   ".primary-button",

@@ -15,6 +15,7 @@ import { Premium } from "./pages/Premium";
 import { Register } from "./pages/Register";
 import { ResetPassword } from "./pages/ResetPassword";
 
+const Charts = lazy(() => import("./pages/Charts").then((module) => ({ default: module.Charts })));
 const CryptoQuiz = lazy(() => import("./pages/CryptoQuiz").then((module) => ({ default: module.CryptoQuiz })));
 
 export default function App() {
@@ -25,6 +26,14 @@ export default function App() {
         <Route path="guides" element={<Guides />} />
         <Route path="courses" element={<Courses />} />
         <Route path="courses/:slug" element={<CourseDetail />} />
+        <Route
+          path="charts"
+          element={
+            <Suspense fallback={<LoadingState label="Loading charts" />}>
+              <Charts />
+            </Suspense>
+          }
+        />
         <Route
           path="quiz"
           element={
