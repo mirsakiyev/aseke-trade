@@ -14,6 +14,7 @@ import { NotFound } from "./pages/NotFound";
 import { Premium } from "./pages/Premium";
 import { Register } from "./pages/Register";
 import { ResetPassword } from "./pages/ResetPassword";
+import { Terms } from "./pages/Terms";
 
 const Charts = lazy(() => import("./pages/Charts").then((module) => ({ default: module.Charts })));
 const CryptoQuiz = lazy(() => import("./pages/CryptoQuiz").then((module) => ({ default: module.CryptoQuiz })));
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="premium" element={<Premium />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
+        <Route path="terms" element={<Terms />} />
         <Route path="reset-password" element={<ResetPassword />} />
         <Route
           path="dashboard"

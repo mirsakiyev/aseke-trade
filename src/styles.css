@@ -1764,6 +1764,36 @@ select:focus {
   min-height: 18px;
 }
 
+.terms-checkbox-label span {
+  line-height: 1.5;
+}
+
+.inline-form-link {
+  color: #eef3f6;
+  font-weight: 850;
+  text-decoration: underline;
+  text-decoration-color: rgba(229, 228, 226, 0.34);
+  text-underline-offset: 0.2rem;
+  transition:
+    color 160ms ease,
+    text-decoration-color 160ms ease;
+}
+
+.inline-form-link:hover {
+  color: #f8fbfc;
+  text-decoration-color: rgba(229, 228, 226, 0.74);
+}
+
+.terms-panel {
+  display: grid;
+  gap: 1rem;
+  max-width: 860px;
+}
+
+.terms-panel p {
+  margin-bottom: 0;
+}
+
 .form-error,
 .form-success {
   margin: 0;

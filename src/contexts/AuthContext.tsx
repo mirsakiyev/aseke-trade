@@ -18,7 +18,7 @@ interface AuthContextValue {
   isAdmin: boolean;
   isPremium: boolean;
   signIn: (email: string, password: string) => Promise<AuthActionResult>;
-  signUp: (fullName: string, email: string, password: string) => Promise<AuthActionResult>;
+  signUp: (fullName: string, email: string, password: string, termsAccepted: boolean) => Promise<AuthActionResult>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<AuthActionResult>;
   refreshProfile: () => Promise<void>;
@@ -121,7 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(
-    async (fullName: string, email: string, password: string): Promise<AuthActionResult> => {
+    async (
+      fullName: string,
+      email: string,
+      password: string,
+      termsAccepted: boolean
+    ): Promise<AuthActionResult> => {
       if (!supabase) {
         return { ok: false, message: "Connect Supabase environment variables before creating accounts." };
       }
@@ -132,13 +137,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!cleanedName) return { ok: false, message: "Full name is required." };
       if (emailError || passwordError) return { ok: false, message: emailError ?? passwordError };
+      if (!termsAccepted) return { ok: false, message: "You must accept the Terms of Agreement to continue." };
 
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
           data: {
-            full_name: cleanedName
+            full_name: cleanedName,
+            terms_accepted: true
           }
         }
       });

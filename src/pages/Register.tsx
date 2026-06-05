@@ -9,6 +9,7 @@ export function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,8 +25,13 @@ export function Register() {
       return;
     }
 
+    if (!termsAccepted) {
+      setMessage("You must accept the Terms of Agreement to continue.");
+      return;
+    }
+
     setIsSubmitting(true);
-    const result = await signUp(fullName, email, password);
+    const result = await signUp(fullName, email, password, termsAccepted);
     setIsSubmitting(false);
     setMessage(result.message);
     setIsSuccess(result.ok);
@@ -88,6 +94,20 @@ export function Register() {
               minLength={8}
               required
             />
+          </label>
+          <label className="checkbox-label terms-checkbox-label">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(event) => setTermsAccepted(event.target.checked)}
+            />
+            <span>
+              I agree to the ASEKE TRADE{" "}
+              <Link className="inline-form-link" to="/terms" onClick={(event) => event.stopPropagation()}>
+                Terms of Agreement
+              </Link>
+              .
+            </span>
           </label>
 
           {message && <p className={isSuccess ? "form-success" : "form-error"}>{message}</p>}

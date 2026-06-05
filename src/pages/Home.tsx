@@ -36,7 +36,7 @@ export function Home() {
             Learn crypto markets with a clean, disciplined framework for tutorials, trading strategy,
             risk management, futures education, and premium courses.
           </p>
-          <p className="founder-line">Founded by Aslan Mirsakiyev, aka Aseke.</p>
+          <p className="founder-line">Founded by Aslan Mirsakiyev</p>
 
           <div className="hero-actions" aria-label="Primary actions">
             <Link className="primary-button" to="/guides">
