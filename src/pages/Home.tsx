@@ -53,6 +53,24 @@ export function Home() {
         </div>
       </section>
 
+      <section className="page market-showcase">
+        <div className="market-image">
+          <img src="/assets/aseke-trade-hero.png" alt="Crypto market desk with Bitcoin and Ethereum coins" />
+        </div>
+        <div className="market-copy">
+          <p className="eyebrow">Market Discipline</p>
+          <h2>Read the setup before risking the trade</h2>
+          <p>
+            Study crypto markets through security, structure, leverage control, and repeatable review.
+          </p>
+          <div className="market-tags" aria-label="Market focus areas">
+            <span>BTC</span>
+            <span>ETH</span>
+            <span>RISK</span>
+          </div>
+        </div>
+      </section>
+
       <section className="page section-grid">
         <div className="section-heading">
           <p className="eyebrow">Curriculum</p>

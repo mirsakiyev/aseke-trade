@@ -10,9 +10,10 @@ import {
   Sparkles,
   X
 } from "lucide-react";
-import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { applyRandomHoverCharts } from "../utils/hoverCharts";
 
 const navItems = [
   { to: "/", label: "Home", icon: Sparkles },
@@ -24,9 +25,18 @@ const navItems = [
 
 export function Layout() {
   const { user, profile, isAdmin, signOut } = useAuth();
+  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const closeMenu = () => setMenuOpen(false);
+  const handleSignOut = () => {
+    closeMenu();
+    void signOut();
+  };
+
+  useEffect(() => {
+    return applyRandomHoverCharts();
+  }, [location.pathname, location.search]);
 
   return (
     <div className="app-shell">
@@ -39,12 +49,22 @@ export function Layout() {
           </span>
         </Link>
 
-        <button className="icon-button menu-button" type="button" onClick={() => setMenuOpen((open) => !open)}>
+        <button
+          className="icon-button menu-button"
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-controls="primary-navigation"
+          aria-expanded={menuOpen}
+        >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
           <span className="sr-only">Toggle navigation</span>
         </button>
 
-        <nav className={menuOpen ? "primary-nav open" : "primary-nav"} aria-label="Primary navigation">
+        <nav
+          className={menuOpen ? "primary-nav open" : "primary-nav"}
+          id="primary-navigation"
+          aria-label="Primary navigation"
+        >
           {navItems.map((item) => (
             <NavItem item={item} closeMenu={closeMenu} key={item.to} />
           ))}
@@ -55,16 +75,40 @@ export function Layout() {
               Admin
             </NavLink>
           )}
+
+          <div className="mobile-actions">
+            {user ? (
+              <>
+                <Link to="/dashboard" className="account-chip" onClick={closeMenu}>
+                  <LockKeyhole size={15} />
+                  <span>{profile?.role ?? "user"}</span>
+                </Link>
+                <button className="ghost-button compact" type="button" onClick={handleSignOut}>
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link className="ghost-button compact" to="/login" onClick={closeMenu}>
+                  Login
+                </Link>
+                <Link className="primary-button compact" to="/register" onClick={closeMenu}>
+                  Register
+                </Link>
+              </>
+            )}
+          </div>
         </nav>
 
-        <div className="account-actions">
+        <div className="account-actions desktop-actions">
           {user ? (
             <>
               <Link to="/dashboard" className="account-chip">
                 <LockKeyhole size={15} />
                 <span>{profile?.role ?? "user"}</span>
               </Link>
-              <button className="ghost-button compact" type="button" onClick={() => void signOut()}>
+              <button className="ghost-button compact" type="button" onClick={handleSignOut}>
                 <LogOut size={16} />
                 Logout
               </button>
