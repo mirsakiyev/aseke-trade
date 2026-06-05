@@ -5,6 +5,7 @@ const supabasePublishableKey = firstConfiguredEnvValue(
   import.meta.env.VITE_SUPABASE_ANON_KEY,
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 );
+export const supabaseProjectRef = getSupabaseProjectRef(supabaseUrl);
 
 function cleanEnvValue(value: string | undefined): string {
   return value?.trim() ?? "";
@@ -16,6 +17,15 @@ function firstConfiguredEnvValue(...values: Array<string | undefined>): string {
 
 function hasPlaceholder(value: string): boolean {
   return value.includes("your-project") || value.includes("your-supabase");
+}
+
+function getSupabaseProjectRef(value: string): string | null {
+  try {
+    const host = new URL(value).hostname;
+    return host.endsWith(".supabase.co") ? host.replace(".supabase.co", "") : host;
+  } catch {
+    return null;
+  }
 }
 
 function validateSupabaseUrl(value: string): string | null {

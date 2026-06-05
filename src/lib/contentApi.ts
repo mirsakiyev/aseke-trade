@@ -1,6 +1,6 @@
 import { sampleCourses, sampleGuides } from "../data/sampleContent";
 import type { Course, CourseModule, Guide, Lesson } from "../types/content";
-import { supabase, supabaseConfigError } from "./supabase";
+import { supabase, supabaseConfigError, supabaseProjectRef } from "./supabase";
 
 type ContentSource = "supabase" | "sample";
 
@@ -11,7 +11,11 @@ export interface ContentResult<T> {
 }
 
 function missingSupabaseMessage(): string {
-  return `${supabaseConfigError ?? "Supabase environment variables are not available in this build."} If you just changed them, restart the dev server or redeploy Netlify.`;
+  return `${supabaseConfigError ?? "Supabase environment variables are not available in this build."} ${projectRefMessage()} If you just changed them, restart the dev server or redeploy Netlify.`;
+}
+
+function projectRefMessage(): string {
+  return supabaseProjectRef ? `Project ref: ${supabaseProjectRef}.` : "Project ref unavailable.";
 }
 
 function maskSensitiveValues(value: string): string {
@@ -46,7 +50,8 @@ function errorDetail(error: unknown): string {
 
 function withErrorDetail(message: string, error: unknown): string {
   const detail = errorDetail(error);
-  return detail ? `${message} ${detail}` : message;
+  const ref = projectRefMessage();
+  return detail ? `${message} ${ref} ${detail}` : `${message} ${ref}`;
 }
 
 function contentLoadError(contentName: string, error: unknown): string {
