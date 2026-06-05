@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  BrainCircuit,
   Crown,
   GraduationCap,
   LayoutDashboard,
@@ -19,6 +20,7 @@ const navItems = [
   { to: "/", label: "Home", icon: Sparkles },
   { to: "/guides", label: "Guides", icon: BookOpen },
   { to: "/courses", label: "Courses", icon: GraduationCap },
+  { to: "/quiz", label: "Quiz", icon: BrainCircuit },
   { to: "/premium", label: "Premium", icon: Crown },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }
 ];

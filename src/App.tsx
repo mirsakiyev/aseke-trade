@@ -1,5 +1,7 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { LoadingState } from "./components/LoadingState";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Admin } from "./pages/Admin";
 import { CourseDetail } from "./pages/CourseDetail";
@@ -13,6 +15,8 @@ import { Premium } from "./pages/Premium";
 import { Register } from "./pages/Register";
 import { ResetPassword } from "./pages/ResetPassword";
 
+const CryptoQuiz = lazy(() => import("./pages/CryptoQuiz").then((module) => ({ default: module.CryptoQuiz })));
+
 export default function App() {
   return (
     <Routes>
@@ -21,6 +25,14 @@ export default function App() {
         <Route path="guides" element={<Guides />} />
         <Route path="courses" element={<Courses />} />
         <Route path="courses/:slug" element={<CourseDetail />} />
+        <Route
+          path="quiz"
+          element={
+            <Suspense fallback={<LoadingState label="Loading quiz" />}>
+              <CryptoQuiz />
+            </Suspense>
+          }
+        />
         <Route path="premium" element={<Premium />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />

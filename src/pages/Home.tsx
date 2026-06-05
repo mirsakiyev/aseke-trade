@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, Crown, GraduationCap, ShieldAlert, TrendingUp } from "lucide-react";
+import { ArrowRight, BookOpen, BrainCircuit, Crown, GraduationCap, ShieldAlert, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const learningAreas = [
@@ -45,6 +45,10 @@ export function Home() {
             </Link>
             <Link className="ghost-button" to="/courses">
               View Courses
+            </Link>
+            <Link className="ghost-button" to="/quiz">
+              Take Quiz
+              <BrainCircuit size={18} />
             </Link>
             <Link className="platinum-button" to="/premium">
               Join Premium

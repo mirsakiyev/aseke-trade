@@ -7,6 +7,8 @@ const hoverTargetSelector = [
   ".section-panel",
   ".module-card",
   ".access-panel",
+  ".quiz-option",
+  ".quiz-recommendation-card",
   ".risk-band",
   ".course-hero > div",
   ".primary-button",

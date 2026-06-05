@@ -8,7 +8,7 @@ export const GUIDE_CATEGORIES = [
   "Advanced Concepts"
 ] as const;
 
-export const DIFFICULTIES = ["Beginner", "Intermediate", "Advanced"] as const;
+export const DIFFICULTIES = ["Beginner", "Intermediate", "Advanced", "Expert"] as const;
 
 export type GuideCategory = (typeof GUIDE_CATEGORIES)[number];
 export type Difficulty = (typeof DIFFICULTIES)[number];
