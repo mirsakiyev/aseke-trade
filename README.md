@@ -38,8 +38,7 @@ ASEKE TRADE is a premium crypto education platform founded by Aslan Mirsakiyev, 
    connection string, pooler URL, or Postgres host. Use the publishable key for browser code, never
    an `sb_secret_...` key.
 
-   `VITE_SUPABASE_ANON_KEY` is still supported for older Supabase projects, but new Supabase
-   projects should use the publishable key.
+   `VITE_SUPABASE_ANON_KEY` is also supported and takes precedence when both key variables are set.
 
 4. Start the app:
 
@@ -129,9 +128,9 @@ To add Stripe or another provider later:
    `VITE_SUPABASE_URL` must be the Project API URL from Supabase's API settings, not the database
    URL from the Database settings page.
 
-   If you already use `VITE_SUPABASE_ANON_KEY`, the app still accepts it as a fallback. After
-   changing Netlify environment variables, trigger a fresh deploy so Vite can bake them into the
-   frontend bundle.
+   If you already use `VITE_SUPABASE_ANON_KEY`, the app accepts it and prefers it when both key
+   variables are set. After changing Netlify environment variables, trigger a fresh deploy so Vite
+   can bake them into the frontend bundle.
 5. Keep secret payment provider keys out of Vite variables.
 
 The `netlify.toml` file includes the redirect needed for React Router.
@@ -155,7 +154,8 @@ public/assets/       Generated project visuals
 ## Security Notes
 
 - Do not hardcode secrets.
-- Use only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in browser code.
+- Use only `VITE_SUPABASE_URL` and one public Supabase browser key variable in browser code.
+  `VITE_SUPABASE_ANON_KEY` is preferred when both key variables are set.
 - Never trust frontend-only authorization.
 - Keep Row Level Security enabled on all Supabase tables.
 - Use service role keys only in secure server-side functions.
