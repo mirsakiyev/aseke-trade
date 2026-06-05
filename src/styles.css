@@ -288,9 +288,8 @@ p {
   min-height: min(720px, calc(100svh - 72px));
   display: grid;
   align-items: center;
-  background-image: url("/assets/aseke-trade-hero.png");
-  background-position: center right;
-  background-size: cover;
+  overflow: hidden;
+  background: #050607;
   border-bottom: 1px solid var(--line);
 }
 
@@ -299,7 +298,9 @@ p {
   inset: 0;
   z-index: -2;
   content: "";
-  background: #050607;
+  background-image: url("/assets/aseke-trade-hero.png");
+  background-position: center right;
+  background-size: cover;
 }
 
 .hero-overlay {
@@ -307,8 +308,8 @@ p {
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(90deg, rgba(5, 6, 7, 0.98) 0%, rgba(5, 6, 7, 0.84) 34%, rgba(5, 6, 7, 0.2) 72%),
-    linear-gradient(180deg, rgba(5, 6, 7, 0.22), rgba(5, 6, 7, 0.82));
+    linear-gradient(90deg, rgba(5, 6, 7, 0.96) 0%, rgba(5, 6, 7, 0.76) 36%, rgba(5, 6, 7, 0.1) 78%),
+    linear-gradient(180deg, rgba(5, 6, 7, 0.12), rgba(5, 6, 7, 0.72));
 }
 
 .hero-content {
@@ -966,13 +967,16 @@ select:focus {
 
   .hero {
     min-height: auto;
-    background-position: 62% center;
+  }
+
+  .hero::before {
+    background-position: 76% center;
   }
 
   .hero-overlay {
     background:
-      linear-gradient(90deg, rgba(5, 6, 7, 0.98), rgba(5, 6, 7, 0.72)),
-      linear-gradient(180deg, rgba(5, 6, 7, 0.18), rgba(5, 6, 7, 0.9));
+      linear-gradient(90deg, rgba(5, 6, 7, 0.86), rgba(5, 6, 7, 0.44)),
+      linear-gradient(180deg, rgba(5, 6, 7, 0.24), rgba(5, 6, 7, 0.9));
   }
 
   .hero-content {

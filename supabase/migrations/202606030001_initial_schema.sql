@@ -320,85 +320,104 @@ alter table public.purchases enable row level security;
 alter table public.saved_guides enable row level security;
 alter table public.lesson_progress enable row level security;
 
+drop policy if exists "profiles_select_owner_or_admin" on public.profiles;
 create policy "profiles_select_owner_or_admin"
 on public.profiles for select
 using (id = auth.uid() or public.is_admin());
 
+drop policy if exists "profiles_update_owner_or_admin" on public.profiles;
 create policy "profiles_update_owner_or_admin"
 on public.profiles for update
 using (id = auth.uid() or public.is_admin())
 with check (id = auth.uid() or public.is_admin());
 
+drop policy if exists "guides_select_by_access" on public.guides;
 create policy "guides_select_by_access"
 on public.guides for select
 using (public.can_access_guide(id));
 
+drop policy if exists "guides_admin_manage" on public.guides;
 create policy "guides_admin_manage"
 on public.guides for all
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "courses_select_catalog_metadata" on public.courses;
 create policy "courses_select_catalog_metadata"
 on public.courses for select
 using (true);
 
+drop policy if exists "courses_admin_manage" on public.courses;
 create policy "courses_admin_manage"
 on public.courses for all
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "course_modules_select_catalog_metadata" on public.course_modules;
 create policy "course_modules_select_catalog_metadata"
 on public.course_modules for select
 using (true);
 
+drop policy if exists "course_modules_admin_manage" on public.course_modules;
 create policy "course_modules_admin_manage"
 on public.course_modules for all
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "lessons_select_by_access" on public.lessons;
 create policy "lessons_select_by_access"
 on public.lessons for select
 using (public.can_access_lesson(id));
 
+drop policy if exists "lessons_admin_manage" on public.lessons;
 create policy "lessons_admin_manage"
 on public.lessons for all
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "purchases_select_owner_or_admin" on public.purchases;
 create policy "purchases_select_owner_or_admin"
 on public.purchases for select
 using (user_id = auth.uid() or public.is_admin());
 
+drop policy if exists "purchases_admin_manage" on public.purchases;
 create policy "purchases_admin_manage"
 on public.purchases for all
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "saved_guides_owner_select" on public.saved_guides;
 create policy "saved_guides_owner_select"
 on public.saved_guides for select
 using (user_id = auth.uid() or public.is_admin());
 
+drop policy if exists "saved_guides_owner_insert" on public.saved_guides;
 create policy "saved_guides_owner_insert"
 on public.saved_guides for insert
 with check (user_id = auth.uid() and public.can_access_guide(guide_id));
 
+drop policy if exists "saved_guides_owner_delete" on public.saved_guides;
 create policy "saved_guides_owner_delete"
 on public.saved_guides for delete
 using (user_id = auth.uid() or public.is_admin());
 
+drop policy if exists "lesson_progress_owner_select" on public.lesson_progress;
 create policy "lesson_progress_owner_select"
 on public.lesson_progress for select
 using (user_id = auth.uid() or public.is_admin());
 
+drop policy if exists "lesson_progress_owner_insert" on public.lesson_progress;
 create policy "lesson_progress_owner_insert"
 on public.lesson_progress for insert
 with check (user_id = auth.uid() and public.can_access_lesson(lesson_id));
 
+drop policy if exists "lesson_progress_owner_update" on public.lesson_progress;
 create policy "lesson_progress_owner_update"
 on public.lesson_progress for update
 using (user_id = auth.uid() or public.is_admin())
 with check ((user_id = auth.uid() and public.can_access_lesson(lesson_id)) or public.is_admin());
 
+drop policy if exists "lesson_progress_owner_delete" on public.lesson_progress;
 create policy "lesson_progress_owner_delete"
 on public.lesson_progress for delete
 using (user_id = auth.uid() or public.is_admin());
@@ -406,3 +425,5 @@ using (user_id = auth.uid() or public.is_admin());
 grant usage on schema public to anon, authenticated;
 grant select on public.guides, public.courses, public.course_modules, public.lessons to anon;
 grant select, insert, update, delete on all tables in schema public to authenticated;
+
+notify pgrst, 'reload schema';
