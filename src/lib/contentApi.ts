@@ -14,6 +14,41 @@ function missingSupabaseMessage(): string {
   return `${supabaseConfigError ?? "Supabase environment variables are not available in this build."} If you just changed them, restart the dev server or redeploy Netlify.`;
 }
 
+function maskSensitiveValues(value: string): string {
+  return value
+    .replace(/sb_publishable_[A-Za-z0-9._-]+/g, "sb_publishable_...")
+    .replace(/sb_secret_[A-Za-z0-9._-]+/g, "sb_secret_...")
+    .replace(/eyJ[A-Za-z0-9._-]+/g, "eyJ...");
+}
+
+function errorDetail(error: unknown): string {
+  if (typeof error !== "object" || error === null) return "";
+
+  const supabaseError = error as {
+    code?: unknown;
+    details?: unknown;
+    hint?: unknown;
+    message?: unknown;
+    name?: unknown;
+  };
+  const parts = [
+    supabaseError.code,
+    supabaseError.message,
+    supabaseError.details,
+    supabaseError.hint,
+    supabaseError.name
+  ]
+    .map((part) => (typeof part === "string" ? maskSensitiveValues(part.trim()) : ""))
+    .filter(Boolean);
+
+  return [...new Set(parts)].join(" ").slice(0, 420);
+}
+
+function withErrorDetail(message: string, error: unknown): string {
+  const detail = errorDetail(error);
+  return detail ? `${message} ${detail}` : message;
+}
+
 function contentLoadError(contentName: string, error: unknown): string {
   const message =
     typeof error === "object" && error !== null && "message" in error
@@ -22,22 +57,25 @@ function contentLoadError(contentName: string, error: unknown): string {
   const lowerMessage = message.toLowerCase();
 
   if (lowerMessage.includes("failed to fetch")) {
-    return `Supabase ${contentName} could not be reached. Showing sample ${contentName}.`;
+    return withErrorDetail(`Supabase ${contentName} could not be reached. Showing sample ${contentName}.`, error);
   }
 
   if (lowerMessage.includes("invalid jwt") || lowerMessage.includes("invalid api key")) {
-    return `Supabase rejected the public API key. Showing sample ${contentName}.`;
+    return withErrorDetail(`Supabase rejected the public API key. Showing sample ${contentName}.`, error);
   }
 
   if (lowerMessage.includes("relationship")) {
-    return `Supabase ${contentName} query does not match the database schema. Showing sample ${contentName}.`;
+    return withErrorDetail(
+      `Supabase ${contentName} query does not match the database schema. Showing sample ${contentName}.`,
+      error
+    );
   }
 
   if (lowerMessage.includes("permission denied") || lowerMessage.includes("row-level security")) {
-    return `Supabase permissions blocked ${contentName}. Showing sample ${contentName}.`;
+    return withErrorDetail(`Supabase permissions blocked ${contentName}. Showing sample ${contentName}.`, error);
   }
 
-  return `Supabase ${contentName} could not be loaded. Showing sample ${contentName}.`;
+  return withErrorDetail(`Supabase ${contentName} could not be loaded. Showing sample ${contentName}.`, error);
 }
 
 function logContentError(contentName: string, error: unknown): void {
