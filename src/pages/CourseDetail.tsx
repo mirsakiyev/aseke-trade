@@ -22,7 +22,7 @@ export function CourseDetail() {
     loadCourseBySlug(slug ?? "").then((result) => {
       if (!mounted) return;
       setCourse(result.data);
-      setNotice(result.source === "sample" ? "Showing sample course content until Supabase is connected." : result.error);
+      setNotice(result.error);
       setIsLoading(false);
     });
 

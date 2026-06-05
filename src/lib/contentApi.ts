@@ -1,7 +1,6 @@
 import { sampleCourses, sampleGuides } from "../data/sampleContent";
 import type { Course, CourseModule, Guide, Lesson } from "../types/content";
-import { supabase } from "./supabase";
-import { safeErrorMessage } from "./validation";
+import { supabase, supabaseConfigError } from "./supabase";
 
 type ContentSource = "supabase" | "sample";
 
@@ -9,6 +8,40 @@ export interface ContentResult<T> {
   data: T;
   source: ContentSource;
   error: string | null;
+}
+
+function missingSupabaseMessage(): string {
+  return `${supabaseConfigError ?? "Supabase environment variables are not available in this build."} If you just changed them, restart the dev server or redeploy Netlify.`;
+}
+
+function contentLoadError(contentName: string, error: unknown): string {
+  const message =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : "";
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes("failed to fetch")) {
+    return `Supabase ${contentName} could not be reached. Showing sample ${contentName}.`;
+  }
+
+  if (lowerMessage.includes("invalid jwt") || lowerMessage.includes("invalid api key")) {
+    return `Supabase rejected the public API key. Showing sample ${contentName}.`;
+  }
+
+  if (lowerMessage.includes("relationship")) {
+    return `Supabase ${contentName} query does not match the database schema. Showing sample ${contentName}.`;
+  }
+
+  if (lowerMessage.includes("permission denied") || lowerMessage.includes("row-level security")) {
+    return `Supabase permissions blocked ${contentName}. Showing sample ${contentName}.`;
+  }
+
+  return `Supabase ${contentName} could not be loaded. Showing sample ${contentName}.`;
+}
+
+function logContentError(contentName: string, error: unknown): void {
+  console.warn(`Supabase ${contentName} load failed`, error);
 }
 
 function sortLessons(lessons: Lesson[]): Lesson[] {
@@ -32,7 +65,7 @@ function normalizeCourse(row: Record<string, unknown>): Course {
 
 export async function loadGuides(): Promise<ContentResult<Guide[]>> {
   if (!supabase) {
-    return { data: sampleGuides, source: "sample", error: null };
+    return { data: sampleGuides, source: "sample", error: missingSupabaseMessage() };
   }
 
   const { data, error } = await supabase
@@ -43,7 +76,8 @@ export async function loadGuides(): Promise<ContentResult<Guide[]>> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return { data: sampleGuides, source: "sample", error: safeErrorMessage(error) };
+    logContentError("guides", error);
+    return { data: sampleGuides, source: "sample", error: contentLoadError("guides", error) };
   }
 
   return { data: (data ?? []) as Guide[], source: "supabase", error: null };
@@ -51,7 +85,7 @@ export async function loadGuides(): Promise<ContentResult<Guide[]>> {
 
 export async function loadCourses(): Promise<ContentResult<Course[]>> {
   if (!supabase) {
-    return { data: sampleCourses, source: "sample", error: null };
+    return { data: sampleCourses, source: "sample", error: missingSupabaseMessage() };
   }
 
   const { data, error } = await supabase
@@ -62,7 +96,8 @@ export async function loadCourses(): Promise<ContentResult<Course[]>> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return { data: sampleCourses, source: "sample", error: safeErrorMessage(error) };
+    logContentError("courses", error);
+    return { data: sampleCourses, source: "sample", error: contentLoadError("courses", error) };
   }
 
   return {
@@ -77,7 +112,7 @@ export async function loadCourseBySlug(slug: string): Promise<ContentResult<Cour
     return {
       data: sampleCourses.find((course) => course.slug === slug) ?? null,
       source: "sample",
-      error: null
+      error: missingSupabaseMessage()
     };
   }
 
@@ -90,10 +125,11 @@ export async function loadCourseBySlug(slug: string): Promise<ContentResult<Cour
     .maybeSingle();
 
   if (error) {
+    logContentError("course", error);
     return {
       data: sampleCourses.find((course) => course.slug === slug) ?? null,
       source: "sample",
-      error: safeErrorMessage(error)
+      error: contentLoadError("course", error)
     };
   }
 

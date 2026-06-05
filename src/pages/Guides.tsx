@@ -22,7 +22,7 @@ export function Guides() {
     loadGuides().then((result) => {
       if (!mounted) return;
       setGuides(result.data);
-      setNotice(result.source === "sample" ? "Showing sample curriculum until Supabase is connected." : result.error);
+      setNotice(result.error);
       setIsLoading(false);
     });
 

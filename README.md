@@ -31,8 +31,11 @@ ASEKE TRADE is a premium crypto education platform founded by Aslan Mirsakiyev, 
 
    ```bash
    VITE_SUPABASE_URL=your-supabase-project-url
-   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+   VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
    ```
+
+   `VITE_SUPABASE_ANON_KEY` is still supported for older Supabase projects, but new Supabase
+   projects should use the publishable key.
 
 4. Start the app:
 
@@ -116,8 +119,12 @@ To add Stripe or another provider later:
    - Publish directory: `dist`
 4. Add environment variables in Netlify:
    - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
    - Future public payment key only if needed
+
+   If you already use `VITE_SUPABASE_ANON_KEY`, the app still accepts it as a fallback. After
+   changing Netlify environment variables, trigger a fresh deploy so Vite can bake them into the
+   frontend bundle.
 5. Keep secret payment provider keys out of Vite variables.
 
 The `netlify.toml` file includes the redirect needed for React Router.

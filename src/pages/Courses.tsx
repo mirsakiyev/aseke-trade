@@ -17,7 +17,7 @@ export function Courses() {
     loadCourses().then((result) => {
       if (!mounted) return;
       setCourses(result.data);
-      setNotice(result.source === "sample" ? "Showing sample courses until Supabase is connected." : result.error);
+      setNotice(result.error);
       setIsLoading(false);
     });
 
