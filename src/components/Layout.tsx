@@ -47,7 +47,9 @@ export function Layout() {
     <div className="app-shell">
       <header className="site-header">
         <Link to="/" className="brand" onClick={closeMenu} aria-label="ASEKE TRADE home">
-          <span className="brand-mark">AT</span>
+          <span className="brand-mark" aria-hidden="true">
+            <img src="/assets/aseke-trade-logo.png" alt="" />
+          </span>
           <span>
             <strong>ASEKE TRADE</strong>
             <small>Crypto Education</small>
@@ -137,7 +139,10 @@ export function Layout() {
 
       <footer className="site-footer">
         <div>
-          <strong>ASEKE TRADE</strong>
+          <div className="footer-brand-line">
+            <img src="/assets/aseke-trade-logo.png" alt="" aria-hidden="true" />
+            <strong>ASEKE TRADE</strong>
+          </div>
           <p>Founded by Aslan Mirsakiyev, aka Aseke.</p>
         </div>
         <p>
