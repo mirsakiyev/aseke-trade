@@ -4,7 +4,33 @@ import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
-import type { LessonProgress, Purchase, SavedGuide } from "../types/content";
+import type { Guide, Lesson, LessonProgress, Purchase, SavedGuide } from "../types/content";
+
+type MaybeArray<T> = T | T[] | null | undefined;
+type SavedGuideRow = Omit<SavedGuide, "guides"> & {
+  guides?: MaybeArray<Pick<Guide, "title" | "slug" | "category">>;
+};
+type LessonProgressRow = Omit<LessonProgress, "lessons"> & {
+  lessons?: MaybeArray<Pick<Lesson, "title">>;
+};
+
+function firstRelation<T>(relation: MaybeArray<T>): T | null {
+  return Array.isArray(relation) ? relation[0] ?? null : relation ?? null;
+}
+
+function normalizeSavedGuide(row: SavedGuideRow): SavedGuide {
+  return {
+    ...row,
+    guides: firstRelation(row.guides)
+  };
+}
+
+function normalizeLessonProgress(row: LessonProgressRow): LessonProgress {
+  return {
+    ...row,
+    lessons: firstRelation(row.lessons)
+  };
+}
 
 export function Dashboard() {
   const { user, profile, isPremium, isAdmin } = useAuth();
@@ -44,8 +70,8 @@ export function Dashboard() {
       }
 
       setPurchases((purchaseResult.data ?? []) as Purchase[]);
-      setSavedGuides((savedResult.data ?? []) as SavedGuide[]);
-      setProgress((progressResult.data ?? []) as LessonProgress[]);
+      setSavedGuides(((savedResult.data ?? []) as SavedGuideRow[]).map(normalizeSavedGuide));
+      setProgress(((progressResult.data ?? []) as LessonProgressRow[]).map(normalizeLessonProgress));
       setIsLoading(false);
     });
 
