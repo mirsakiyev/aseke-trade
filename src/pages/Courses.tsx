@@ -33,7 +33,7 @@ export function Courses() {
           <p className="eyebrow">Courses</p>
           <h1>Structured paths for market education</h1>
           <p className="muted">
-            Preview free lessons, then unlock premium modules through verified Supabase access records.
+            Follow five clear learning paths, from crypto basics through advanced trading, DeFi, and development.
           </p>
         </div>
         <Link className="platinum-button" to="/premium">
@@ -63,7 +63,11 @@ export function Courses() {
               <p>{course.description}</p>
               <div className="card-meta">
                 <span>{formatMoney(course.price_cents)}</span>
-                <span>{course.modules.reduce((count, module) => count + module.lessons.length, 0)} lessons</span>
+                <span>
+                  {course.guides.length > 0
+                    ? `${course.guides.length} guides`
+                    : `${course.modules.reduce((count, module) => count + module.lessons.length, 0)} lessons`}
+                </span>
               </div>
               <Link className="text-link" to={`/courses/${course.slug}`}>
                 View course

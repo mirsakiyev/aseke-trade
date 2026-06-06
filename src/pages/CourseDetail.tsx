@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, LockKeyhole, PlayCircle } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, LockKeyhole, PlayCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
@@ -54,6 +54,8 @@ export function CourseDetail() {
     if (!course) return false;
     return !course.is_premium || isAdmin || isPremium || purchasedCourseIds.has(course.id);
   }, [course, isAdmin, isPremium, purchasedCourseIds]);
+
+  const courseGuides = course?.guides ?? [];
 
   const markLessonComplete = async (lessonId: string) => {
     if (!supabase || !user) {
@@ -117,7 +119,7 @@ export function CourseDetail() {
             <h2>{user ? "Premium access required" : "Login to continue"}</h2>
             <p>
               {user
-                ? "Your account needs premium status or a verified course purchase to unlock the protected lessons."
+                ? "Your account needs premium status or a verified course purchase to unlock the protected guides."
                 : "Create an account or sign in to track progress and unlock eligible premium content."}
             </p>
             <div className="inline-actions">
@@ -144,47 +146,85 @@ export function CourseDetail() {
       {notice && <p className="soft-notice">{notice}</p>}
 
       <section className="module-list">
-        {course.modules.map((module) => (
-          <article className="module-card" key={module.id}>
+        {courseGuides.length > 0 ? (
+          <article className="module-card">
             <div className="module-heading">
-              <span>Module {module.sort_order}</span>
-              <h2>{module.title}</h2>
+              <span>{courseGuides.length} guides</span>
+              <h2>Course guide list</h2>
             </div>
             <div className="lesson-list">
-              {module.lessons.map((lesson) => {
-                const locked = lesson.is_premium && !lesson.is_preview && !hasAccess;
+              {courseGuides.map((guide) => {
+                const locked = (guide.is_premium || course.is_premium) && !hasAccess;
                 return (
-                  <div className={locked ? "lesson-row locked" : "lesson-row"} key={lesson.id}>
+                  <div className={locked ? "lesson-row locked" : "lesson-row"} key={guide.id}>
                     <div className="lesson-icon">
-                      {locked ? <LockKeyhole size={18} /> : lesson.is_preview ? <PlayCircle size={18} /> : <CheckCircle2 size={18} />}
+                      {locked ? <LockKeyhole size={18} /> : <BookOpen size={18} />}
                     </div>
                     <div>
                       <div className="lesson-title-line">
-                        <h3>{lesson.title}</h3>
-                        {lesson.is_preview && <span className="status-pill free">Preview</span>}
-                        {lesson.is_premium && !lesson.is_preview && <span className="status-pill premium">Premium</span>}
+                        <h3>{guide.title}</h3>
+                        <span className={locked || guide.is_premium ? "status-pill premium" : "status-pill free"}>
+                          {locked ? "Locked" : guide.is_premium ? "Premium" : "Free"}
+                        </span>
                       </div>
                       <p>
                         {locked
-                          ? "This lesson is locked until your account has premium access or a verified purchase."
-                          : lesson.content}
+                          ? "This guide is part of the premium Trading Academy path."
+                          : guide.description}
                       </p>
-                      {!locked && user && (
-                        <button
-                          className="ghost-button compact"
-                          type="button"
-                          onClick={() => void markLessonComplete(lesson.id)}
-                        >
-                          Mark Complete
-                        </button>
-                      )}
+                      <Link className="ghost-button compact" to={`/guides/${guide.slug}`}>
+                        {locked ? "View Access" : "Open Guide"}
+                        <ArrowRight size={16} />
+                      </Link>
                     </div>
                   </div>
                 );
               })}
             </div>
           </article>
-        ))}
+        ) : (
+          course.modules.map((module) => (
+            <article className="module-card" key={module.id}>
+              <div className="module-heading">
+                <span>Module {module.sort_order}</span>
+                <h2>{module.title}</h2>
+              </div>
+              <div className="lesson-list">
+                {module.lessons.map((lesson) => {
+                  const locked = lesson.is_premium && !lesson.is_preview && !hasAccess;
+                  return (
+                    <div className={locked ? "lesson-row locked" : "lesson-row"} key={lesson.id}>
+                      <div className="lesson-icon">
+                        {locked ? <LockKeyhole size={18} /> : lesson.is_preview ? <PlayCircle size={18} /> : <CheckCircle2 size={18} />}
+                      </div>
+                      <div>
+                        <div className="lesson-title-line">
+                          <h3>{lesson.title}</h3>
+                          {lesson.is_preview && <span className="status-pill free">Preview</span>}
+                          {lesson.is_premium && !lesson.is_preview && <span className="status-pill premium">Premium</span>}
+                        </div>
+                        <p>
+                          {locked
+                            ? "This lesson is locked until your account has premium access or a verified purchase."
+                            : lesson.content}
+                        </p>
+                        {!locked && user && (
+                          <button
+                            className="ghost-button compact"
+                            type="button"
+                            onClick={() => void markLessonComplete(lesson.id)}
+                          >
+                            Mark Complete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          ))
+        )}
       </section>
     </main>
   );

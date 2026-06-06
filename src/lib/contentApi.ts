@@ -97,12 +97,28 @@ function sortModules(modules: CourseModule[]): CourseModule[] {
     .map((module) => ({ ...module, lessons: sortLessons(module.lessons ?? []) }));
 }
 
-function normalizeCourse(row: Record<string, unknown>): Course {
-  const modules = ((row.course_modules as CourseModule[] | undefined) ?? row.modules ?? []) as CourseModule[];
+function sortGuides(guides: Guide[]): Guide[] {
+  return [...guides].sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
+}
+
+function normalizeGuide(row: Record<string, unknown>): Guide {
+  const courseValue = row.course ?? row.courses ?? null;
+  const course = Array.isArray(courseValue) ? courseValue[0] ?? null : courseValue;
 
   return {
-    ...(row as unknown as Omit<Course, "modules">),
-    modules: sortModules(modules)
+    ...(row as unknown as Omit<Guide, "course">),
+    course: course as Guide["course"]
+  };
+}
+
+function normalizeCourse(row: Record<string, unknown>): Course {
+  const modules = ((row.course_modules as CourseModule[] | undefined) ?? row.modules ?? []) as CourseModule[];
+  const guides = ((row.guides as Record<string, unknown>[] | undefined) ?? []).map(normalizeGuide);
+
+  return {
+    ...(row as unknown as Omit<Course, "modules" | "guides">),
+    modules: sortModules(modules),
+    guides: sortGuides(guides)
   };
 }
 
@@ -114,16 +130,18 @@ export async function loadGuides(): Promise<ContentResult<Guide[]>> {
   const { data, error } = await supabase
     .from("guides")
     .select(
-      "id,title,slug,description,content,category,difficulty,estimated_read_time,is_premium,created_by,created_at,updated_at"
+      "id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,is_premium,is_archived,sort_order,created_by,created_at,updated_at,course:courses(id,title,slug,is_premium)"
     )
-    .order("created_at", { ascending: false });
+    .eq("is_archived", false)
+    .order("sort_order", { ascending: true })
+    .order("title", { ascending: true });
 
   if (error) {
     logContentError("guides", error);
     return { data: sampleGuides, source: "sample", error: contentLoadError("guides", error) };
   }
 
-  return { data: (data ?? []) as Guide[], source: "supabase", error: null };
+  return { data: sortGuides(((data ?? []) as unknown as Record<string, unknown>[]).map(normalizeGuide)), source: "supabase", error: null };
 }
 
 export async function loadCourses(): Promise<ContentResult<Course[]>> {
@@ -134,9 +152,12 @@ export async function loadCourses(): Promise<ContentResult<Course[]>> {
   const { data, error } = await supabase
     .from("courses")
     .select(
-      "id,title,slug,description,difficulty,price_cents,is_premium,created_at,updated_at,course_modules(id,course_id,title,sort_order,created_at,lessons(id,module_id,title,content,video_url,sort_order,is_preview,is_premium,created_at,updated_at))"
+      "id,title,slug,description,difficulty,price_cents,is_premium,is_archived,sort_order,created_at,updated_at,guides(id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,is_premium,is_archived,sort_order,created_by,created_at,updated_at),course_modules(id,course_id,title,sort_order,created_at,lessons(id,module_id,title,content,video_url,sort_order,is_preview,is_premium,created_at,updated_at))"
     )
-    .order("created_at", { ascending: false });
+    .eq("is_archived", false)
+    .eq("guides.is_archived", false)
+    .order("sort_order", { ascending: true })
+    .order("title", { ascending: true });
 
   if (error) {
     logContentError("courses", error);
@@ -162,9 +183,11 @@ export async function loadCourseBySlug(slug: string): Promise<ContentResult<Cour
   const { data, error } = await supabase
     .from("courses")
     .select(
-      "id,title,slug,description,difficulty,price_cents,is_premium,created_at,updated_at,course_modules(id,course_id,title,sort_order,created_at,lessons(id,module_id,title,content,video_url,sort_order,is_preview,is_premium,created_at,updated_at))"
+      "id,title,slug,description,difficulty,price_cents,is_premium,is_archived,sort_order,created_at,updated_at,guides(id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,is_premium,is_archived,sort_order,created_by,created_at,updated_at),course_modules(id,course_id,title,sort_order,created_at,lessons(id,module_id,title,content,video_url,sort_order,is_preview,is_premium,created_at,updated_at))"
     )
     .eq("slug", slug)
+    .eq("is_archived", false)
+    .eq("guides.is_archived", false)
     .maybeSingle();
 
   if (error) {
@@ -183,6 +206,40 @@ export async function loadCourseBySlug(slug: string): Promise<ContentResult<Cour
   };
 }
 
+export async function loadGuideBySlug(slug: string): Promise<ContentResult<Guide | null>> {
+  if (!supabase) {
+    return {
+      data: sampleGuides.find((guide) => guide.slug === slug) ?? null,
+      source: "sample",
+      error: missingSupabaseMessage()
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("guides")
+    .select(
+      "id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,is_premium,is_archived,sort_order,created_by,created_at,updated_at,course:courses(id,title,slug,is_premium)"
+    )
+    .eq("slug", slug)
+    .eq("is_archived", false)
+    .maybeSingle();
+
+  if (error) {
+    logContentError("guide", error);
+    return {
+      data: sampleGuides.find((guide) => guide.slug === slug) ?? null,
+      source: "sample",
+      error: contentLoadError("guide", error)
+    };
+  }
+
+  return {
+    data: data ? normalizeGuide(data as unknown as Record<string, unknown>) : null,
+    source: "supabase",
+    error: null
+  };
+}
+
 export async function loadPurchasedCourseIds(userId: string): Promise<Set<string>> {
   if (!supabase) return new Set();
 
@@ -195,4 +252,18 @@ export async function loadPurchasedCourseIds(userId: string): Promise<Set<string
   if (error) return new Set();
 
   return new Set((data ?? []).map((row) => row.course_id).filter(Boolean) as string[]);
+}
+
+export async function loadPurchasedGuideIds(userId: string): Promise<Set<string>> {
+  if (!supabase) return new Set();
+
+  const { data, error } = await supabase
+    .from("purchases")
+    .select("guide_id")
+    .eq("user_id", userId)
+    .in("status", ["paid", "active", "granted"]);
+
+  if (error) return new Set();
+
+  return new Set((data ?? []).map((row) => row.guide_id).filter(Boolean) as string[]);
 }

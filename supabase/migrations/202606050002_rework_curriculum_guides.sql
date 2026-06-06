@@ -1,3 +1,85 @@
+alter table public.courses
+add column if not exists sort_order integer not null default 1;
+
+alter table public.courses
+add column if not exists is_archived boolean not null default false;
+
+alter table public.guides
+add column if not exists course_id uuid;
+
+alter table public.guides
+add column if not exists sort_order integer not null default 1;
+
+alter table public.guides
+add column if not exists is_archived boolean not null default false;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'guides_course_id_fkey'
+      and conrelid = 'public.guides'::regclass
+  ) then
+    alter table public.guides
+    add constraint guides_course_id_fkey
+    foreign key (course_id) references public.courses(id) on delete set null;
+  end if;
+end $$;
+
+alter table public.guides
+drop constraint if exists guides_category_check;
+
+alter table public.guides
+add constraint guides_category_check
+check (
+  category in (
+    'Crypto Basics',
+    'Investing & Market Research',
+    'Trading Academy',
+    'DeFi & On-Chain Intelligence',
+    'Blockchain Development',
+    'Basics',
+    'Wallets & Security',
+    'Spot Trading',
+    'Futures Trading',
+    'Risk Management',
+    'Trading Strategies',
+    'Advanced Concepts'
+  )
+);
+
+alter table public.guides
+drop constraint if exists guides_difficulty_check;
+
+alter table public.guides
+add constraint guides_difficulty_check
+check (
+  difficulty in (
+    'Beginner',
+    'Intermediate',
+    'Advanced',
+    'Expert',
+    'Beginner / Intermediate',
+    'Intermediate / Advanced',
+    'Advanced / Expert',
+    'Beginner / Intermediate / Advanced'
+  )
+);
+
+alter table public.courses
+drop constraint if exists courses_difficulty_check;
+
+alter table public.courses
+add constraint courses_difficulty_check
+check (difficulty in ('Beginner', 'Intermediate', 'Advanced', 'Expert'));
+
+create index if not exists courses_sort_order_idx on public.courses(sort_order);
+create index if not exists courses_is_archived_idx on public.courses(is_archived);
+create index if not exists guides_course_id_idx on public.guides(course_id);
+create index if not exists guides_sort_order_idx on public.guides(sort_order);
+create index if not exists guides_is_archived_idx on public.guides(is_archived);
+
 insert into public.courses (
   id,
   title,
@@ -331,5 +413,101 @@ where slug not in (
   'blockchain-development-basics'
 )
 and is_archived = false;
+
+create or replace function public.can_access_course(target_course_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    public.is_admin()
+    or public.has_premium_access()
+    or public.has_course_purchase(target_course_id)
+    or exists (
+      select 1
+      from public.courses
+      where id = target_course_id
+        and is_archived = false
+        and is_premium = false
+    );
+$$;
+
+create or replace function public.can_access_guide(target_guide_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    public.is_admin()
+    or public.has_premium_access()
+    or public.has_guide_purchase(target_guide_id)
+    or exists (
+      select 1
+      from public.guides
+      where id = target_guide_id
+        and course_id is not null
+        and public.has_course_purchase(course_id)
+    )
+    or exists (
+      select 1
+      from public.guides g
+      left join public.courses c on c.id = g.course_id
+      where g.id = target_guide_id
+        and g.is_archived = false
+        and g.is_premium = false
+        and coalesce(c.is_premium, false) = false
+    );
+$$;
+
+create or replace function public.can_access_lesson(target_lesson_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.lessons l
+    join public.course_modules m on m.id = l.module_id
+    join public.courses c on c.id = m.course_id
+    where l.id = target_lesson_id
+      and c.is_archived = false
+      and (
+        l.is_preview = true
+        or l.is_premium = false
+        or c.is_premium = false
+        or public.can_access_course(c.id)
+      )
+  );
+$$;
+
+drop policy if exists "guides_select_by_access" on public.guides;
+drop policy if exists "guides_select_catalog_metadata" on public.guides;
+create policy "guides_select_catalog_metadata"
+on public.guides for select
+using (is_archived = false or public.is_admin());
+
+drop policy if exists "courses_select_catalog_metadata" on public.courses;
+create policy "courses_select_catalog_metadata"
+on public.courses for select
+using (is_archived = false or public.is_admin());
+
+drop policy if exists "course_modules_select_catalog_metadata" on public.course_modules;
+create policy "course_modules_select_catalog_metadata"
+on public.course_modules for select
+using (
+  public.is_admin()
+  or exists (
+    select 1
+    from public.courses
+    where id = course_id
+      and is_archived = false
+  )
+);
 
 notify pgrst, 'reload schema';

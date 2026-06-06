@@ -1,16 +1,23 @@
 export const GUIDE_CATEGORIES = [
-  "Basics",
-  "Wallets & Security",
-  "Spot Trading",
-  "Futures Trading",
-  "Risk Management",
-  "Trading Strategies",
-  "Advanced Concepts"
+  "Crypto Basics",
+  "Investing & Market Research",
+  "Trading Academy",
+  "DeFi & On-Chain Intelligence",
+  "Blockchain Development"
 ] as const;
 
-export const DIFFICULTIES = ["Beginner", "Intermediate", "Advanced", "Expert"] as const;
+export const COURSE_DIFFICULTIES = ["Beginner", "Intermediate", "Advanced", "Expert"] as const;
+
+export const DIFFICULTIES = [
+  ...COURSE_DIFFICULTIES,
+  "Beginner / Intermediate",
+  "Intermediate / Advanced",
+  "Advanced / Expert",
+  "Beginner / Intermediate / Advanced"
+] as const;
 
 export type GuideCategory = (typeof GUIDE_CATEGORIES)[number];
+export type CourseDifficulty = (typeof COURSE_DIFFICULTIES)[number];
 export type Difficulty = (typeof DIFFICULTIES)[number];
 export type UserRole = "user" | "premium" | "admin";
 
@@ -25,6 +32,7 @@ export interface Profile {
 
 export interface Guide {
   id: string;
+  course_id: string | null;
   title: string;
   slug: string;
   description: string;
@@ -33,9 +41,12 @@ export interface Guide {
   difficulty: Difficulty;
   estimated_read_time: number;
   is_premium: boolean;
+  is_archived: boolean;
+  sort_order: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  course?: Pick<Course, "id" | "title" | "slug" | "is_premium"> | null;
 }
 
 export interface Course {
@@ -43,12 +54,15 @@ export interface Course {
   title: string;
   slug: string;
   description: string;
-  difficulty: Difficulty;
+  difficulty: CourseDifficulty;
   price_cents: number;
   is_premium: boolean;
+  is_archived: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
   modules: CourseModule[];
+  guides: Guide[];
 }
 
 export interface CourseModule {

@@ -5,9 +5,11 @@ import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { sanitizePlainText, slugify, validateSlug } from "../lib/validation";
 import {
+  COURSE_DIFFICULTIES,
   DIFFICULTIES,
   GUIDE_CATEGORIES,
   type Course,
+  type CourseDifficulty,
   type Difficulty,
   type Guide,
   type GuideCategory,
@@ -18,7 +20,7 @@ import {
 
 type AdminTab = "guides" | "courses" | "lessons" | "users";
 
-type FlatCourse = Omit<Course, "modules">;
+type FlatCourse = Omit<Course, "modules" | "guides">;
 type FlatModule = {
   id: string;
   course_id: string;
@@ -28,23 +30,28 @@ type FlatModule = {
 };
 
 const blankGuideForm = {
+  course_id: "",
   title: "",
   slug: "",
   description: "",
   content: "",
-  category: "Basics" as GuideCategory,
+  category: "Crypto Basics" as GuideCategory,
   difficulty: "Beginner" as Difficulty,
   estimated_read_time: "8",
-  is_premium: false
+  is_premium: false,
+  is_archived: false,
+  sort_order: "1"
 };
 
 const blankCourseForm = {
   title: "",
   slug: "",
   description: "",
-  difficulty: "Beginner" as Difficulty,
+  difficulty: "Beginner" as CourseDifficulty,
   price_cents: "0",
-  is_premium: false
+  is_premium: false,
+  is_archived: false,
+  sort_order: "1"
 };
 
 const blankModuleForm = {
@@ -91,6 +98,15 @@ export function Admin() {
     () => new Map(courses.map((course) => [course.id, course.title])),
     [courses]
   );
+  const categoryByCourseId = useMemo(
+    () =>
+      new Map(
+        courses
+          .filter((course) => (GUIDE_CATEGORIES as readonly string[]).includes(course.title))
+          .map((course) => [course.id, course.title as GuideCategory])
+      ),
+    [courses]
+  );
   const moduleNameById = useMemo(
     () => new Map(modules.map((module) => [module.id, module.title])),
     [modules]
@@ -126,8 +142,16 @@ export function Admin() {
       setMessage("Some admin data could not be loaded. Check your admin role and RLS policies.");
     }
 
-    setGuides((guideResult.data ?? []) as Guide[]);
-    setCourses((courseResult.data ?? []) as FlatCourse[]);
+    setGuides(
+      [...((guideResult.data ?? []) as Guide[])].sort(
+        (a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999) || a.title.localeCompare(b.title)
+      )
+    );
+    setCourses(
+      [...((courseResult.data ?? []) as FlatCourse[])].sort(
+        (a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999) || a.title.localeCompare(b.title)
+      )
+    );
     setModules((moduleResult.data ?? []) as FlatModule[]);
     setLessons((lessonResult.data ?? []) as Lesson[]);
     setProfiles((profileResult.data ?? []) as Profile[]);
@@ -150,14 +174,17 @@ export function Admin() {
     }
 
     const payload = {
+      course_id: guideForm.course_id || null,
       title: sanitizePlainText(guideForm.title, 160),
       slug: guideForm.slug.trim(),
       description: sanitizePlainText(guideForm.description, 500),
       content: sanitizePlainText(guideForm.content, 12000),
-      category: guideForm.category,
+      category: categoryByCourseId.get(guideForm.course_id) ?? guideForm.category,
       difficulty: guideForm.difficulty,
       estimated_read_time: Number(guideForm.estimated_read_time),
       is_premium: guideForm.is_premium,
+      is_archived: guideForm.is_archived,
+      sort_order: Number(guideForm.sort_order),
       created_by: user.id
     };
 
@@ -189,7 +216,9 @@ export function Admin() {
       description: sanitizePlainText(courseForm.description, 700),
       difficulty: courseForm.difficulty,
       price_cents: Number(courseForm.price_cents),
-      is_premium: courseForm.is_premium
+      is_premium: courseForm.is_premium,
+      is_archived: courseForm.is_archived,
+      sort_order: Number(courseForm.sort_order)
     };
 
     const result = editingCourseId
@@ -346,6 +375,38 @@ export function Admin() {
                     required
                   />
                 </label>
+                <div className="form-row">
+                  <label>
+                    Course
+                    <select
+                      value={guideForm.course_id}
+                      onChange={(event) => {
+                        const courseId = event.target.value;
+                        setGuideForm((form) => ({
+                          ...form,
+                          course_id: courseId,
+                          category: categoryByCourseId.get(courseId) ?? form.category
+                        }));
+                      }}
+                    >
+                      <option value="">No course</option>
+                      {courses.map((course) => (
+                        <option key={course.id} value={course.id}>
+                          {course.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Sort order
+                    <input
+                      type="number"
+                      min={1}
+                      value={guideForm.sort_order}
+                      onChange={(event) => setGuideForm((form) => ({ ...form, sort_order: event.target.value }))}
+                    />
+                  </label>
+                </div>
                 <label>
                   Description
                   <textarea
@@ -411,6 +472,14 @@ export function Admin() {
                     />
                     Premium
                   </label>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={guideForm.is_archived}
+                      onChange={(event) => setGuideForm((form) => ({ ...form, is_archived: event.target.checked }))}
+                    />
+                    Archived
+                  </label>
                 </div>
                 <button className="primary-button full-width" type="submit">
                   <Plus size={17} />
@@ -423,7 +492,10 @@ export function Admin() {
                   <li key={guide.id}>
                     <div>
                       <strong>{guide.title}</strong>
-                      <span>{guide.category} - {guide.is_premium ? "Premium" : "Free"}</span>
+                      <span>
+                        #{guide.sort_order ?? "-"} - {courseNameById.get(guide.course_id ?? "") ?? guide.category} -{" "}
+                        {guide.is_archived ? "Archived" : guide.is_premium ? "Premium" : "Free"}
+                      </span>
                     </div>
                     <div className="row-actions">
                       <button
@@ -432,6 +504,7 @@ export function Admin() {
                         onClick={() => {
                           setEditingGuideId(guide.id);
                           setGuideForm({
+                            course_id: guide.course_id ?? "",
                             title: guide.title,
                             slug: guide.slug,
                             description: guide.description,
@@ -439,7 +512,9 @@ export function Admin() {
                             category: guide.category,
                             difficulty: guide.difficulty,
                             estimated_read_time: String(guide.estimated_read_time),
-                            is_premium: guide.is_premium
+                            is_premium: guide.is_premium,
+                            is_archived: Boolean(guide.is_archived),
+                            sort_order: String(guide.sort_order ?? 1)
                           });
                         }}
                       >
@@ -489,16 +564,25 @@ export function Admin() {
                     required
                   />
                 </label>
+                <label>
+                  Sort order
+                  <input
+                    type="number"
+                    min={1}
+                    value={courseForm.sort_order}
+                    onChange={(event) => setCourseForm((form) => ({ ...form, sort_order: event.target.value }))}
+                  />
+                </label>
                 <div className="form-row">
                   <label>
                     Difficulty
                     <select
                       value={courseForm.difficulty}
                       onChange={(event) =>
-                        setCourseForm((form) => ({ ...form, difficulty: event.target.value as Difficulty }))
+                        setCourseForm((form) => ({ ...form, difficulty: event.target.value as CourseDifficulty }))
                       }
                     >
-                      {DIFFICULTIES.map((difficulty) => (
+                      {COURSE_DIFFICULTIES.map((difficulty) => (
                         <option key={difficulty}>{difficulty}</option>
                       ))}
                     </select>
@@ -521,6 +605,14 @@ export function Admin() {
                   />
                   Premium course
                 </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={courseForm.is_archived}
+                    onChange={(event) => setCourseForm((form) => ({ ...form, is_archived: event.target.checked }))}
+                  />
+                  Archived
+                </label>
                 <button className="primary-button full-width" type="submit">
                   <Plus size={17} />
                   Save Course
@@ -532,7 +624,10 @@ export function Admin() {
                   <li key={course.id}>
                     <div>
                       <strong>{course.title}</strong>
-                      <span>{course.difficulty} - {course.is_premium ? "Premium" : "Free"}</span>
+                      <span>
+                        #{course.sort_order ?? "-"} - {course.difficulty} -{" "}
+                        {course.is_archived ? "Archived" : course.is_premium ? "Premium" : "Free"}
+                      </span>
                     </div>
                     <div className="row-actions">
                       <button
@@ -546,7 +641,9 @@ export function Admin() {
                             description: course.description,
                             difficulty: course.difficulty,
                             price_cents: String(course.price_cents),
-                            is_premium: course.is_premium
+                            is_premium: course.is_premium,
+                            is_archived: Boolean(course.is_archived),
+                            sort_order: String(course.sort_order ?? 1)
                           });
                         }}
                       >

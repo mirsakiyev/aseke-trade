@@ -7,6 +7,7 @@ import { Admin } from "./pages/Admin";
 import { CourseDetail } from "./pages/CourseDetail";
 import { Courses } from "./pages/Courses";
 import { Dashboard } from "./pages/Dashboard";
+import { GuideDetail } from "./pages/GuideDetail";
 import { Guides } from "./pages/Guides";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
@@ -25,6 +26,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="guides" element={<Guides />} />
+        <Route path="guides/:slug" element={<GuideDetail />} />
         <Route path="courses" element={<Courses />} />
         <Route path="courses/:slug" element={<CourseDetail />} />
         <Route

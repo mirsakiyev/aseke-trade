@@ -18,9 +18,9 @@
   --danger: #ff6b6b;
   --success: #7ee0a7;
   --shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
-  --crypto-gradient: linear-gradient(135deg, rgba(229, 228, 226, 0.18), rgba(184, 214, 222, 0.09));
-  --crypto-gradient-hover: linear-gradient(135deg, rgba(246, 248, 250, 0.34), rgba(184, 214, 222, 0.16));
-  --crypto-glow: 0 22px 70px rgba(229, 228, 226, 0.14);
+  --crypto-gradient: linear-gradient(135deg, rgba(229, 228, 226, 0.1), rgba(184, 214, 222, 0.05));
+  --crypto-gradient-hover: linear-gradient(135deg, rgba(246, 248, 250, 0.18), rgba(184, 214, 222, 0.08));
+  --crypto-glow: 0 18px 52px rgba(229, 228, 226, 0.075);
   --candlestick-chart-overlay: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 180' preserveAspectRatio='none'%3E%3Cg stroke-linecap='round'%3E%3Cline x1='0' y1='48' x2='0' y2='132' stroke='%237ee0a7' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='-8' y='70' width='16' height='36' rx='2' fill='%237ee0a7' fill-opacity='.14' stroke='%237ee0a7' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='60' y1='58' x2='60' y2='146' stroke='%23ff6b6b' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='52' y='86' width='16' height='36' rx='2' fill='%23ff6b6b' fill-opacity='.14' stroke='%23ff6b6b' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='120' y1='42' x2='120' y2='124' stroke='%237ee0a7' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='112' y='64' width='16' height='34' rx='2' fill='%237ee0a7' fill-opacity='.14' stroke='%237ee0a7' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='180' y1='64' x2='180' y2='150' stroke='%23ff6b6b' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='172' y='90' width='16' height='38' rx='2' fill='%23ff6b6b' fill-opacity='.14' stroke='%23ff6b6b' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='240' y1='44' x2='240' y2='130' stroke='%237ee0a7' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='232' y='66' width='16' height='40' rx='2' fill='%237ee0a7' fill-opacity='.14' stroke='%237ee0a7' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='300' y1='60' x2='300' y2='154' stroke='%23ff6b6b' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='292' y='88' width='16' height='42' rx='2' fill='%23ff6b6b' fill-opacity='.14' stroke='%23ff6b6b' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='360' y1='50' x2='360' y2='136' stroke='%237ee0a7' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='352' y='72' width='16' height='36' rx='2' fill='%237ee0a7' fill-opacity='.14' stroke='%237ee0a7' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='420' y1='56' x2='420' y2='144' stroke='%23ff6b6b' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='412' y='84' width='16' height='40' rx='2' fill='%23ff6b6b' fill-opacity='.14' stroke='%23ff6b6b' stroke-opacity='.64' stroke-width='1.8'/%3E%3C/g%3E%3C/svg%3E");
   --btc-chart-overlay: var(--candlestick-chart-overlay);
 }
@@ -353,7 +353,7 @@ p {
 
 .primary-button:hover {
   box-shadow:
-    0 16px 40px rgba(229, 228, 226, 0.2),
+    0 14px 34px rgba(229, 228, 226, 0.12),
     var(--crypto-glow);
 }
 
@@ -394,15 +394,15 @@ p {
 
 .platinum-button {
   padding: 0 1rem;
-  border-color: rgba(229, 228, 226, 0.46);
-  background: rgba(229, 228, 226, 0.09);
+  border-color: rgba(229, 228, 226, 0.34);
+  background: rgba(229, 228, 226, 0.065);
   color: #eef3f6;
 }
 
 .platinum-button:hover {
   background:
     var(--crypto-gradient-hover),
-    rgba(229, 228, 226, 0.12);
+    rgba(229, 228, 226, 0.075);
   box-shadow: var(--crypto-glow);
 }
 
@@ -740,10 +740,10 @@ p {
 .quiz-recommendation-card:hover,
 .risk-band:hover,
 .course-hero > div:hover {
-  border-color: rgba(229, 228, 226, 0.36);
+  border-color: rgba(229, 228, 226, 0.24);
   background:
     var(--crypto-gradient),
-    linear-gradient(180deg, rgba(21, 25, 31, 0.98), rgba(10, 12, 15, 0.98));
+    linear-gradient(180deg, rgba(16, 19, 23, 0.97), rgba(8, 10, 12, 0.99));
   box-shadow:
     var(--shadow),
     var(--crypto-glow);
@@ -761,7 +761,7 @@ p {
 .quiz-recommendation-card:hover::after,
 .risk-band:hover::after,
 .course-hero > div:hover::after {
-  opacity: 0.46;
+  opacity: 0.28;
   transform: translateY(0);
 }
 

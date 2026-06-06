@@ -1,4 +1,4 @@
-import { BookOpen, BookmarkPlus, Filter, LockKeyhole, Timer } from "lucide-react";
+import { ArrowRight, BookOpen, BookmarkPlus, Filter, LockKeyhole, Timer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
@@ -86,33 +86,46 @@ export function Guides() {
         <LoadingState label="Loading guides" />
       ) : (
         <section className="content-grid">
-          {filteredGuides.map((guide) => (
-            <article className="content-card" key={guide.id}>
-              <div className="card-topline">
-                <span className={guide.is_premium ? "status-pill premium" : "status-pill free"}>
-                  {guide.is_premium ? "Premium" : "Free"}
-                </span>
-                <span className="meta-with-icon">
-                  <Timer size={15} />
-                  {guide.estimated_read_time} min
-                </span>
-              </div>
-              <h2>{guide.title}</h2>
-              <p>{guide.description}</p>
-              <div className="card-meta">
-                <span>{guide.category}</span>
-                <span>{guide.difficulty}</span>
-              </div>
-              <div className="guide-preview">
-                <BookOpen size={16} />
-                <span>{guide.content}</span>
-              </div>
-              <button className="ghost-button compact" type="button" onClick={() => void saveGuide(guide.id)}>
-                <BookmarkPlus size={16} />
-                Save Guide
-              </button>
-            </article>
-          ))}
+          {filteredGuides.map((guide) => {
+            const isPremiumGuide = guide.is_premium || Boolean(guide.course?.is_premium);
+            return (
+              <article className="content-card" key={guide.id}>
+                <div className="card-topline">
+                  <span className={isPremiumGuide ? "status-pill premium" : "status-pill free"}>
+                    {isPremiumGuide ? "Premium" : "Free"}
+                  </span>
+                  <span className="meta-with-icon">
+                    <Timer size={15} />
+                    {guide.estimated_read_time} min
+                  </span>
+                </div>
+                <h2>{guide.title}</h2>
+                <p>{guide.description}</p>
+                <div className="card-meta">
+                  <span>{guide.category}</span>
+                  <span>{guide.difficulty}</span>
+                </div>
+                <div className="guide-preview">
+                  <BookOpen size={16} />
+                  <span>
+                    {isPremiumGuide
+                      ? "Premium guide. Open it to review access options."
+                      : "Free guide available in this learning path."}
+                  </span>
+                </div>
+                <div className="inline-actions">
+                  <Link className="ghost-button compact" to={`/guides/${guide.slug}`}>
+                    Open Guide
+                    <ArrowRight size={16} />
+                  </Link>
+                  <button className="ghost-button compact" type="button" onClick={() => void saveGuide(guide.id)}>
+                    <BookmarkPlus size={16} />
+                    Save
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </section>
       )}
     </main>

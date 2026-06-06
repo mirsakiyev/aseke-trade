@@ -15,9 +15,9 @@ import {
   type CryptoQuizQuestion,
   type QuizDifficulty
 } from "../data/cryptoQuizQuestions";
-import type { Difficulty } from "../types/content";
+import type { CourseDifficulty } from "../types/content";
 
-type QuizLevel = Difficulty;
+type QuizLevel = CourseDifficulty;
 
 type QuizAttemptQuestion = CryptoQuizQuestion & {
   shuffledOptions: string[];
@@ -96,64 +96,64 @@ const levelRecommendations: Record<QuizLevel, LevelRecommendation[]> = {
     {
       title: "Crypto Foundations",
       description: "Start here for wallets, exchanges, spot markets, and the safety habits every learner needs first.",
-      href: "/courses/crypto-foundations",
+      href: "/courses/crypto-basics",
       label: "Course",
       level: "Beginner"
     },
     {
-      title: "Wallets and Seed Phrases",
+      title: "Crypto Safety & Security",
       description: "Reinforce custody basics before moving larger balances or connecting wallets to apps.",
-      href: "/guides/how-wallets-and-seed-phrases-work",
+      href: "/guides/crypto-safety-security",
       label: "Guide",
       level: "Beginner"
     }
   ],
   Intermediate: [
     {
-      title: "Strategy Lab",
+      title: "Investing & Market Research",
       description: "Build repeatable trading frameworks around setups, execution rules, journaling, and review.",
-      href: "/courses/strategy-lab",
+      href: "/courses/investing-market-research",
       label: "Course",
       level: "Intermediate"
     },
     {
-      title: "Support and Resistance Strategy",
-      description: "Practice turning levels into complete plans instead of reacting after a move starts.",
-      href: "/guides/support-and-resistance-strategy",
+      title: "Tokenomics & Project Research",
+      description: "Practice turning market research into a clearer view of supply, incentives, and project quality.",
+      href: "/guides/tokenomics-project-research",
       label: "Guide",
       level: "Intermediate"
     }
   ],
   Advanced: [
     {
-      title: "Advanced Futures Risk Control",
+      title: "Trading Academy",
       description: "Study liquidation buffers, funding awareness, leverage caps, and exposure control.",
-      href: "/courses/advanced-futures-risk-control",
+      href: "/courses/trading-academy",
       label: "Course",
       level: "Advanced"
     },
     {
-      title: "Advanced Futures Trading Risk Control",
+      title: "Risk Management Masterclass",
       description: "Go deeper on correlation, liquidation distance, and risk planning under volatility.",
-      href: "/guides/advanced-futures-trading-risk-control",
+      href: "/guides/risk-management-masterclass",
       label: "Guide",
       level: "Advanced"
     }
   ],
   Expert: [
     {
-      title: "Expert Course Track",
+      title: "Blockchain Development",
       description: "Use this tag for future courses on rollups, MEV, zero-knowledge proofs, validator economics, and tokenomics.",
-      href: "/courses",
-      label: "Track",
+      href: "/courses/blockchain-development",
+      label: "Course",
       level: "Expert"
     },
     {
-      title: "Advanced Futures Risk Control",
-      description: "Until expert modules are added, this is the closest live course for high-level market risk work.",
-      href: "/courses/advanced-futures-risk-control",
-      label: "Course",
-      level: "Advanced"
+      title: "On-Chain Analysis",
+      description: "Read wallet behavior, liquidity movements, holder cohorts, and advanced on-chain market signals.",
+      href: "/guides/on-chain-analysis",
+      label: "Guide",
+      level: "Expert"
     }
   ]
 };
