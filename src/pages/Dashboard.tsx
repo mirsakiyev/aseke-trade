@@ -131,9 +131,14 @@ export function Dashboard() {
             Premium content unlocks when Supabase confirms premium profile status, admin role, or a paid
             purchase record.
           </p>
-          <Link className="text-link" to="/premium">
-            Manage premium
-          </Link>
+          <div className="inline-actions">
+            <Link className="text-link" to="/premium">
+              Manage premium
+            </Link>
+            <Link className="text-link" to="/account/payments">
+              Payment history
+            </Link>
+          </div>
         </article>
       </section>
 

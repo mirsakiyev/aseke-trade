@@ -11,7 +11,7 @@ ASEKE TRADE is a premium crypto education platform founded by Aslan Mirsakiyev, 
 - Protected user dashboard
 - Admin-only panel for guides, courses, modules, lessons, users, and premium access
 - Supabase Row Level Security policies for role and purchase-based access
-- Payment-provider-ready premium page without fake client-side checkout
+- Secure crypto checkout with server-side on-chain verification
 
 ## Local Setup
 
@@ -60,6 +60,8 @@ ASEKE TRADE is a premium crypto education platform founded by Aslan Mirsakiyev, 
    - Netlify: `https://your-site.netlify.app`
 3. Run the migration in `supabase/migrations/202606030001_initial_schema.sql`.
 4. Run `supabase/seed.sql` for sample guides, courses, modules, and lessons.
+5. Configure crypto payment secrets and Edge Functions with the steps in
+   [`docs/crypto-payments.md`](docs/crypto-payments.md).
 
 With the Supabase CLI, the common flow is:
 
@@ -100,18 +102,13 @@ Premium lesson access is granted only when Supabase confirms at least one of the
 - the user is `premium`
 - the user is `admin`
 - the user has a valid `paid`, `active`, or `granted` purchase record
+- the user has verified `premium_access` from a confirmed crypto payment
 
-## Payment Integration Notes
+## Crypto Payment Integration
 
-The premium page intentionally does not create fake payments or client-side purchases.
-
-To add Stripe or another provider later:
-
-1. Create checkout sessions from a Netlify Function or other secure server endpoint.
-2. Store secret keys only in server-side environment variables.
-3. Validate payment webhooks with provider signatures.
-4. Insert or update `purchases` through a server-side Supabase service role key.
-5. Keep browser code limited to reading access state through RLS-protected queries.
+Crypto checkout is implemented with Supabase Edge Functions. Keep blockchain API keys, receiving
+addresses, and the service role key in Supabase secrets, not Vite or Netlify browser variables. See
+[`docs/crypto-payments.md`](docs/crypto-payments.md) for deployment and testing.
 
 ## Netlify Deployment
 
@@ -123,7 +120,7 @@ To add Stripe or another provider later:
 4. Add environment variables in Netlify:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_PUBLISHABLE_KEY`
-   - Future public payment key only if needed
+   - No crypto API keys or service role keys
 
    `VITE_SUPABASE_URL` must be the Project API URL from Supabase's API settings, not the database
    URL from the Database settings page.
@@ -131,7 +128,7 @@ To add Stripe or another provider later:
    If you already use `VITE_SUPABASE_ANON_KEY`, the app accepts it and prefers it when both key
    variables are set. After changing Netlify environment variables, trigger a fresh deploy so Vite
    can bake them into the frontend bundle.
-5. Keep secret payment provider keys out of Vite variables.
+5. Keep crypto API keys, receiving wallet configuration, and service role keys out of Vite variables.
 
 The `netlify.toml` file includes the redirect needed for React Router.
 
@@ -145,7 +142,10 @@ src/
   lib/               Supabase client, content queries, validation helpers
   pages/             Public, auth, dashboard, premium, and admin pages
   types/             Shared TypeScript models
+docs/
+  crypto-payments.md Crypto payment setup and testing guide
 supabase/
+  functions/         Crypto payment Edge Functions
   migrations/        Schema, triggers, RLS policies
   seed.sql           Sample curriculum content
 public/assets/       Generated project visuals
@@ -156,6 +156,7 @@ public/assets/       Generated project visuals
 - Do not hardcode secrets.
 - Use only `VITE_SUPABASE_URL` and one public Supabase browser key variable in browser code.
   `VITE_SUPABASE_ANON_KEY` is preferred when both key variables are set.
+- Never ask users for seed phrases or private keys.
 - Never trust frontend-only authorization.
 - Keep Row Level Security enabled on all Supabase tables.
 - Use service role keys only in secure server-side functions.

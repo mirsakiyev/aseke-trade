@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, CheckCircle2, LockKeyhole, PlayCircle } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, LockKeyhole, PlayCircle, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
@@ -124,8 +124,9 @@ export function CourseDetail() {
             </p>
             <div className="inline-actions">
               {user ? (
-                <Link className="primary-button" to="/premium">
-                  View Premium
+                <Link className="primary-button" to={`/checkout/course/${course.id}`}>
+                  <WalletCards size={17} />
+                  Buy with Crypto
                   <ArrowRight size={17} />
                 </Link>
               ) : (

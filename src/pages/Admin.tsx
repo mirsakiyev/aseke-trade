@@ -1,5 +1,6 @@
-import { Edit3, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import { Edit3, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -38,6 +39,7 @@ const blankGuideForm = {
   category: "Crypto Basics" as GuideCategory,
   difficulty: "Beginner" as Difficulty,
   estimated_read_time: "8",
+  price_cents: "0",
   is_premium: false,
   is_archived: false,
   sort_order: "1"
@@ -182,6 +184,7 @@ export function Admin() {
       category: categoryByCourseId.get(guideForm.course_id) ?? guideForm.category,
       difficulty: guideForm.difficulty,
       estimated_read_time: Number(guideForm.estimated_read_time),
+      price_cents: Number(guideForm.price_cents),
       is_premium: guideForm.is_premium,
       is_archived: guideForm.is_archived,
       sort_order: Number(guideForm.sort_order),
@@ -323,10 +326,16 @@ export function Admin() {
             Admin-only route backed by Supabase Row Level Security for content, users, purchases, and premium grants.
           </p>
         </div>
-        <button className="ghost-button" type="button" onClick={() => void refreshAdminData()}>
-          <RefreshCw size={17} />
-          Refresh
-        </button>
+        <div className="inline-actions">
+          <Link className="ghost-button" to="/admin/crypto-payments">
+            <WalletCards size={17} />
+            Crypto Payments
+          </Link>
+          <button className="ghost-button" type="button" onClick={() => void refreshAdminData()}>
+            <RefreshCw size={17} />
+            Refresh
+          </button>
+        </div>
       </section>
 
       {!supabase && (
@@ -464,6 +473,15 @@ export function Admin() {
                       }
                     />
                   </label>
+                  <label>
+                    Price cents
+                    <input
+                      type="number"
+                      min={0}
+                      value={guideForm.price_cents}
+                      onChange={(event) => setGuideForm((form) => ({ ...form, price_cents: event.target.value }))}
+                    />
+                  </label>
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
@@ -491,10 +509,10 @@ export function Admin() {
                 {guides.map((guide) => (
                   <li key={guide.id}>
                     <div>
-                      <strong>{guide.title}</strong>
+                        <strong>{guide.title}</strong>
                       <span>
                         #{guide.sort_order ?? "-"} - {courseNameById.get(guide.course_id ?? "") ?? guide.category} -{" "}
-                        {guide.is_archived ? "Archived" : guide.is_premium ? "Premium" : "Free"}
+                        {guide.is_archived ? "Archived" : guide.is_premium ? "Premium" : "Free"} - {guide.price_cents} cents
                       </span>
                     </div>
                     <div className="row-actions">
@@ -512,6 +530,7 @@ export function Admin() {
                             category: guide.category,
                             difficulty: guide.difficulty,
                             estimated_read_time: String(guide.estimated_read_time),
+                            price_cents: String(guide.price_cents ?? 0),
                             is_premium: guide.is_premium,
                             is_archived: Boolean(guide.is_archived),
                             sort_order: String(guide.sort_order ?? 1)

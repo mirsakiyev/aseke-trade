@@ -3,9 +3,13 @@ import { Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { LoadingState } from "./components/LoadingState";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AccountPayments } from "./pages/AccountPayments";
 import { Admin } from "./pages/Admin";
+import { AdminCryptoPayments } from "./pages/AdminCryptoPayments";
 import { CourseDetail } from "./pages/CourseDetail";
 import { Courses } from "./pages/Courses";
+import { CryptoCheckout } from "./pages/CryptoCheckout";
+import { CryptoPayment } from "./pages/CryptoPayment";
 import { Dashboard } from "./pages/Dashboard";
 import { GuideDetail } from "./pages/GuideDetail";
 import { Guides } from "./pages/Guides";
@@ -59,10 +63,42 @@ export default function App() {
           }
         />
         <Route
+          path="checkout/:itemType/:itemId"
+          element={
+            <ProtectedRoute>
+              <CryptoCheckout />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="payment/:paymentId"
+          element={
+            <ProtectedRoute>
+              <CryptoPayment />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="account/payments"
+          element={
+            <ProtectedRoute>
+              <AccountPayments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="admin"
           element={
             <ProtectedRoute requireAdmin>
               <Admin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/crypto-payments"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminCryptoPayments />
             </ProtectedRoute>
           }
         />

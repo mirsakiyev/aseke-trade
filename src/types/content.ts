@@ -40,6 +40,7 @@ export interface Guide {
   category: GuideCategory;
   difficulty: Difficulty;
   estimated_read_time: number;
+  price_cents: number;
   is_premium: boolean;
   is_archived: boolean;
   sort_order: number;
@@ -97,6 +98,41 @@ export interface Purchase {
   payment_reference: string | null;
   amount_cents: number | null;
   created_at: string;
+}
+
+export type CryptoPaymentStatus =
+  | "pending"
+  | "submitted"
+  | "verifying"
+  | "confirmed"
+  | "underpaid"
+  | "overpaid"
+  | "expired"
+  | "failed"
+  | "duplicate";
+
+export type CryptoAsset = "USDT" | "USDC";
+export type CryptoNetwork = "TRC20" | "ERC20";
+
+export interface CryptoPayment {
+  id: string;
+  user_id: string;
+  course_id: string | null;
+  guide_id: string | null;
+  payment_method_id: string;
+  expected_amount: string | number;
+  received_amount: string | number | null;
+  asset: CryptoAsset;
+  network: CryptoNetwork;
+  receive_address: string;
+  tx_hash: string | null;
+  status: CryptoPaymentStatus;
+  expires_at: string;
+  submitted_at: string | null;
+  confirmed_at: string | null;
+  admin_review_notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SavedGuide {

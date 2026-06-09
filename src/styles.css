@@ -1531,6 +1531,12 @@ p {
   color: #e8f0f3;
 }
 
+.status-pill.danger {
+  border-color: rgba(255, 107, 107, 0.5);
+  background: rgba(255, 107, 107, 0.1);
+  color: #ffd4d4;
+}
+
 .soft-notice,
 .warning-box {
   padding: 0.9rem 1rem;
@@ -1690,6 +1696,208 @@ p {
 
 .lesson-row .ghost-button {
   margin-top: 0.75rem;
+}
+
+.checkout-grid,
+.payment-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.46fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.checkout-auth-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.checkout-method-panel,
+.checkout-summary-panel,
+.payment-action-panel,
+.payment-instructions-panel,
+.payment-history-card,
+.admin-payment-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.payment-method-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.payment-method-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 74px;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.045);
+  color: var(--platinum-soft);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.payment-method-option:hover,
+.payment-method-option:has(input:checked) {
+  border-color: rgba(229, 228, 226, 0.38);
+  background:
+    var(--crypto-gradient),
+    rgba(229, 228, 226, 0.07);
+  transform: translateY(-1px);
+}
+
+.payment-method-option input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.payment-method-option strong,
+.payment-method-option small {
+  display: block;
+}
+
+.payment-method-option strong {
+  color: var(--platinum);
+}
+
+.payment-method-option small {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.payment-warning-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.payment-warning-list p {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+  margin: 0;
+  color: var(--platinum-soft);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.payment-warning-list svg {
+  margin-top: 0.2rem;
+  color: var(--danger);
+}
+
+.payment-qr-frame {
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(246, 248, 250, 0.92), rgba(174, 184, 193, 0.7)),
+    #f8fbfc;
+}
+
+.payment-qr-frame img {
+  width: min(240px, 100%);
+  border-radius: 6px;
+}
+
+.address-copy-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.address-copy-box code {
+  overflow-wrap: anywhere;
+  min-height: 44px;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(5, 6, 7, 0.9);
+  color: var(--platinum);
+  line-height: 1.45;
+}
+
+.payment-history-list,
+.admin-payment-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.payment-history-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.payment-history-card h2,
+.admin-payment-card h2 {
+  margin: 0.7rem 0 0.35rem;
+  font-size: clamp(1.3rem, 2vw, 1.8rem);
+}
+
+.admin-payment-filters {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) repeat(3, minmax(150px, 0.18fr));
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.04);
+}
+
+.admin-payment-filters label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-payment-card-header {
+  display: flex;
+  gap: 1rem;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.payment-admin-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.payment-admin-details div {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.04);
+}
+
+.payment-admin-details dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.payment-admin-details dd {
+  overflow-wrap: anywhere;
+  margin: 0.3rem 0 0;
+  color: var(--platinum-soft);
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .auth-page {
@@ -2070,6 +2278,12 @@ select:focus {
   .dashboard-grid,
   .dashboard-grid.three,
   .admin-grid,
+  .checkout-grid,
+  .payment-grid,
+  .admin-payment-filters,
+  .payment-admin-details,
+  .checkout-auth-panel,
+  .payment-history-card,
   .charts-grid,
   .quiz-status-grid,
   .quiz-recommendation-grid,
@@ -2142,6 +2356,10 @@ select:focus {
   .dashboard-grid,
   .dashboard-grid.three,
   .admin-grid,
+  .checkout-grid,
+  .payment-grid,
+  .admin-payment-filters,
+  .payment-admin-details,
   .charts-grid,
   .quiz-status-grid,
   .quiz-option-list,
@@ -2164,6 +2382,9 @@ select:focus {
 
   .hero-actions,
   .inline-actions,
+  .checkout-auth-panel,
+  .payment-history-card,
+  .admin-payment-card-header,
   .chart-selector-panel,
   .charts-learning-cta,
   .quiz-actions,

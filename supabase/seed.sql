@@ -332,4 +332,10 @@ where slug not in (
 )
 and is_archived = false;
 
+update public.guides
+set price_cents = 4900,
+    updated_at = now()
+where is_premium = true
+  and price_cents = 0;
+
 notify pgrst, 'reload schema';

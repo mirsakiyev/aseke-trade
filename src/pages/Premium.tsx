@@ -1,4 +1,4 @@
-import { Check, Crown, ShieldCheck } from "lucide-react";
+import { Check, Crown, ShieldCheck, WalletCards } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -19,8 +19,8 @@ export function Premium() {
           <p className="eyebrow">Premium Access</p>
           <h1>Secure access structure for paid education</h1>
           <p className="muted">
-            Payments are intentionally prepared as a provider-ready placeholder. Access is granted only
-            through verified database records, premium profile status, or admin role.
+            Premium access is granted through verified database records, premium profile status, admin role,
+            or confirmed on-chain crypto payments.
           </p>
         </div>
         <span className="status-pill premium">
@@ -43,7 +43,7 @@ export function Premium() {
         <article className="pricing-card featured">
           <p className="eyebrow">Premium</p>
           <h2>Full Education Access</h2>
-          <p className="price-line">Provider ready</p>
+          <p className="price-line">$199</p>
           <ul className="check-list">
             {premiumItems.map((item) => (
               <li key={item}>
@@ -52,10 +52,10 @@ export function Premium() {
               </li>
             ))}
           </ul>
-          {/* TODO: Connect this action to a trusted payment provider checkout session created server-side. */}
-          <button className="primary-button full-width" type="button" disabled>
-            Secure checkout pending
-          </button>
+          <Link className="primary-button full-width" to={user ? "/checkout/course/10000000-0000-4000-8000-000000000003" : "/register"}>
+            <WalletCards size={17} />
+            Buy with Crypto
+          </Link>
         </article>
 
         <article className="pricing-card">
@@ -78,9 +78,8 @@ export function Premium() {
           <h2>No fake checkout, no client-side granting</h2>
         </div>
         <p>
-          Future Stripe or payment provider integration should create checkout sessions from a secure
-          serverless function, validate webhooks with provider signatures, then insert or update purchases
-          through a server-side service role key.
+          Crypto checkout creates server-side payment intents, verifies token transfers on-chain, and
+          unlocks education only after the expected amount reaches the configured ASEKE TRADE address.
         </p>
         <ShieldCheck size={32} aria-hidden="true" />
       </section>

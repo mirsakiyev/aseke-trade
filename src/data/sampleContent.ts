@@ -108,6 +108,7 @@ function guide(
     category,
     difficulty,
     estimated_read_time: 8,
+    price_cents: is_premium ? 4900 : 0,
     is_premium,
     is_archived: false,
     sort_order,
