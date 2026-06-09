@@ -11,7 +11,7 @@ ASEKE TRADE is a premium crypto education platform founded by Aslan Mirsakiyev, 
 - Protected user dashboard
 - Admin-only panel for guides, courses, modules, lessons, users, and premium access
 - Supabase Row Level Security policies for role and purchase-based access
-- Secure crypto checkout with server-side on-chain verification
+- Secure crypto checkout, account balance deposits, and server-side on-chain verification
 
 ## Local Setup
 
@@ -106,9 +106,10 @@ Premium lesson access is granted only when Supabase confirms at least one of the
 
 ## Crypto Payment Integration
 
-Crypto checkout is implemented with Supabase Edge Functions. Keep blockchain API keys, receiving
-addresses, and the service role key in Supabase secrets, not Vite or Netlify browser variables. See
-[`docs/crypto-payments.md`](docs/crypto-payments.md) for deployment and testing.
+Crypto checkout and balance deposits are implemented with Supabase Edge Functions. Keep blockchain
+API keys, receiving addresses, and the service role key in Supabase secrets, not Vite or Netlify
+browser variables. See [`docs/crypto-payments.md`](docs/crypto-payments.md) for deployment and
+testing.
 
 ## Netlify Deployment
 
@@ -145,7 +146,7 @@ src/
 docs/
   crypto-payments.md Crypto payment setup and testing guide
 supabase/
-  functions/         Crypto payment Edge Functions
+  functions/         Crypto payment, deposit, and balance Edge Functions
   migrations/        Schema, triggers, RLS policies
   seed.sql           Sample curriculum content
 public/assets/       Generated project visuals

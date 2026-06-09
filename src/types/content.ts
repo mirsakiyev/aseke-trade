@@ -119,6 +119,7 @@ export interface CryptoPayment {
   user_id: string;
   course_id: string | null;
   guide_id: string | null;
+  payment_type: "purchase" | "deposit";
   payment_method_id: string;
   expected_amount: string | number;
   received_amount: string | number | null;
@@ -133,6 +134,37 @@ export interface CryptoPayment {
   admin_review_notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CryptoPaymentMethod {
+  id: string;
+  asset: CryptoAsset;
+  network: CryptoNetwork;
+  receive_address: string;
+  min_confirmations: number;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountBalance {
+  user_id: string;
+  balance_cents: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountBalanceTransaction {
+  id: string;
+  user_id: string;
+  crypto_payment_id: string | null;
+  course_id: string | null;
+  guide_id: string | null;
+  transaction_type: "deposit" | "purchase" | "refund" | "adjustment";
+  amount_cents: number;
+  description: string | null;
+  created_at: string;
 }
 
 export interface SavedGuide {

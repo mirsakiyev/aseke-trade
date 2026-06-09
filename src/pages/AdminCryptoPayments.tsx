@@ -1,9 +1,9 @@
-import { RefreshCw, Save, Search, ShieldCheck } from "lucide-react";
+import { Edit3, Plus, RefreshCw, Save, Search, ShieldCheck } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { LoadingState } from "../components/LoadingState";
 import { cryptoStatusMessages, formatStableAmount, statusTone } from "../lib/cryptoPayments";
 import { supabase } from "../lib/supabase";
-import type { CryptoAsset, CryptoNetwork, CryptoPayment, CryptoPaymentStatus } from "../types/content";
+import type { CryptoAsset, CryptoNetwork, CryptoPayment, CryptoPaymentMethod, CryptoPaymentStatus } from "../types/content";
 
 type StatusFilter = "all" | CryptoPaymentStatus;
 type AssetFilter = "all" | CryptoAsset;
@@ -21,8 +21,20 @@ const statuses: StatusFilter[] = [
   "duplicate"
 ];
 
+const blankWalletForm = {
+  id: "",
+  asset: "USDT" as CryptoAsset,
+  network: "TRC20" as CryptoNetwork,
+  receive_address: "",
+  min_confirmations: "12",
+  is_active: false,
+  notes: ""
+};
+
 export function AdminCryptoPayments() {
   const [payments, setPayments] = useState<CryptoPayment[]>([]);
+  const [wallets, setWallets] = useState<CryptoPaymentMethod[]>([]);
+  const [walletForm, setWalletForm] = useState(blankWalletForm);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
@@ -38,17 +50,23 @@ export function AdminCryptoPayments() {
     }
 
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from("crypto_payments")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const [paymentResult, walletResult] = await Promise.all([
+      supabase.from("crypto_payments").select("*").order("created_at", { ascending: false }),
+      supabase
+        .from("crypto_payment_methods")
+        .select("*")
+        .order("asset", { ascending: true })
+        .order("network", { ascending: true })
+    ]);
 
-    if (error) {
+    if (paymentResult.error || walletResult.error) {
       setMessage("Crypto payments could not be loaded.");
       setPayments([]);
+      setWallets([]);
     } else {
-      const nextPayments = (data ?? []) as CryptoPayment[];
+      const nextPayments = (paymentResult.data ?? []) as CryptoPayment[];
       setPayments(nextPayments);
+      setWallets((walletResult.data ?? []) as CryptoPaymentMethod[]);
       setNotes(Object.fromEntries(nextPayments.map((payment) => [payment.id, payment.admin_review_notes ?? ""])));
       setMessage(null);
     }
@@ -96,6 +114,35 @@ export function AdminCryptoPayments() {
     if (!error) await refreshPayments();
   };
 
+  const saveWallet = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const payload = {
+      asset: walletForm.asset,
+      network: walletForm.network,
+      receive_address: walletForm.receive_address.trim(),
+      min_confirmations: Number(walletForm.min_confirmations),
+      is_active: walletForm.is_active,
+      notes: walletForm.notes.trim() || null
+    };
+
+    const result = walletForm.id
+      ? await supabase.from("crypto_payment_methods").update(payload).eq("id", walletForm.id)
+      : await supabase.from("crypto_payment_methods").insert(payload);
+
+    setMessage(
+      result.error
+        ? "Wallet could not be saved. Check admin access and make sure only one active wallet exists per asset/network."
+        : "Wallet saved."
+    );
+
+    if (!result.error) {
+      setWalletForm(blankWalletForm);
+      await refreshPayments();
+    }
+  };
+
   return (
     <main className="page page-stack">
       <section className="page-title-row">
@@ -112,6 +159,125 @@ export function AdminCryptoPayments() {
 
       {!supabase && <p className="warning-box">Supabase is not connected.</p>}
       {message && <p className="soft-notice">{message}</p>}
+
+      <section className="admin-grid">
+        <form className="section-panel stack-form" onSubmit={saveWallet}>
+          <div>
+            <p className="eyebrow">Receiving Wallets</p>
+            <h2>{walletForm.id ? "Edit wallet" : "Add wallet"}</h2>
+          </div>
+
+          <div className="form-row">
+            <label>
+              Asset
+              <select
+                value={walletForm.asset}
+                onChange={(event) => setWalletForm((form) => ({ ...form, asset: event.target.value as CryptoAsset }))}
+              >
+                <option value="USDT">USDT</option>
+                <option value="USDC">USDC</option>
+              </select>
+            </label>
+            <label>
+              Network
+              <select
+                value={walletForm.network}
+                onChange={(event) => setWalletForm((form) => ({ ...form, network: event.target.value as CryptoNetwork }))}
+              >
+                <option value="TRC20">TRC20</option>
+                <option value="ERC20">ERC20</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Receive address
+            <input
+              value={walletForm.receive_address}
+              onChange={(event) => setWalletForm((form) => ({ ...form, receive_address: event.target.value }))}
+              required
+            />
+          </label>
+
+          <div className="form-row">
+            <label>
+              Confirmations
+              <input
+                type="number"
+                min={1}
+                value={walletForm.min_confirmations}
+                onChange={(event) => setWalletForm((form) => ({ ...form, min_confirmations: event.target.value }))}
+              />
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={walletForm.is_active}
+                onChange={(event) => setWalletForm((form) => ({ ...form, is_active: event.target.checked }))}
+              />
+              Active
+            </label>
+          </div>
+
+          <label>
+            Notes
+            <textarea
+              value={walletForm.notes}
+              onChange={(event) => setWalletForm((form) => ({ ...form, notes: event.target.value }))}
+              rows={3}
+            />
+          </label>
+
+          <button className="primary-button full-width" type="submit">
+            <Plus size={17} />
+            Save Wallet
+          </button>
+        </form>
+
+        <article className="section-panel">
+          <h2>Configured wallets</h2>
+          <ul className="admin-list">
+            {wallets.map((wallet) => (
+              <li key={wallet.id}>
+                <div>
+                  <strong>
+                    {wallet.asset} {wallet.network}
+                  </strong>
+                  <span>
+                    {wallet.is_active ? "Active" : "Inactive"} - {wallet.receive_address}
+                  </span>
+                </div>
+                <button
+                  className="icon-button"
+                  type="button"
+                  onClick={() =>
+                    setWalletForm({
+                      id: wallet.id,
+                      asset: wallet.asset,
+                      network: wallet.network,
+                      receive_address: wallet.receive_address,
+                      min_confirmations: String(wallet.min_confirmations),
+                      is_active: wallet.is_active,
+                      notes: wallet.notes ?? ""
+                    })
+                  }
+                >
+                  <Edit3 size={16} />
+                  <span className="sr-only">Edit wallet</span>
+                </button>
+              </li>
+            ))}
+            {!wallets.length && (
+              <li>
+                <div>
+                  <strong>No wallets configured</strong>
+                  <span>Add active receiving addresses before users create payments.</span>
+                </div>
+              </li>
+            )}
+          </ul>
+        </article>
+      </section>
 
       <section className="admin-payment-filters">
         <label>

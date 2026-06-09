@@ -5,6 +5,7 @@ import {
   handleError,
   handleOptions,
   jsonResponse,
+  normalizeDepositAmount,
   normalizeAssetNetwork,
   resolveCheckoutItem
 } from "../_shared/crypto-payments.ts";
@@ -23,7 +24,16 @@ Deno.serve(async (request) => {
     const body = (await request.json()) as Record<string, unknown>;
     const { asset, network } = normalizeAssetNetwork(body.asset, body.network);
     const method = await getActivePaymentMethod(supabase, asset, network);
-    const item = await resolveCheckoutItem(supabase, body);
+    const paymentType = body.payment_type === "deposit" ? "deposit" : "purchase";
+    const item =
+      paymentType === "deposit"
+        ? {
+            courseId: null,
+            guideId: null,
+            title: "Account balance deposit",
+            ...normalizeDepositAmount(body.amount)
+          }
+        : await resolveCheckoutItem(supabase, body);
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
     const { data, error } = await supabase
@@ -32,6 +42,7 @@ Deno.serve(async (request) => {
         user_id: user.id,
         course_id: item.courseId,
         guide_id: item.guideId,
+        payment_type: paymentType,
         payment_method_id: method.row.id,
         expected_amount: item.expectedAmount,
         asset,

@@ -41,6 +41,7 @@ export interface CryptoPaymentRow {
   user_id: string;
   course_id: string | null;
   guide_id: string | null;
+  payment_type: "purchase" | "deposit";
   payment_method_id: string;
   expected_amount: string | number;
   received_amount: string | number | null;
@@ -139,7 +140,7 @@ export function handleError(error: unknown): Response {
 
 export function getServiceClient(): SupabaseClient {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")?.trim();
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new ApiError(500, "missing_supabase_secrets", "Supabase server secrets are not configured.");
@@ -175,7 +176,7 @@ export async function getAuthenticatedUser(request: Request, supabase: SupabaseC
 
 export function requireServiceRole(request: Request): void {
   const token = getBearerToken(request);
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")?.trim();
 
   if (!serviceRoleKey || token !== serviceRoleKey) {
     throw new ApiError(403, "server_only", "Payment verification is server-only.");
@@ -216,25 +217,49 @@ export function normalizeTxHash(txHash: unknown, network: SupportedNetwork): str
 }
 
 export async function syncConfiguredPaymentMethods(supabase: SupabaseClient): Promise<void> {
-  const rows = paymentMethodConfigs.map((method) => {
+  for (const method of paymentMethodConfigs) {
     const address = Deno.env.get(method.envName)?.trim() ?? "";
+    const { data: existing, error: lookupError } = await supabase
+      .from("crypto_payment_methods")
+      .select("id,receive_address")
+      .eq("id", method.id)
+      .maybeSingle();
 
-    return {
-      id: method.id,
-      asset: method.asset,
-      network: method.network,
-      receive_address: address || `configure:${method.envName}`,
-      min_confirmations: method.minConfirmations,
-      is_active: Boolean(address)
-    };
-  });
+    if (lookupError) {
+      throw new ApiError(500, "payment_method_sync_failed", "Crypto payment methods could not be checked.");
+    }
 
-  const { error } = await supabase.from("crypto_payment_methods").upsert(rows, {
-    onConflict: "asset,network"
-  });
+    if (!existing) {
+      const { error: insertError } = await supabase.from("crypto_payment_methods").insert({
+        id: method.id,
+        asset: method.asset,
+        network: method.network,
+        receive_address: address || `configure:${method.envName}`,
+        min_confirmations: method.minConfirmations,
+        is_active: Boolean(address)
+      });
 
-  if (error) {
-    throw new ApiError(500, "payment_method_sync_failed", "Crypto payment methods could not be prepared.");
+      if (insertError) {
+        throw new ApiError(500, "payment_method_sync_failed", "Crypto payment methods could not be prepared.");
+      }
+
+      continue;
+    }
+
+    if (address && String(existing.receive_address).startsWith("configure:")) {
+      const { error: updateError } = await supabase
+        .from("crypto_payment_methods")
+        .update({
+          receive_address: address,
+          min_confirmations: method.minConfirmations,
+          is_active: true
+        })
+        .eq("id", method.id);
+
+      if (updateError) {
+        throw new ApiError(500, "payment_method_sync_failed", "Crypto payment methods could not be activated.");
+      }
+    }
   }
 }
 
@@ -267,6 +292,35 @@ export async function getActivePaymentMethod(
 
 export function centsToStableAmount(cents: number): string {
   return (cents / 100).toFixed(2);
+}
+
+export function normalizeDepositAmount(amount: unknown): {
+  expectedAmount: string;
+  amountCents: number;
+} {
+  const value = String(amount ?? "").trim();
+  if (!/^\d+(\.\d{1,6})?$/.test(value)) {
+    throw new ApiError(400, "invalid_deposit_amount", "Enter a valid deposit amount.");
+  }
+
+  const numericAmount = Number(value);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new ApiError(400, "invalid_deposit_amount", "Deposit amount must be greater than zero.");
+  }
+
+  const amountCents = Math.round(numericAmount * 100);
+  if (amountCents < 1) {
+    throw new ApiError(400, "deposit_too_small", "Minimum deposit is 0.01 stablecoin.");
+  }
+
+  const [wholePart, fractionPart = ""] = value.split(".");
+  const whole = wholePart.replace(/^0+(?=\d)/, "") || "0";
+  const fraction = fractionPart.replace(/0+$/, "");
+
+  return {
+    expectedAmount: fraction ? `${whole}.${fraction}` : `${whole}.00`,
+    amountCents
+  };
 }
 
 export async function resolveCheckoutItem(
@@ -361,6 +415,11 @@ export async function verifyPaymentById(
   }
 
   const payment = data as CryptoPaymentRow;
+  if (payment.status === "confirmed") {
+    await finalizeConfirmedPayment(supabase, payment);
+    return payment;
+  }
+
   if (!payment.tx_hash) {
     throw new ApiError(400, "tx_hash_required", "Submit a transaction hash before verification.");
   }
@@ -402,8 +461,24 @@ export async function verifyPaymentById(
     received_amount: verification.receivedAmount ?? payment.expected_amount,
     confirmed_at: new Date().toISOString()
   });
-  await grantAccessFromPayment(supabase, confirmed);
+  await finalizeConfirmedPayment(supabase, confirmed);
   return confirmed;
+}
+
+async function finalizeConfirmedPayment(supabase: SupabaseClient, payment: CryptoPaymentRow): Promise<void> {
+  if (payment.payment_type === "deposit") {
+    const { error } = await supabase.rpc("credit_crypto_deposit", {
+      target_payment_id: payment.id
+    });
+
+    if (error) {
+      throw new ApiError(500, "deposit_credit_failed", "Account balance could not be credited.");
+    }
+
+    return;
+  }
+
+  await grantAccessFromPayment(supabase, payment);
 }
 
 async function findConfirmedDuplicate(supabase: SupabaseClient, payment: CryptoPaymentRow): Promise<boolean> {

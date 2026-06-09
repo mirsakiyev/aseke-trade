@@ -1,5 +1,14 @@
 import { sampleCourses, sampleGuides } from "../data/sampleContent";
-import type { Course, CryptoAsset, CryptoNetwork, CryptoPayment, CryptoPaymentStatus, Guide } from "../types/content";
+import type {
+  AccountBalance,
+  AccountBalanceTransaction,
+  Course,
+  CryptoAsset,
+  CryptoNetwork,
+  CryptoPayment,
+  CryptoPaymentStatus,
+  Guide
+} from "../types/content";
 import { supabase } from "./supabase";
 
 export interface PaymentMethodChoice {
@@ -37,6 +46,14 @@ interface SubmitPaymentResponse {
   payment: CryptoPayment;
 }
 
+interface SpendAccountBalanceResponse {
+  result: {
+    transaction_id: string;
+    balance_cents: number;
+    purchase_id: string;
+  };
+}
+
 type MaybeArray<T> = T | T[] | null | undefined;
 
 export const cryptoPaymentMethods: PaymentMethodChoice[] = [
@@ -64,7 +81,7 @@ export const cryptoStatusMessages: Record<CryptoPaymentStatus, string> = {
   pending: "Waiting for payment",
   submitted: "Transaction submitted",
   verifying: "Verifying on-chain",
-  confirmed: "Payment confirmed. Premium access unlocked.",
+  confirmed: "Payment confirmed.",
   underpaid: "Payment received but amount is lower than required.",
   overpaid: "Payment received above the expected amount.",
   expired: "Payment window expired. Create a new payment.",
@@ -157,6 +174,30 @@ export async function createCryptoPayment(input: {
   return invokeCryptoFunction<CreatePaymentResponse>("create-crypto-payment", body);
 }
 
+export async function createCryptoDeposit(input: {
+  amount: string;
+  asset: CryptoAsset;
+  network: CryptoNetwork;
+}): Promise<CreatePaymentResponse> {
+  return invokeCryptoFunction<CreatePaymentResponse>("create-crypto-payment", {
+    payment_type: "deposit",
+    amount: input.amount,
+    asset: input.asset,
+    network: input.network
+  });
+}
+
+export async function spendAccountBalance(input: {
+  itemType: "course" | "guide";
+  itemId: string;
+}): Promise<SpendAccountBalanceResponse["result"]> {
+  const response = await invokeCryptoFunction<SpendAccountBalanceResponse>("spend-account-balance", {
+    item_type: input.itemType,
+    item_id: input.itemId
+  });
+  return response.result;
+}
+
 export async function submitCryptoTx(paymentId: string, txHash: string): Promise<CryptoPayment> {
   const response = await invokeCryptoFunction<SubmitPaymentResponse>("submit-crypto-tx", {
     payment_id: paymentId,
@@ -184,6 +225,27 @@ export async function fetchUserCryptoPayments(userId: string): Promise<CryptoPay
 
   if (error) return [];
   return (data ?? []) as CryptoPayment[];
+}
+
+export async function fetchAccountBalance(userId: string): Promise<AccountBalance | null> {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.from("account_balances").select("*").eq("user_id", userId).maybeSingle();
+  if (error) return null;
+  return data as AccountBalance | null;
+}
+
+export async function fetchAccountBalanceTransactions(userId: string): Promise<AccountBalanceTransaction[]> {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("account_balance_transactions")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return (data ?? []) as AccountBalanceTransaction[];
 }
 
 async function invokeCryptoFunction<T>(functionName: string, body: Record<string, unknown>): Promise<T> {

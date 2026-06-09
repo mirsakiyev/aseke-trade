@@ -6,19 +6,24 @@ import { useAuth } from "../contexts/AuthContext";
 import {
   createCryptoPayment,
   cryptoPaymentMethods,
+  fetchAccountBalance,
   fetchCheckoutItem,
+  spendAccountBalance,
   type CheckoutItem
 } from "../lib/cryptoPayments";
 import { formatMoney } from "../lib/validation";
+import type { AccountBalance } from "../types/content";
 
 export function CryptoCheckout() {
   const { itemType, itemId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [item, setItem] = useState<CheckoutItem | null>(null);
+  const [balance, setBalance] = useState<AccountBalance | null>(null);
   const [selectedMethod, setSelectedMethod] = useState(cryptoPaymentMethods[0]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [isPayingWithBalance, setIsPayingWithBalance] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,7 +40,28 @@ export function CryptoCheckout() {
     };
   }, [itemId, itemType]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    if (!user) {
+      setBalance(null);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    fetchAccountBalance(user.id).then((nextBalance) => {
+      if (mounted) setBalance(nextBalance);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
   const checkoutType = useMemo(() => (itemType === "guide" ? "guide" : "course"), [itemType]);
+  const availableBalance = balance?.balance_cents ?? 0;
+  const canPayWithBalance = Boolean(item && item.price_cents > 0 && availableBalance >= item.price_cents);
 
   const createPayment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -56,6 +82,25 @@ export function CryptoCheckout() {
       setMessage(error instanceof Error ? error.message : "Crypto checkout could not be started.");
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const payWithBalance = async () => {
+    if (!item || !user) return;
+
+    setIsPayingWithBalance(true);
+    setMessage(null);
+
+    try {
+      await spendAccountBalance({
+        itemType: checkoutType,
+        itemId: item.id
+      });
+      navigate("/account/payments");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Balance payment could not be completed.");
+    } finally {
+      setIsPayingWithBalance(false);
     }
   };
 
@@ -155,6 +200,10 @@ export function CryptoCheckout() {
                 <dt>Network</dt>
                 <dd>{selectedMethod.label}</dd>
               </div>
+              <div>
+                <dt>Account balance</dt>
+                <dd>{formatMoney(availableBalance)}</dd>
+              </div>
             </dl>
 
             <div className="payment-warning-list">
@@ -175,6 +224,14 @@ export function CryptoCheckout() {
             <button className="primary-button full-width" type="submit" disabled={isCreating || item.price_cents <= 0}>
               {isCreating ? "Creating payment" : "Continue"}
               <ArrowRight size={17} />
+            </button>
+            <button
+              className="ghost-button full-width"
+              type="button"
+              disabled={!canPayWithBalance || isPayingWithBalance}
+              onClick={() => void payWithBalance()}
+            >
+              {isPayingWithBalance ? "Processing balance" : "Pay with Balance"}
             </button>
           </aside>
         </form>

@@ -54,6 +54,16 @@ export function CryptoPayment() {
     const seconds = Math.floor((remaining % 60000) / 1000);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }, [now, payment]);
+  const statusMessage = useMemo(() => {
+    if (!payment) return "";
+    if (payment.status === "confirmed") {
+      return payment.payment_type === "deposit"
+        ? "Deposit confirmed. Account balance credited."
+        : "Payment confirmed. Premium access unlocked.";
+    }
+
+    return cryptoStatusMessages[payment.status];
+  }, [payment]);
 
   const submitHash = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -127,12 +137,13 @@ export function CryptoPayment() {
           <p className="eyebrow">Crypto Payment</p>
           <h1>{formatStableAmount(payment.expected_amount, payment.asset)}</h1>
           <p className="muted">
+            {payment.payment_type === "deposit" ? "Account balance deposit" : "Premium content purchase"} -{" "}
             {payment.asset} on {payment.network}. Use the exact network and token shown here.
           </p>
         </div>
         <span className={`status-pill ${statusTone(payment.status)}`}>
           {payment.status === "confirmed" ? <CheckCircle2 size={15} /> : <Clock3 size={15} />}
-          {cryptoStatusMessages[payment.status]}
+          {statusMessage}
         </span>
       </section>
 
