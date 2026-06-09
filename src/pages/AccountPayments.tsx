@@ -79,7 +79,7 @@ export function AccountPayments() {
       });
       navigate(`/payment/${response.payment.id}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Deposit invoice could not be created.");
+      setMessage(error instanceof Error ? error.message : "We could not start this deposit. Please try again.");
     } finally {
       setIsCreatingDeposit(false);
     }
@@ -90,8 +90,10 @@ export function AccountPayments() {
       <section className="page-title-row">
         <div>
           <p className="eyebrow">Account</p>
-          <h1>Crypto payment history</h1>
-          <p className="muted">Track pending invoices, submitted transactions, and confirmed premium access.</p>
+          <h1>Balance and payment history</h1>
+          <p className="muted">
+            Top up your account, review crypto deposits, and track verified Premium access.
+          </p>
         </div>
         <span className="status-pill premium">
           <WalletCards size={15} />
@@ -111,15 +113,17 @@ export function AccountPayments() {
               <h2>{accountStatus.balanceLabel}</h2>
               <p className="muted">
                 Plan: {accountStatus.planLabel}. Verified deposits credit this balance. Balance purchases deduct from it
-                and create an audit entry.
+                and create a payment history entry.
               </p>
             </article>
 
             <form className="section-panel stack-form" onSubmit={createDeposit}>
               <div>
                 <p className="eyebrow">Deposit Crypto</p>
-                <h2>Create deposit invoice</h2>
-                <p className="muted">Minimum deposit: $10.00. QR and copy buttons show the receiving address only.</p>
+                <h2>Top up balance</h2>
+                <p className="muted">
+                  Minimum deposit: $10.00. The QR code and copy button show the receiving address only.
+                </p>
               </div>
 
               <label>
@@ -159,7 +163,7 @@ export function AccountPayments() {
 
               <button className="primary-button full-width" type="submit" disabled={isCreatingDeposit}>
                 <Plus size={17} />
-                {isCreatingDeposit ? "Creating deposit" : "Create Deposit"}
+                {isCreatingDeposit ? "Creating deposit" : "Create deposit request"}
               </button>
               <button
                 className="ghost-button full-width"
@@ -216,9 +220,11 @@ export function AccountPayments() {
             <section className="section-panel">
               <p className="eyebrow">No Payments</p>
               <h2>No crypto payments yet</h2>
-              <p className="muted">Premium purchases and balance deposits will appear here.</p>
-              <Link className="primary-button" to="/courses">
-                Browse courses
+              <p className="muted">
+                You have no payments yet. Top up your balance or join the Trading Academy when you are ready.
+              </p>
+              <Link className="primary-button" to="/premium">
+                Join Trading Academy
               </Link>
             </section>
           )}
@@ -248,12 +254,12 @@ export function AccountPayments() {
 function CryptoDepositGuide() {
   const steps = [
     "Choose a deposit amount of $10.00 or more.",
-    "Choose the asset and network you will actually send from your wallet or exchange.",
-    "Create the invoice, then copy or scan the receiving address.",
-    "Open your wallet or exchange and paste the exact receiving address.",
-    "Send the exact amount on the exact network shown on ASEKE TRADE.",
-    "After sending, copy the transaction hash, transaction ID, or TxID from transaction details, withdrawal history, or activity.",
-    "Paste that transaction hash on the ASEKE TRADE payment page so the server can verify it on-chain."
+    "Choose the exact asset and network you will send from your wallet or exchange.",
+    "Create the payment request, then copy or scan the receiving address.",
+    "Paste the address into your wallet or exchange withdrawal screen.",
+    "Send only the selected asset on the selected network shown by ASEKE TRADE.",
+    "After sending, copy the transaction hash, transaction ID, or TxID from your withdrawal details.",
+    "Paste that transaction hash on the ASEKE TRADE payment page so the server can verify the transfer on-chain."
   ];
 
   return (
@@ -298,7 +304,7 @@ function CryptoDepositGuide() {
         </p>
         <p>
           <ShieldAlert size={16} />
-          Never send from the wrong network, never send unsupported coins, and never paste a seed phrase or private key.
+          Sending the wrong asset or network may result in lost funds. Never paste a seed phrase or private key.
         </p>
         <p>
           <ShieldAlert size={16} />

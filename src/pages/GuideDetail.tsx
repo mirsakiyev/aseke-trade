@@ -114,14 +114,14 @@ export function GuideDetail() {
             <h2>{user ? "Premium guide locked" : "Login to continue"}</h2>
             <p>
               {user
-                ? "This guide belongs to the Premium Trading Academy path. Upgrade to unlock it until your subscription expires."
-                : "Create an account or sign in to unlock eligible premium education and track your progress."}
+                ? "This guide belongs to the Premium Trading Academy path. Upgrade to unlock advanced trading education until your subscription expires."
+                : "Create an account or sign in to unlock eligible Premium education and track your progress."}
             </p>
             <div className="inline-actions">
               {user ? (
                 <Link className="primary-button" to={premiumCheckoutPath("premium_1_month")}>
                   <WalletCards size={17} />
-                  Get Premium
+                  Join Trading Academy
                   <ArrowRight size={17} />
                 </Link>
               ) : (
@@ -153,7 +153,7 @@ export function GuideDetail() {
           paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)
         ) : (
           <p className="muted">
-            {guide.description} Full content is available after premium access is verified.
+            {guide.description} Full content is available after Premium access is verified.
           </p>
         )}
 

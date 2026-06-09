@@ -7,9 +7,9 @@ export const PREMIUM_PLANS = [
     durationMonths: 1,
     durationLabel: "1 month",
     priceCents: 1000,
-    badge: "Minimum plan",
+    badge: "Starter month",
     featured: false,
-    description: "Start with the minimum Premium subscription duration."
+    description: "Start the Trading Academy with one month of Premium access."
   },
   {
     id: "premium_1_year",
@@ -17,9 +17,9 @@ export const PREMIUM_PLANS = [
     durationMonths: 12,
     durationLabel: "1 year",
     priceCents: 5000,
-    badge: "Better value",
+    badge: "Best value",
     featured: true,
-    description: "Best value for learners staying with the full Premium path."
+    description: "Stay active for a full year of advanced trading education and support."
   }
 ] as const;
 

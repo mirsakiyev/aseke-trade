@@ -66,7 +66,7 @@ export function CryptoCheckout() {
       });
       navigate(`/payment/${response.payment.id}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Crypto checkout could not be started.");
+      setMessage(error instanceof Error ? error.message : "We could not start this payment. Please try again.");
     } finally {
       setIsCreating(false);
     }
@@ -86,7 +86,7 @@ export function CryptoCheckout() {
       });
       navigate("/account/payments");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Balance payment could not be completed.");
+      setMessage(error instanceof Error ? error.message : "We could not complete your balance purchase. Please check your balance and try again.");
     } finally {
       setIsPayingWithBalance(false);
     }
@@ -106,7 +106,7 @@ export function CryptoCheckout() {
         <section className="section-panel">
           <p className="eyebrow">Checkout</p>
           <h1>Item unavailable</h1>
-          <p className="muted">This course or guide cannot be prepared for checkout.</p>
+          <p className="muted">This course, guide, or plan cannot be prepared for checkout.</p>
           <Link className="primary-button" to="/courses">
             Back to courses
           </Link>
@@ -120,10 +120,10 @@ export function CryptoCheckout() {
       <section className="page-title-row">
         <div>
           <p className="eyebrow">Crypto Checkout</p>
-          <h1>{isPremiumCheckout ? PREMIUM_PRODUCT_LABEL : item.title}</h1>
+          <h1>{isPremiumCheckout ? "Join Trading Academy" : item.title}</h1>
           <p className="muted">
             {isPremiumCheckout
-              ? `Product: ${PREMIUM_PRODUCT_LABEL}. Duration: ${item.duration_label}. Price: ${formatMoney(item.price_cents)}.`
+              ? `Premium Trading Academy access. Duration: ${item.duration_label}. Price: ${formatMoney(item.price_cents)}.`
               : item.description}
           </p>
         </div>
@@ -140,7 +140,7 @@ export function CryptoCheckout() {
           <LockKeyhole size={28} />
           <div>
             <h2>Login to continue</h2>
-            <p className="muted">Crypto payment intents are attached to your ASEKE TRADE account.</p>
+            <p className="muted">Crypto payments are attached to your ASEKE TRADE account for secure access tracking.</p>
           </div>
           <div className="inline-actions">
             <Link className="primary-button" to="/login">
@@ -156,7 +156,7 @@ export function CryptoCheckout() {
           <section className="section-panel checkout-method-panel">
             <div>
               <p className="eyebrow">Select Network</p>
-              <h2>{isPremiumCheckout ? "Pay for Premium with crypto" : "Buy with crypto"}</h2>
+              <h2>{isPremiumCheckout ? "Pay for Trading Academy with crypto" : "Pay with crypto"}</h2>
             </div>
 
             <div className="payment-method-grid" role="radiogroup" aria-label="Payment method">
@@ -207,7 +207,7 @@ export function CryptoCheckout() {
             <div className="payment-warning-list">
               <p>
                 <AlertTriangle size={16} />
-                Sending on the wrong network may result in lost funds.
+                Only send the selected asset on the selected network. Wrong-network transfers may be lost.
               </p>
               <p>
                 <AlertTriangle size={16} />
@@ -217,12 +217,12 @@ export function CryptoCheckout() {
               </p>
               <p>
                 <AlertTriangle size={16} />
-                Crypto payments may be irreversible.
+                Crypto payments are usually irreversible.
               </p>
             </div>
 
             <button className="primary-button full-width" type="submit" disabled={isCreating || item.price_cents <= 0}>
-              {isCreating ? "Creating payment" : "Continue"}
+              {isCreating ? "Creating payment" : "Pay with Crypto"}
               <ArrowRight size={17} />
             </button>
             <button

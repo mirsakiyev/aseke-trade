@@ -22,7 +22,8 @@ export function Charts() {
           <p className="eyebrow">Market Charts</p>
           <h1>Live Crypto Charts</h1>
           <p>
-            Track Bitcoin and major crypto assets in real time with live TradingView market charts.
+            Track major crypto markets and study how price, volume, trend structure, and market behavior
+            work together.
           </p>
         </div>
         <span className="charts-title-mark" aria-hidden="true">
@@ -62,17 +63,17 @@ export function Charts() {
       </section>
 
       <p className="soft-notice">
-        Charts are provided for educational purposes only and are not financial advice.
+        Charts are for education and market observation only. They are not financial advice.
       </p>
 
       <section className="charts-learning-cta">
         <div>
           <p className="eyebrow">Chart Education</p>
           <h2>Want to understand what you are seeing?</h2>
-          <p>Start learning crypto strategy with ASEKE TRADE guides.</p>
+          <p>Study chart reading, risk management, and trading strategy with ASEKE TRADE education.</p>
         </div>
         <Link className="primary-button" to="/guides">
-          Open guides
+          Start Learning Free
           <ArrowRight size={18} />
         </Link>
       </section>

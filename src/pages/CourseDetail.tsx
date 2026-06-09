@@ -120,14 +120,14 @@ export function CourseDetail() {
             <h2>{user ? "Premium access required" : "Login to continue"}</h2>
             <p>
               {user
-                ? "Your account needs an active Premium subscription to unlock the protected guides."
-                : "Create an account or sign in to track progress and unlock eligible premium content."}
+                ? "Upgrade to Premium to join the Trading Academy and unlock advanced trading education for this path."
+                : "Create an account or sign in to track progress and unlock eligible Premium education."}
             </p>
             <div className="inline-actions">
               {user ? (
                 <Link className="primary-button" to={premiumCheckoutPath("premium_1_month")}>
                   <WalletCards size={17} />
-                  View Premium Plans
+                  Join Trading Academy
                   <ArrowRight size={17} />
                 </Link>
               ) : (
@@ -152,7 +152,7 @@ export function CourseDetail() {
           <article className="module-card">
             <div className="module-heading">
               <span>{courseGuides.length} guides</span>
-              <h2>Course guide list</h2>
+              <h2>Learning guides</h2>
             </div>
             <div className="lesson-list">
               {courseGuides.map((guide) => {
@@ -171,11 +171,11 @@ export function CourseDetail() {
                       </div>
                       <p>
                         {locked
-                          ? "This guide is part of the premium Trading Academy path."
+                          ? "This guide is part of the Premium Trading Academy path."
                           : guide.description}
                       </p>
                       <Link className="ghost-button compact" to={`/guides/${guide.slug}`}>
-                        {locked ? "View Access" : "Open Guide"}
+                        {locked ? "View access" : "Open guide"}
                         <ArrowRight size={16} />
                       </Link>
                     </div>
@@ -207,7 +207,7 @@ export function CourseDetail() {
                         </div>
                         <p>
                           {locked
-                            ? "This lesson is locked until your account has premium access or a verified purchase."
+                            ? "This lesson unlocks with Premium access or a verified purchase."
                             : lesson.content}
                         </p>
                         {!locked && user && (

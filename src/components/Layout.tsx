@@ -143,11 +143,17 @@ export function Layout() {
             <img src="/assets/aseke-trade-logo.png" alt="" aria-hidden="true" />
             <strong>ASEKE TRADE</strong>
           </div>
-          <p>ASEKE TRADE - Crypto Education Temple.</p>
+          <p>Crypto trading education built around safety, structure, and discipline.</p>
+          <nav className="footer-links" aria-label="Footer links">
+            <Link to="/terms">Terms</Link>
+            <Link to="/guides">Guides</Link>
+            <Link to="/charts">Charts</Link>
+            <Link to="/premium">Trading Academy</Link>
+          </nav>
         </div>
         <p>
-          Educational content only. Not financial advice. Crypto and futures trading are risky, and users
-          are responsible for their own decisions.
+          Educational content only. Not financial advice. Crypto markets, leverage, and futures trading
+          are volatile and involve risk. Users are responsible for their own decisions.
         </p>
       </footer>
     </div>

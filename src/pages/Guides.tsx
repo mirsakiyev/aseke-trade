@@ -47,7 +47,7 @@ export function Guides() {
       guide_id: guideId
     });
 
-    setNotice(error ? "Guide could not be saved. It may already be in your dashboard." : "Guide saved to your dashboard.");
+    setNotice(error ? "This guide could not be saved. It may already be in your dashboard." : "Guide saved to your dashboard.");
   };
 
   return (
@@ -55,14 +55,14 @@ export function Guides() {
       <section className="page-title-row">
         <div>
           <p className="eyebrow">Guides and Tutorials</p>
-          <h1>Free and premium crypto education</h1>
+          <h1>Crypto guides for safer market decisions</h1>
           <p className="muted">
-            Filter the curriculum by topic, difficulty, read time, and access level.
+            Browse foundations, safety guides, market research, on-chain intelligence, and Premium Trading Academy materials.
           </p>
         </div>
         <Link className="primary-button" to="/premium">
           <LockKeyhole size={17} />
-          Premium Access
+          Upgrade to Premium
         </Link>
       </section>
 
@@ -109,13 +109,13 @@ export function Guides() {
                   <BookOpen size={16} />
                   <span>
                     {isPremiumGuide
-                      ? "Premium guide. Open it to review access options."
-                      : "Free guide available in this learning path."}
+                      ? "Premium Trading Academy guide. Open it to review access options."
+                      : "Free guide for building safer crypto foundations."}
                   </span>
                 </div>
                 <div className="inline-actions">
                   <Link className="ghost-button compact" to={`/guides/${guide.slug}`}>
-                    Open Guide
+                    Open guide
                     <ArrowRight size={16} />
                   </Link>
                   <button className="ghost-button compact" type="button" onClick={() => void saveGuide(guide.id)}>

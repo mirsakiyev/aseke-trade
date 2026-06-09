@@ -5,29 +5,30 @@ import { formatPremiumPrice, PREMIUM_PLANS, premiumCheckoutPath, type PremiumPla
 import { formatMoney } from "../lib/validation";
 
 const premiumPerks = [
-  "Access to Premium courses/guides",
-  "Premium trading signals",
-  "Individual strategy creation for Premium users",
-  "1-on-1 training sessions",
-  "Advanced trading education",
-  "Risk management lessons",
-  "Futures and derivatives education",
-  "Priority updates for new Premium materials"
+  "Access the ASEKE TRADE Trading Academy",
+  "Study advanced trading lessons step by step",
+  "Build risk management and trade review habits",
+  "Learn trading psychology and execution discipline",
+  "Study futures, leverage, liquidation, and derivatives",
+  "Review Premium market examples and trading signals",
+  "Request individual strategy support",
+  "Access 1-on-1 learning guidance when available"
 ];
 
 const comparisonRows = [
-  { feature: "Beginner crypto education", free: true, premium: true },
-  { feature: "Crypto Foundations", free: true, premium: true },
-  { feature: "Crypto Safety & Security", free: true, premium: true },
-  { feature: "Limited guides", free: true, premium: true },
+  { feature: "Crypto basics", free: true, premium: true },
+  { feature: "Wallet safety and self-custody", free: true, premium: true },
+  { feature: "Beginner guides and market foundations", free: true, premium: true },
+  { feature: "Limited educational content", free: true, premium: true },
   { feature: "Trading Academy access", free: false, premium: true },
-  { feature: "Premium trading signals", free: false, premium: true },
-  { feature: "Individual trading strategy help", free: false, premium: true },
-  { feature: "1-on-1 training", free: false, premium: true },
-  { feature: "Advanced trading guides", free: false, premium: true },
-  { feature: "Futures, leverage, liquidation, and derivatives education", free: false, premium: true },
+  { feature: "Advanced trading strategies", free: false, premium: true },
+  { feature: "Technical analysis education", free: false, premium: true },
   { feature: "Risk management masterclass", free: false, premium: true },
-  { feature: "Trading psychology content", free: false, premium: true }
+  { feature: "Trading psychology", free: false, premium: true },
+  { feature: "Futures and derivatives education", free: false, premium: true },
+  { feature: "Premium trading signals", free: false, premium: true },
+  { feature: "Individual trading strategy support", free: false, premium: true },
+  { feature: "1-on-1 training access", free: false, premium: true }
 ];
 
 export function Premium() {
@@ -40,11 +41,11 @@ export function Premium() {
     <main className="page page-stack">
       <section className="page-title-row">
         <div>
-          <p className="eyebrow">Premium Access</p>
-          <h1>Premium crypto education with time-based access</h1>
+          <p className="eyebrow">Trading Academy</p>
+          <h1>Join the ASEKE TRADE Trading Academy</h1>
           <p className="muted">
-            Choose a Premium subscription, pay with verified crypto or account balance, and keep access until
-            the subscription expiry date.
+            Premium unlocks advanced trading education, risk management frameworks, trading psychology,
+            futures and derivatives lessons, Premium signals, individual strategy support, and 1-on-1 guidance.
           </p>
         </div>
         <span className="status-pill premium">
@@ -56,32 +57,34 @@ export function Premium() {
       <section className="pricing-grid premium-plan-grid">
         <article className="pricing-card">
           <p className="eyebrow">Free</p>
-          <h2>Starter access</h2>
+          <h2>Foundation access</h2>
           <p className="price-line">$0</p>
-          <p>Beginner education, crypto basics, basic market education, and limited free content.</p>
+          <p>
+            Learn crypto basics, wallet safety, beginner guides, and market foundations before risking capital.
+          </p>
           <ul className="check-list">
             <li>
               <Check size={17} />
-              Access to free beginner courses/guides
+              Free beginner courses and guides
             </li>
             <li>
               <Check size={17} />
-              Crypto basics and safety foundations
+              Crypto basics, wallet safety, and market foundations
             </li>
             <li>
               <X size={17} />
-              No Premium signals, strategy support, or 1-on-1 training
+              Trading Academy, signals, strategy support, and 1-on-1 guidance are Premium
             </li>
           </ul>
           <Link className="ghost-button full-width" to="/guides">
-            Browse Free Guides
+            Start Learning Free
           </Link>
         </article>
 
         {PREMIUM_PLANS.map((plan) => (
           <article className={plan.featured ? "pricing-card featured" : "pricing-card"} key={plan.id}>
             <p className="eyebrow">{plan.badge}</p>
-            <h2>{plan.productLabel}</h2>
+            <h2>Trading Academy</h2>
             <p className="price-line">
               {formatMoney(plan.priceCents)}
               <span> / {plan.durationLabel}</span>
@@ -97,7 +100,7 @@ export function Premium() {
             </ul>
             <Link className="primary-button full-width" to={planLink(plan.id)}>
               <WalletCards size={17} />
-              Get Premium - {plan.durationLabel} / {formatPremiumPrice(plan.priceCents)}
+              Join Trading Academy - {plan.durationLabel} / {formatPremiumPrice(plan.priceCents)}
             </Link>
           </article>
         ))}
@@ -107,11 +110,11 @@ export function Premium() {
         <div className="lesson-title-line">
           <div>
             <p className="eyebrow">Premium Perks</p>
-            <h2>What Premium includes</h2>
+            <h2>What the Trading Academy includes</h2>
           </div>
           <span className="status-pill premium">
             <Sparkles size={15} />
-            Placeholder perks
+            Premium education
           </span>
         </div>
         <div className="premium-perk-grid">
@@ -127,7 +130,7 @@ export function Premium() {
       <section className="section-panel page-stack">
         <div>
           <p className="eyebrow">Comparison</p>
-          <h2>Free vs Premium</h2>
+          <h2>Free foundations vs Premium Trading Academy</h2>
         </div>
         <div className="comparison-table" role="table" aria-label="Free and Premium comparison">
           <div className="comparison-row comparison-head" role="row">
@@ -148,11 +151,11 @@ export function Premium() {
       <section className="risk-band">
         <div>
           <p className="eyebrow">Payment Security</p>
-          <h2>Verified access only</h2>
+          <h2>Educational access, verified securely</h2>
         </div>
         <p>
-          Premium unlocks only after verified on-chain payment or a successful account balance purchase.
-          Expiry is tracked on your ASEKE TRADE profile.
+          Premium content is educational only and does not guarantee profits. Access unlocks only after a
+          verified on-chain payment or a successful account balance purchase, with expiry tracked on your profile.
         </p>
         <ShieldCheck size={32} aria-hidden="true" />
       </section>

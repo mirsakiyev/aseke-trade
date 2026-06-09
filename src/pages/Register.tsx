@@ -43,7 +43,9 @@ export function Register() {
         <div>
           <p className="eyebrow">Create Account</p>
           <h1>Join ASEKE TRADE</h1>
-          <p className="muted">Register to save guides, track progress, and unlock verified premium access.</p>
+          <p className="muted">
+            Create your account to save guides, track progress, and unlock verified Premium Trading Academy access.
+          </p>
         </div>
 
         {!isConfigured && (
@@ -114,7 +116,7 @@ export function Register() {
 
           <button className="primary-button full-width" type="submit" disabled={isSubmitting || !isConfigured}>
             <UserPlus size={17} />
-            {isSubmitting ? "Creating account" : "Register"}
+            {isSubmitting ? "Creating account" : "Create account"}
           </button>
         </form>
 

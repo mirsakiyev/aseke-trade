@@ -88,7 +88,9 @@ export function Dashboard() {
         <div>
           <p className="eyebrow">Dashboard</p>
           <h1>Learning account</h1>
-          <p className="muted">Your profile, access status, saved guides, and course progress.</p>
+          <p className="muted">
+            Continue your trading education, manage your balance, and track your Premium access.
+          </p>
         </div>
         <span className={accountStatus.isPremiumActive ? "status-pill premium" : "status-pill free"}>
           <Crown size={15} />
@@ -136,7 +138,9 @@ export function Dashboard() {
           </span>
           <h2>Account access</h2>
           <p className="muted">
-            Keep funds ready for Premium purchases and manage your access from one place.
+            {accountStatus.isPremiumActive
+              ? "Your Premium access is active. Continue the Trading Academy, review Premium materials, or extend your subscription."
+              : "You are on the Basic plan. Upgrade to join the Trading Academy and unlock advanced lessons, Premium signals, strategy support, and 1-on-1 guidance."}
           </p>
           <div className="inline-actions">
             <Link className="primary-button compact" to="/account/payments">
@@ -145,7 +149,7 @@ export function Dashboard() {
             </Link>
             <Link className="ghost-button compact" to="/premium">
               <ShieldCheck size={16} />
-              {accountStatus.isPremiumActive ? "Extend Premium" : "Upgrade Premium"}
+              {accountStatus.isPremiumActive ? "Extend Premium" : "Join Trading Academy"}
             </Link>
           </div>
         </article>
@@ -159,7 +163,7 @@ export function Dashboard() {
             <span className="feature-icon">
               <GraduationCap size={21} />
             </span>
-            <h2>Purchased Access</h2>
+            <h2>Recent Payments & Access</h2>
             {purchases.length ? (
               <ul className="plain-list">
                 {purchases.map((purchase) => (
@@ -170,7 +174,9 @@ export function Dashboard() {
                 ))}
               </ul>
             ) : (
-              <p className="muted">No purchases or manual grants yet.</p>
+              <p className="muted">
+                You have no payments yet. Top up your balance or join the Trading Academy when you are ready.
+              </p>
             )}
           </article>
 
@@ -189,7 +195,7 @@ export function Dashboard() {
                 ))}
               </ul>
             ) : (
-              <p className="muted">No saved guides yet.</p>
+              <p className="muted">No saved guides yet. Start with Crypto Foundations, then save the guides you want to revisit.</p>
             )}
           </article>
 
@@ -208,7 +214,9 @@ export function Dashboard() {
                 ))}
               </ul>
             ) : (
-              <p className="muted">No lesson progress recorded yet.</p>
+              <p className="muted">
+                You have not started any lessons yet. Begin with foundations, then move toward Trading Academy topics when ready.
+              </p>
             )}
           </article>
         </section>

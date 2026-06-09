@@ -89,15 +89,15 @@ export const cryptoPaymentMethods: PaymentMethodChoice[] = [
 ];
 
 export const cryptoStatusMessages: Record<CryptoPaymentStatus, string> = {
-  pending: "Waiting for payment",
+  pending: "Payment request ready",
   submitted: "Transaction submitted",
-  verifying: "Verifying on-chain",
-  confirmed: "Payment confirmed.",
-  underpaid: "Payment received but amount is lower than required.",
+  verifying: "Checking blockchain confirmations",
+  confirmed: "Payment completed",
+  underpaid: "Payment received, but the amount is lower than required.",
   overpaid: "Payment received above the expected amount.",
-  expired: "Payment window expired. Create a new payment.",
-  failed: "Transaction failed or could not be verified.",
-  duplicate: "This transaction was already used."
+  expired: "This payment request expired. Create a new request before sending funds.",
+  failed: "This transaction could not be verified.",
+  duplicate: "This transaction hash was already used."
 };
 
 export function formatStableAmount(amount: string | number, asset: CryptoAsset): string {
@@ -161,7 +161,7 @@ export async function fetchCheckoutItem(itemType: string | undefined, itemId: st
       id: plan.id,
       itemType,
       title: PREMIUM_PRODUCT_LABEL,
-      description: `${plan.durationLabel} ASEKE TRADE Premium subscription.`,
+      description: `${plan.durationLabel} ASEKE TRADE Trading Academy access.`,
       price_cents: plan.priceCents,
       is_premium: true,
       product_label: PREMIUM_PRODUCT_LABEL,
@@ -359,7 +359,7 @@ async function invokeCryptoFunction<T>(functionName: string, body: Record<string
 }
 
 async function functionErrorMessage(error: { message?: string; context?: unknown }): Promise<string> {
-  const fallback = error.message || "Edge Function request failed.";
+  const fallback = error.message || "We could not complete this request. Please try again.";
   const context = error.context;
 
   if (context instanceof Response) {

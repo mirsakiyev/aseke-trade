@@ -31,14 +31,15 @@ export function Courses() {
       <section className="page-title-row">
         <div>
           <p className="eyebrow">Courses</p>
-          <h1>Structured paths for market education</h1>
+          <h1>Structured crypto education for better trading decisions</h1>
           <p className="muted">
-            Follow five clear learning paths, from crypto basics through advanced trading, DeFi, and development.
+            Start with foundations, then move toward Trading Academy topics like market structure,
+            technical analysis, risk management, futures, and trading psychology.
           </p>
         </div>
         <Link className="platinum-button" to="/premium">
           <Crown size={17} />
-          Join Premium
+          Join Trading Academy
         </Link>
       </section>
 
@@ -70,7 +71,7 @@ export function Courses() {
                 </span>
               </div>
               <Link className="text-link" to={`/courses/${course.slug}`}>
-                View course
+                View learning path
                 <ArrowRight size={16} />
               </Link>
             </article>

@@ -62,10 +62,10 @@ export function CryptoPayment() {
     if (!payment) return "";
     if (payment.status === "confirmed") {
       return payment.payment_type === "deposit"
-        ? "Deposit confirmed. Account balance credited."
+        ? "Payment completed. Your balance has been updated."
         : payment.product_type === "premium"
-          ? "Premium subscription confirmed."
-          : "Payment confirmed. Content access unlocked.";
+          ? "Payment completed. Your Premium access has been updated."
+          : "Payment completed. Content access has been updated.";
     }
 
     return cryptoStatusMessages[payment.status];
@@ -83,7 +83,7 @@ export function CryptoPayment() {
       setPayment(nextPayment);
       setTxHash(nextPayment.tx_hash ?? txHash);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Transaction could not be submitted.");
+      setMessage(error instanceof Error ? error.message : "We could not check this transaction. Please review the hash and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -118,7 +118,7 @@ export function CryptoPayment() {
         await refreshPayment();
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Payment status could not be refreshed.");
+      setMessage(error instanceof Error ? error.message : "Payment status could not be refreshed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -157,7 +157,7 @@ export function CryptoPayment() {
             {payment.product_type === "premium"
               ? `Product: ${PREMIUM_PRODUCT_LABEL}. Duration: ${durationLabel}. Price: ${formatMoney(payment.fiat_amount_cents ?? Math.round(Number(payment.expected_amount) * 100))}.`
               : `${productLabel} - ${payment.asset} on ${payment.network}.`}{" "}
-            Use the exact network and token shown here.
+            Send only the exact token and network shown here, then paste the transaction hash for verification.
           </p>
         </div>
         <span className={`status-pill ${statusTone(payment.status)}`}>
@@ -234,15 +234,15 @@ export function CryptoPayment() {
           <div className="payment-warning-list">
             <p>
               <ShieldAlert size={16} />
-              Do not send ETH, TRX, or any unsupported token to this invoice.
+              Do not send ETH, TRX, or any unsupported token to this payment request.
             </p>
             <p>
               <ShieldAlert size={16} />
-              Wrong-network transfers may be lost and cannot unlock access.
+              Wrong-network transfers may be lost and cannot unlock balance or Premium access.
             </p>
             <p>
               <ShieldAlert size={16} />
-              Confirmation happens only after on-chain verification.
+              Access updates only after on-chain verification.
             </p>
           </div>
 
@@ -251,7 +251,7 @@ export function CryptoPayment() {
               <p className="eyebrow">Transaction verification</p>
               <h2>Paste transaction ID after sending</h2>
               <p className="muted">
-                ASEKE TRADE verifies the exact blockchain transaction before crediting balance or activating Premium.
+                ASEKE TRADE checks the exact blockchain transaction before crediting balance or activating Premium.
               </p>
             </div>
             <form className="stack-form" onSubmit={submitHash}>
@@ -271,7 +271,7 @@ export function CryptoPayment() {
                   disabled={isSubmitting || isTerminalPaymentStatus(payment.status)}
                 >
                   <Send size={17} />
-                  {isSubmitting ? "Checking" : "Verify transaction"}
+                  {isSubmitting ? "Checking" : "Verify transaction hash"}
                 </button>
                 <button className="ghost-button" type="button" onClick={() => void recheckPayment()} disabled={isSubmitting}>
                   <RefreshCw size={17} />

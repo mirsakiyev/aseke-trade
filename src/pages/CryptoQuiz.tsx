@@ -419,7 +419,7 @@ export function CryptoQuiz() {
               disabled={answeredCount !== attempt.length}
               onClick={submitQuiz}
             >
-              Submit quiz
+              See my level
               <CheckCircle2 size={18} />
             </button>
           </>
