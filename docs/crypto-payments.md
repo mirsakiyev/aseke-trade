@@ -134,6 +134,7 @@ Admins can add or edit receiving wallet rows:
 - notes
 
 Only active wallet rows are used for new user payment/deposit invoices. The database allows only one active row per asset/network pair.
+Account balance deposits must be at least 10 USD.
 
 ## User Pages
 
@@ -166,7 +167,8 @@ Confirmed Premium purchases create `premium_subscriptions` rows and update `prof
 - Non-admin cannot open admin crypto payment controls.
 - User can create a pending 1 month Premium purchase for 10 USD.
 - User can create a pending 1 year Premium purchase for 50 USD.
-- User can create a pending account deposit.
+- User can create a pending account deposit of 10 USD or more.
+- Deposits below 10 USD are rejected.
 - Payment page shows correct amount, asset, network, address, and expiry.
 - Malformed transaction hash is rejected.
 - Wrong-network or wrong-token transaction does not unlock access.

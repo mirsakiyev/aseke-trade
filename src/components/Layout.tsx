@@ -143,7 +143,7 @@ export function Layout() {
             <img src="/assets/aseke-trade-logo.png" alt="" aria-hidden="true" />
             <strong>ASEKE TRADE</strong>
           </div>
-          <p>Founded by Aslan Mirsakiyev, aka Aseke.</p>
+          <p>ASEKE TRADE - Crypto Education Temple.</p>
         </div>
         <p>
           Educational content only. Not financial advice. Crypto and futures trading are risky, and users

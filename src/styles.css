@@ -1777,6 +1777,81 @@ p {
   font-size: clamp(1.15rem, 2vw, 1.5rem);
 }
 
+.form-hint {
+  margin: -0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.deposit-guide-panel {
+  gap: 1rem;
+}
+
+.guide-step-grid,
+.guide-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.guide-step-card,
+.guide-visual-grid article {
+  min-height: 100%;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.045);
+  color: var(--platinum-soft);
+}
+
+.guide-step-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+}
+
+.guide-step-card span {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(229, 228, 226, 0.34);
+  border-radius: 999px;
+  background: rgba(229, 228, 226, 0.1);
+  color: var(--platinum);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.guide-step-card p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.guide-visual-grid article {
+  display: grid;
+  gap: 0.7rem;
+  align-content: center;
+  min-height: 112px;
+}
+
+.guide-visual-grid svg {
+  color: var(--platinum);
+}
+
+.guide-visual-grid strong {
+  line-height: 1.35;
+}
+
+.deposit-guide-warnings {
+  padding: 0.85rem;
+  border: 1px solid rgba(255, 107, 107, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 107, 107, 0.055);
+}
+
 .payment-method-grid {
   display: grid;
   gap: 0.7rem;
@@ -2417,6 +2492,8 @@ select:focus {
   .charts-grid,
   .quiz-status-grid,
   .quiz-recommendation-grid,
+  .guide-step-grid,
+  .guide-visual-grid,
   .course-hero,
   .market-showcase {
     grid-template-columns: 1fr 1fr;
@@ -2511,6 +2588,8 @@ select:focus {
   .quiz-result-panel,
   .quiz-card-footer,
   .quiz-submit-panel,
+  .guide-step-grid,
+  .guide-visual-grid,
   .course-hero,
   .market-showcase,
   .form-row,

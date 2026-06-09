@@ -1,4 +1,4 @@
-import { ArrowRight, Clock3, Plus, WalletCards } from "lucide-react";
+import { ArrowRight, BookOpen, Clock3, Copy, Hash, HelpCircle, Plus, ShieldAlert, WalletCards } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
@@ -18,6 +18,9 @@ import { formatPlanDuration, PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
 import { formatMoney } from "../lib/validation";
 import type { AccountBalanceTransaction, CryptoPayment } from "../types/content";
 
+const MIN_DEPOSIT_USD = 10;
+const DEFAULT_DEPOSIT_AMOUNT = "10.00";
+
 export function AccountPayments() {
   const { user } = useAuth();
   const accountStatus = useAccountStatus();
@@ -25,7 +28,8 @@ export function AccountPayments() {
   const [payments, setPayments] = useState<CryptoPayment[]>([]);
   const [transactions, setTransactions] = useState<AccountBalanceTransaction[]>([]);
   const [selectedMethod, setSelectedMethod] = useState(cryptoPaymentMethods[0]);
-  const [depositAmount, setDepositAmount] = useState("50.00");
+  const [depositAmount, setDepositAmount] = useState(DEFAULT_DEPOSIT_AMOUNT);
+  const [showDepositGuide, setShowDepositGuide] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingDeposit, setIsCreatingDeposit] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -63,6 +67,11 @@ export function AccountPayments() {
     setMessage(null);
 
     try {
+      const numericAmount = Number(depositAmount);
+      if (!Number.isFinite(numericAmount) || numericAmount < MIN_DEPOSIT_USD) {
+        throw new Error("Minimum deposit is 10 USD.");
+      }
+
       const response = await createCryptoDeposit({
         amount: depositAmount,
         asset: selectedMethod.asset,
@@ -110,18 +119,26 @@ export function AccountPayments() {
               <div>
                 <p className="eyebrow">Deposit Crypto</p>
                 <h2>Create deposit invoice</h2>
+                <p className="muted">Minimum deposit: $10.00. QR and copy buttons show the receiving address only.</p>
               </div>
 
               <label>
                 Amount
                 <input
+                  type="number"
                   inputMode="decimal"
+                  min={MIN_DEPOSIT_USD}
+                  step="0.01"
                   value={depositAmount}
                   onChange={(event) => setDepositAmount(event.target.value)}
-                  placeholder="50.00"
+                  placeholder={DEFAULT_DEPOSIT_AMOUNT}
+                  aria-describedby="deposit-minimum"
                   required
                 />
               </label>
+              <p className="form-hint" id="deposit-minimum">
+                Enter at least $10.00. Send the exact stablecoin amount shown on the payment page.
+              </p>
 
               <div className="payment-method-grid" role="radiogroup" aria-label="Deposit method">
                 {cryptoPaymentMethods.map((method) => (
@@ -144,8 +161,20 @@ export function AccountPayments() {
                 <Plus size={17} />
                 {isCreatingDeposit ? "Creating deposit" : "Create Deposit"}
               </button>
+              <button
+                className="ghost-button full-width"
+                type="button"
+                onClick={() => setShowDepositGuide((open) => !open)}
+                aria-controls="crypto-deposit-guide"
+                aria-expanded={showDepositGuide}
+              >
+                <HelpCircle size={17} />
+                {showDepositGuide ? "Hide deposit guide" : "How to deposit with crypto"}
+              </button>
             </form>
           </section>
+
+          {showDepositGuide && <CryptoDepositGuide />}
 
           {payments.length ? (
             <section className="payment-history-list">
@@ -213,6 +242,76 @@ export function AccountPayments() {
         </>
       )}
     </main>
+  );
+}
+
+function CryptoDepositGuide() {
+  const steps = [
+    "Choose a deposit amount of $10.00 or more.",
+    "Choose the asset and network you will actually send from your wallet or exchange.",
+    "Create the invoice, then copy or scan the receiving address.",
+    "Open your wallet or exchange and paste the exact receiving address.",
+    "Send the exact amount on the exact network shown on ASEKE TRADE.",
+    "After sending, copy the transaction hash, transaction ID, or TxID from transaction details, withdrawal history, or activity.",
+    "Paste that transaction hash on the ASEKE TRADE payment page so the server can verify it on-chain."
+  ];
+
+  return (
+    <section className="section-panel deposit-guide-panel" id="crypto-deposit-guide">
+      <div>
+        <p className="eyebrow">Deposit Guide</p>
+        <h2>How to deposit with crypto</h2>
+        <p className="muted">
+          Use only the supported asset and network shown on your invoice. The address QR and copy button contain only
+          the receiving address; confirm amount, asset, and network separately before sending.
+        </p>
+      </div>
+
+      <div className="guide-step-grid">
+        {steps.map((step, index) => (
+          <article className="guide-step-card" key={step}>
+            <span>{index + 1}</span>
+            <p>{step}</p>
+          </article>
+        ))}
+      </div>
+
+      <div className="guide-visual-grid" aria-label="Crypto deposit visual placeholders">
+        <article>
+          <Copy size={18} />
+          <strong>Screenshot: Copy address from ASEKE TRADE</strong>
+        </article>
+        <article>
+          <BookOpen size={18} />
+          <strong>Screenshot: Paste address in wallet or exchange</strong>
+        </article>
+        <article>
+          <Hash size={18} />
+          <strong>Screenshot: Find transaction hash after sending</strong>
+        </article>
+      </div>
+
+      <div className="payment-warning-list deposit-guide-warnings">
+        <p>
+          <ShieldAlert size={16} />
+          USDT TRC20 must be sent on TRON/TRC20. USDT ERC20 and USDC ERC20 must be sent on Ethereum/ERC20.
+        </p>
+        <p>
+          <ShieldAlert size={16} />
+          Never send from the wrong network, never send unsupported coins, and never paste a seed phrase or private key.
+        </p>
+        <p>
+          <ShieldAlert size={16} />
+          Crypto transfers usually cannot be reversed. If a payment is delayed, wait for confirmations and refresh the
+          payment page, then paste the transaction hash again if needed.
+        </p>
+      </div>
+
+      <p className="soft-notice">
+        A transaction hash, also called transaction ID or TxID, is the unique blockchain receipt for your transfer. Most
+        wallets and exchanges show it after withdrawal under transaction details, withdrawal history, or activity.
+      </p>
+    </section>
   );
 }
 

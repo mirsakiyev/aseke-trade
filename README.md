@@ -1,6 +1,6 @@
 # ASEKE TRADE
 
-ASEKE TRADE is a premium crypto education platform founded by Aslan Mirsakiyev, aka Aseke. It is built with Vite, React, TypeScript, Supabase, and Netlify-friendly routing.
+ASEKE TRADE is a premium crypto education platform for disciplined market education. It is built with Vite, React, TypeScript, Supabase, and Netlify-friendly routing.
 
 ## Features
 

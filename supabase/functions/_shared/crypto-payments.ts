@@ -12,6 +12,7 @@ const TRON_USDT_CONTRACT_HEX = "a614f803b6fd780986a42c78ec9c7f77e6ded13c";
 const ETH_USDT_CONTRACT = "0xdac17f958d2ee523a2206206994597c13d831ec7";
 const ETH_USDC_CONTRACT = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const MIN_DEPOSIT_CENTS = 1000;
 
 export type SupportedAsset = "USDT" | "USDC";
 export type SupportedNetwork = "TRC20" | "ERC20";
@@ -403,8 +404,8 @@ export function normalizeDepositAmount(amount: unknown): {
   }
 
   const amountCents = Math.round(numericAmount * 100);
-  if (amountCents < 1) {
-    throw new ApiError(400, "deposit_too_small", "Minimum deposit is 0.01 stablecoin.");
+  if (amountCents < MIN_DEPOSIT_CENTS) {
+    throw new ApiError(400, "deposit_too_small", "Minimum deposit is 10 USD.");
   }
 
   const [wholePart, fractionPart = ""] = value.split(".");
