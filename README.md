@@ -1,17 +1,17 @@
 # ASEKE TRADE
 
-ASEKE TRADE is a premium crypto education platform for disciplined market education. It is built with Vite, React, TypeScript, Supabase, and Netlify-friendly routing.
+ASEKE TRADE is a Trading Academy for disciplined crypto market education. It is built with Vite, React, TypeScript, Supabase, and Netlify-friendly routing.
 
 ## Features
 
 - Dark black and platinum fintech design
-- Free and premium guides
-- Course catalog with free previews and locked premium lessons
+- Free guides and Trading Academy materials
+- Course catalog with free previews and locked Trading Academy lessons
 - Supabase authentication, password reset, and email verification support
 - Protected user dashboard
-- Admin-only panel for guides, courses, modules, lessons, users, and premium access
+- Admin-only panel for guides, courses, modules, lessons, users, and Trading Academy access
 - Supabase Row Level Security policies for role and purchase-based access
-- Secure Premium subscriptions, crypto checkout, account balance deposits, and server-side on-chain verification
+- Secure Trading Academy memberships, crypto checkout, account balance deposits, and server-side on-chain verification
 
 ## Local Setup
 
@@ -94,20 +94,20 @@ After signing out and back in, the Admin navigation item will appear.
 ## Roles and Access
 
 - `user`: can read free content and manage their own dashboard records.
-- `premium`: can access premium guides and premium course lessons until `premium_until` expires.
-- `admin`: can manage content, users, purchases, and premium access.
+- `premium`: internal role for users with active Trading Academy access until `premium_until` expires.
+- `admin`: can manage content, users, purchases, and Trading Academy access.
 
-Premium lesson access is granted only when Supabase confirms at least one of these:
+Trading Academy lesson access is granted only when Supabase confirms at least one of these:
 
 - the user has a future `premium_until` date
 - the user is `admin`
 - the user has a valid `paid`, `active`, or `granted` purchase record
 - the user has verified `premium_access` from a confirmed crypto payment
-- the user has an active Premium subscription record
+- the user has an active Trading Academy subscription record
 
 ## Crypto Payment Integration
 
-Crypto checkout, Premium subscriptions, balance deposits, and balance-based Premium purchases are
+Crypto checkout, Trading Academy memberships, balance deposits, and balance-based Trading Academy purchases are
 implemented with Supabase Edge Functions. Keep blockchain API keys, receiving addresses, and
 `SERVICE_ROLE_KEY` in Supabase secrets, not Vite or Netlify browser variables. See
 [`docs/crypto-payments.md`](docs/crypto-payments.md) for deployment and testing.
@@ -142,7 +142,7 @@ src/
   contexts/          Supabase auth and profile state
   data/              Local sample content fallback
   lib/               Supabase client, content queries, validation helpers
-  pages/             Public, auth, dashboard, premium, and admin pages
+  pages/             Public, auth, dashboard, Trading Academy, and admin pages
   types/             Shared TypeScript models
 docs/
   crypto-payments.md Crypto payment setup and testing guide

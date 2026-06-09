@@ -57,12 +57,12 @@ export function Guides() {
           <p className="eyebrow">Guides and Tutorials</p>
           <h1>Crypto guides for safer market decisions</h1>
           <p className="muted">
-            Browse foundations, safety guides, market research, on-chain intelligence, and Premium Trading Academy materials.
+            Browse foundations, safety guides, market research, on-chain intelligence, and Trading Academy materials.
           </p>
         </div>
-        <Link className="primary-button" to="/premium">
+        <Link className="primary-button" to="/trading-academy">
           <LockKeyhole size={17} />
-          Upgrade to Premium
+          Join Trading Academy
         </Link>
       </section>
 
@@ -92,7 +92,7 @@ export function Guides() {
               <article className="content-card" key={guide.id}>
                 <div className="card-topline">
                   <span className={isPremiumGuide ? "status-pill premium" : "status-pill free"}>
-                    {isPremiumGuide ? "Premium" : "Free"}
+                    {isPremiumGuide ? "Trading Academy" : "Free"}
                   </span>
                   <span className="meta-with-icon">
                     <Timer size={15} />
@@ -109,7 +109,7 @@ export function Guides() {
                   <BookOpen size={16} />
                   <span>
                     {isPremiumGuide
-                      ? "Premium Trading Academy guide. Open it to review access options."
+                      ? "Trading Academy guide. Open it to review access options."
                       : "Free guide for building safer crypto foundations."}
                   </span>
                 </div>

@@ -37,7 +37,7 @@ export function Courses() {
             technical analysis, risk management, futures, and trading psychology.
           </p>
         </div>
-        <Link className="platinum-button" to="/premium">
+        <Link className="platinum-button" to="/trading-academy">
           <Crown size={17} />
           Join Trading Academy
         </Link>
@@ -53,7 +53,7 @@ export function Courses() {
             <article className="content-card course-card" key={course.id}>
               <div className="card-topline">
                 <span className={course.is_premium ? "status-pill premium" : "status-pill free"}>
-                  {course.is_premium ? "Premium" : "Free"}
+                  {course.is_premium ? "Trading Academy" : "Free"}
                 </span>
                 <span className="meta-with-icon">
                   <GraduationCap size={15} />
@@ -63,7 +63,7 @@ export function Courses() {
               <h2>{course.title}</h2>
               <p>{course.description}</p>
               <div className="card-meta">
-                <span>{course.is_premium ? "Premium subscription" : formatMoney(course.price_cents)}</span>
+                <span>{course.is_premium ? "Trading Academy access" : formatMoney(course.price_cents)}</span>
                 <span>
                   {course.guides.length > 0
                     ? `${course.guides.length} guides`

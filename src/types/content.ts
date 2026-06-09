@@ -187,7 +187,7 @@ export interface PremiumSubscription {
   id: string;
   user_id: string;
   product_type: "premium";
-  product_label: "Premium";
+  product_label: string;
   plan_id: PremiumPlanId;
   plan_duration_months: number;
   starts_at: string;

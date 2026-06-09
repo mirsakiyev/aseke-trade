@@ -26,10 +26,10 @@ Deno.serve(async (request) => {
 
     if (productType === "premium" || itemType === "premium") {
       if (!planId) {
-        throw new ApiError(400, "plan_id_required", "Choose a Premium plan.");
+        throw new ApiError(400, "plan_id_required", "Choose a Trading Academy plan.");
       }
     } else if ((itemType !== "course" && itemType !== "guide") || !itemId) {
-      throw new ApiError(400, "invalid_balance_purchase_item", "Choose Premium, one course, or one guide.");
+      throw new ApiError(400, "invalid_balance_purchase_item", "Choose Trading Academy, one course, or one guide.");
     }
 
     const { data, error } = await supabase.rpc("spend_account_balance_for_user", {
@@ -66,7 +66,7 @@ Deno.serve(async (request) => {
 
 function safeBalancePurchaseDetail(message: string): string {
   if (/insufficient account balance/i.test(message)) return "Insufficient account balance.";
-  if (/premium plan is not active/i.test(message)) return "The selected Premium plan is not active.";
+  if (/premium plan is not active/i.test(message)) return "The selected Trading Academy plan is not active.";
   if (/already has access/i.test(message)) return "This account already has access.";
   if (/required|choose|cannot include|not purchasable/i.test(message)) return message;
 

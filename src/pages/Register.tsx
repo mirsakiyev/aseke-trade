@@ -44,7 +44,7 @@ export function Register() {
           <p className="eyebrow">Create Account</p>
           <h1>Join ASEKE TRADE</h1>
           <p className="muted">
-            Create your account to save guides, track progress, and unlock verified Premium Trading Academy access.
+            Create your account to save guides, track progress, and unlock verified Trading Academy access.
           </p>
         </div>
 

@@ -18,8 +18,8 @@ const learningAreas = [
     icon: GraduationCap
   },
   {
-    title: "Premium Support",
-    text: "Unlock Premium signals, individual strategy support, and 1-on-1 guidance for serious learners.",
+    title: "Academy Support",
+    text: "Unlock Trading Academy signals, individual strategy support, and 1-on-1 guidance for serious learners.",
     icon: Crown
   }
 ];
@@ -63,7 +63,7 @@ export function Home() {
           <p className="founder-line">Learn without hype. Build discipline before risking capital.</p>
 
           <div className="hero-actions" aria-label="Primary actions">
-            <Link className="primary-button" to="/premium">
+            <Link className="primary-button" to="/trading-academy">
               Join Trading Academy
               <ArrowRight size={18} />
             </Link>

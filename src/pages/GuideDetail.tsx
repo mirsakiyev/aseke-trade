@@ -104,18 +104,18 @@ export function GuideDetail() {
               <Timer size={15} />
               {guide.estimated_read_time} min
             </span>
-            <span>{guide.is_premium || guide.course?.is_premium ? "Premium" : "Free"}</span>
+            <span>{guide.is_premium || guide.course?.is_premium ? "Trading Academy" : "Free"}</span>
           </div>
         </div>
 
         {!hasAccess && (
           <aside className="access-panel">
             <LockKeyhole size={26} />
-            <h2>{user ? "Premium guide locked" : "Login to continue"}</h2>
+            <h2>{user ? "Trading Academy guide locked" : "Login to continue"}</h2>
             <p>
               {user
-                ? "This guide belongs to the Premium Trading Academy path. Upgrade to unlock advanced trading education until your subscription expires."
-                : "Create an account or sign in to unlock eligible Premium education and track your progress."}
+                ? "This guide belongs to the Trading Academy path. Join to unlock advanced trading education until your access expires."
+                : "Create an account or sign in to unlock eligible Trading Academy education and track your progress."}
             </p>
             <div className="inline-actions">
               {user ? (
@@ -145,7 +145,7 @@ export function GuideDetail() {
         <div className="lesson-title-line">
           <h2>{hasAccess ? "Guide content" : "Locked preview"}</h2>
           <span className={hasAccess ? "status-pill free" : "status-pill premium"}>
-            {hasAccess ? "Available" : "Premium"}
+            {hasAccess ? "Available" : "Trading Academy"}
           </span>
         </div>
 
@@ -153,7 +153,7 @@ export function GuideDetail() {
           paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)
         ) : (
           <p className="muted">
-            {guide.description} Full content is available after Premium access is verified.
+            {guide.description} Full content is available after Trading Academy access is verified.
           </p>
         )}
 

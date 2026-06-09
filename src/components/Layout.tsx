@@ -25,7 +25,7 @@ const navItems = [
   { to: "/courses", label: "Courses", icon: GraduationCap },
   { to: "/charts", label: "Charts", icon: TrendingUp },
   { to: "/quiz", label: "Quiz", icon: BrainCircuit },
-  { to: "/premium", label: "Premium", icon: Crown },
+  { to: "/trading-academy", label: "Trading Academy", icon: Crown },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }
 ];
 
@@ -148,7 +148,7 @@ export function Layout() {
             <Link to="/terms">Terms</Link>
             <Link to="/guides">Guides</Link>
             <Link to="/charts">Charts</Link>
-            <Link to="/premium">Trading Academy</Link>
+            <Link to="/trading-academy">Trading Academy</Link>
           </nav>
         </div>
         <p>

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { LoadingState } from "./components/LoadingState";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -49,7 +49,8 @@ export default function App() {
             </Suspense>
           }
         />
-        <Route path="premium" element={<Premium />} />
+        <Route path="trading-academy" element={<Premium />} />
+        <Route path="premium" element={<Navigate to="/trading-academy" replace />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
         <Route path="terms" element={<Terms />} />

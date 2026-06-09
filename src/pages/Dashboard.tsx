@@ -89,7 +89,7 @@ export function Dashboard() {
           <p className="eyebrow">Dashboard</p>
           <h1>Learning account</h1>
           <p className="muted">
-            Continue your trading education, manage your balance, and track your Premium access.
+            Continue your trading education, manage your balance, and track your Trading Academy access.
           </p>
         </div>
         <span className={accountStatus.isPremiumActive ? "status-pill premium" : "status-pill free"}>
@@ -125,7 +125,7 @@ export function Dashboard() {
             </div>
             {accountStatus.isPremiumActive && accountStatus.premiumUntilLabel && (
               <div>
-                <dt>Premium Expires</dt>
+                <dt>Trading Academy Access Expires</dt>
                 <dd>{accountStatus.premiumUntilLabel}</dd>
               </div>
             )}
@@ -139,17 +139,17 @@ export function Dashboard() {
           <h2>Account access</h2>
           <p className="muted">
             {accountStatus.isPremiumActive
-              ? "Your Premium access is active. Continue the Trading Academy, review Premium materials, or extend your subscription."
-              : "You are on the Basic plan. Upgrade to join the Trading Academy and unlock advanced lessons, Premium signals, strategy support, and 1-on-1 guidance."}
+              ? "Your Trading Academy access is active. Continue advanced lessons, review Trading Academy materials, study trading strategies, or extend your access."
+              : "You are on the Basic plan. Join Trading Academy to unlock advanced trading education, strategy lessons, signals, and 1-on-1 learning."}
           </p>
           <div className="inline-actions">
             <Link className="primary-button compact" to="/account/payments">
               <ArrowUpRight size={16} />
               Top up balance
             </Link>
-            <Link className="ghost-button compact" to="/premium">
+            <Link className="ghost-button compact" to="/trading-academy">
               <ShieldCheck size={16} />
-              {accountStatus.isPremiumActive ? "Extend Premium" : "Join Trading Academy"}
+              {accountStatus.isPremiumActive ? "Extend Trading Academy Access" : "Join Trading Academy"}
             </Link>
           </div>
         </article>
@@ -169,7 +169,7 @@ export function Dashboard() {
                 {purchases.map((purchase) => (
                   <li key={purchase.id}>
                     <strong>{purchase.status}</strong>
-                    <span>{purchase.course_id ?? purchase.guide_id ?? "Premium access"}</span>
+                    <span>{purchase.course_id ?? purchase.guide_id ?? "Trading Academy access"}</span>
                   </li>
                 ))}
               </ul>

@@ -86,7 +86,7 @@ interface VerificationResult {
 
 interface PremiumPlanConfig {
   id: PremiumPlanId;
-  productLabel: "Premium";
+  productLabel: "Trading Academy";
   durationMonths: number;
   durationLabel: string;
   priceCents: number;
@@ -136,14 +136,14 @@ export const paymentMethodConfigs: PaymentMethodConfig[] = [
 export const premiumPlanConfigs: PremiumPlanConfig[] = [
   {
     id: "premium_1_month",
-    productLabel: "Premium",
+    productLabel: "Trading Academy",
     durationMonths: 1,
     durationLabel: "1 month",
     priceCents: 1000
   },
   {
     id: "premium_1_year",
-    productLabel: "Premium",
+    productLabel: "Trading Academy",
     durationMonths: 12,
     durationLabel: "1 year",
     priceCents: 5000
@@ -383,7 +383,7 @@ export function getPremiumPlan(planId: unknown): PremiumPlanConfig {
   const plan = premiumPlanConfigs.find((item) => item.id === normalizedPlanId);
 
   if (!plan) {
-    throw new ApiError(400, "invalid_premium_plan", "Choose a valid Premium plan.");
+    throw new ApiError(400, "invalid_premium_plan", "Choose a valid Trading Academy plan.");
   }
 
   return plan;
@@ -453,7 +453,7 @@ export async function resolveCheckoutItem(
   const guideId = typeof body.guide_id === "string" ? body.guide_id.trim() : "";
 
   if ((courseId && guideId) || (!courseId && !guideId)) {
-    throw new ApiError(400, "invalid_checkout_item", "Choose exactly one premium course or guide.");
+    throw new ApiError(400, "invalid_checkout_item", "Choose exactly one paid course or guide.");
   }
 
   if (courseId) {
@@ -608,7 +608,7 @@ async function finalizeConfirmedPayment(supabase: SupabaseClient, payment: Crypt
     });
 
     if (error) {
-      throw new ApiError(500, "premium_subscription_failed", "Premium subscription could not be activated.");
+      throw new ApiError(500, "premium_subscription_failed", "Trading Academy access could not be activated.");
     }
 
     return;
@@ -668,7 +668,7 @@ async function grantAccessFromPayment(supabase: SupabaseClient, payment: CryptoP
   const { data: existingAccess, error: accessLookupError } = await existingAccessQuery;
 
   if (accessLookupError) {
-    throw new ApiError(500, "access_lookup_failed", "Premium access could not be checked.");
+      throw new ApiError(500, "access_lookup_failed", "Trading Academy access could not be checked.");
   }
 
   if (!existingAccess?.length) {
@@ -681,7 +681,7 @@ async function grantAccessFromPayment(supabase: SupabaseClient, payment: CryptoP
     });
 
     if (accessInsertError && accessInsertError.code !== "23505") {
-      throw new ApiError(500, "access_insert_failed", "Premium access could not be granted.");
+      throw new ApiError(500, "access_insert_failed", "Trading Academy access could not be granted.");
     }
   }
 

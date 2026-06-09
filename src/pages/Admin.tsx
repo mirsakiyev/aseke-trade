@@ -297,11 +297,11 @@ export function Admin() {
     const targetProfile = profiles.find((profile) => profile.id === profileId);
     const premiumUntil = new Date();
     premiumUntil.setFullYear(premiumUntil.getFullYear() + 1);
-    const { error } = await supabase
+  const { error } = await supabase
       .from("profiles")
       .update({ role: targetProfile?.role === "admin" ? "admin" : "premium", premium_until: premiumUntil.toISOString() })
       .eq("id", profileId);
-    setMessage(error ? "Premium access could not be granted." : "Premium access granted for one year.");
+    setMessage(error ? "Trading Academy access could not be granted." : "Trading Academy access granted for one year.");
     if (!error) await refreshAdminData();
   };
 
@@ -312,7 +312,7 @@ export function Admin() {
       .from("profiles")
       .update({ role: targetProfile?.role === "admin" ? "admin" : "user", premium_until: null })
       .eq("id", profileId);
-    setMessage(error ? "Premium access could not be revoked." : "Premium access revoked.");
+    setMessage(error ? "Trading Academy access could not be revoked." : "Trading Academy access revoked.");
     if (!error) await refreshAdminData();
   };
 
@@ -323,7 +323,7 @@ export function Admin() {
           <p className="eyebrow">Admin Panel</p>
           <h1>Content and access management</h1>
           <p className="muted">
-            Admin-only route backed by Supabase Row Level Security for content, users, purchases, and premium grants.
+            Admin-only route backed by Supabase Row Level Security for content, users, purchases, and Trading Academy grants.
           </p>
         </div>
         <div className="inline-actions">
@@ -488,7 +488,7 @@ export function Admin() {
                       checked={guideForm.is_premium}
                       onChange={(event) => setGuideForm((form) => ({ ...form, is_premium: event.target.checked }))}
                     />
-                    Premium
+                    Requires Trading Academy
                   </label>
                   <label className="checkbox-label">
                     <input
@@ -512,7 +512,7 @@ export function Admin() {
                         <strong>{guide.title}</strong>
                       <span>
                         #{guide.sort_order ?? "-"} - {courseNameById.get(guide.course_id ?? "") ?? guide.category} -{" "}
-                        {guide.is_archived ? "Archived" : guide.is_premium ? "Premium" : "Free"} - {guide.price_cents} cents
+                        {guide.is_archived ? "Archived" : guide.is_premium ? "Trading Academy" : "Free"} - {guide.price_cents} cents
                       </span>
                     </div>
                     <div className="row-actions">
@@ -622,7 +622,7 @@ export function Admin() {
                     checked={courseForm.is_premium}
                     onChange={(event) => setCourseForm((form) => ({ ...form, is_premium: event.target.checked }))}
                   />
-                  Premium course
+                  Trading Academy course
                 </label>
                 <label className="checkbox-label">
                   <input
@@ -645,7 +645,7 @@ export function Admin() {
                       <strong>{course.title}</strong>
                       <span>
                         #{course.sort_order ?? "-"} - {course.difficulty} -{" "}
-                        {course.is_archived ? "Archived" : course.is_premium ? "Premium" : "Free"}
+                        {course.is_archived ? "Archived" : course.is_premium ? "Trading Academy" : "Free"}
                       </span>
                     </div>
                     <div className="row-actions">
@@ -788,7 +788,7 @@ export function Admin() {
                         checked={lessonForm.is_premium}
                         onChange={(event) => setLessonForm((form) => ({ ...form, is_premium: event.target.checked }))}
                       />
-                      Premium lesson
+                      Trading Academy lesson
                     </label>
                   </div>
                   <button className="primary-button full-width" type="submit">
@@ -882,15 +882,15 @@ export function Admin() {
                     <div>
                       <strong>{profile.full_name ?? profile.username ?? profile.id}</strong>
                       <span>
-                        {profile.role} - {profile.premium_until ? new Date(profile.premium_until).toLocaleDateString() : "no premium date"}
+                        {profile.role === "premium" ? "Trading Academy" : profile.role} - {profile.premium_until ? new Date(profile.premium_until).toLocaleDateString() : "no Trading Academy date"}
                       </span>
                     </div>
                     <div className="row-actions text-actions">
                       <button className="ghost-button compact" type="button" onClick={() => void grantPremium(profile.id)}>
-                        Grant
+                        Grant Academy
                       </button>
                       <button className="ghost-button compact danger-text" type="button" onClick={() => void revokePremium(profile.id)}>
-                        Revoke
+                        Revoke Academy
                       </button>
                     </div>
                   </li>
@@ -903,7 +903,7 @@ export function Admin() {
                     <div>
                       <strong>{purchase.status}</strong>
                       <span>
-                        User {purchase.user_id.slice(0, 8)} - {purchase.course_id ?? purchase.guide_id ?? "premium"}
+                        User {purchase.user_id.slice(0, 8)} - {purchase.course_id ?? purchase.guide_id ?? "Trading Academy"}
                       </span>
                     </div>
                     <ShieldCheck size={18} />

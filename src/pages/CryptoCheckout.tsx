@@ -123,7 +123,7 @@ export function CryptoCheckout() {
           <h1>{isPremiumCheckout ? "Join Trading Academy" : item.title}</h1>
           <p className="muted">
             {isPremiumCheckout
-              ? `Premium Trading Academy access. Duration: ${item.duration_label}. Price: ${formatMoney(item.price_cents)}.`
+              ? `You are joining Trading Academy. Duration: ${item.duration_label}. Price: ${formatMoney(item.price_cents)}.`
               : item.description}
           </p>
         </div>
@@ -212,7 +212,7 @@ export function CryptoCheckout() {
               <p>
                 <AlertTriangle size={16} />
                 {isPremiumCheckout
-                  ? "Premium starts or extends only after blockchain verification."
+                  ? "Trading Academy access starts or extends only after blockchain verification."
                   : "Access unlocks only after blockchain verification."}
               </p>
               <p>

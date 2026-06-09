@@ -1,6 +1,7 @@
 import type { Profile } from "../types/content";
+import { TRADING_ACADEMY_PRODUCT_LABEL } from "./premiumPlans";
 
-export type AccountPlanLabel = "Basic" | "Premium";
+export type AccountPlanLabel = "Basic" | typeof TRADING_ACADEMY_PRODUCT_LABEL;
 
 export function formatUsd(cents: number): string {
   const safeCents = Number.isFinite(cents) ? cents : 0;
@@ -22,7 +23,7 @@ export function hasActivePremiumAccess(profile: Profile | null, now = Date.now()
 }
 
 export function accountPlanLabel(profile: Profile | null): AccountPlanLabel {
-  return hasActivePremiumAccess(profile) ? "Premium" : "Basic";
+  return hasActivePremiumAccess(profile) ? TRADING_ACADEMY_PRODUCT_LABEL : "Basic";
 }
 
 export function premiumExpiryLabel(profile: Profile | null): string | null {

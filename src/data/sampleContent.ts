@@ -36,7 +36,7 @@ const courseRows = [
     title: "Trading Academy",
     slug: "trading-academy",
     description:
-      "Premium trading education for market structure, technical analysis, risk, psychology, futures, derivatives, and strategy.",
+      "Trading Academy education for market structure, technical analysis, risk, psychology, futures, derivatives, and strategy.",
     difficulty: "Advanced" as CourseDifficulty,
     price_cents: 0,
     is_premium: true,

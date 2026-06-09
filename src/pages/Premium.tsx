@@ -1,7 +1,14 @@
 import { Check, Crown, ShieldCheck, Sparkles, WalletCards, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { formatPremiumPrice, PREMIUM_PLANS, premiumCheckoutPath, type PremiumPlanId } from "../lib/premiumPlans";
+import {
+  formatPremiumPrice,
+  formatTradingAcademyPlan,
+  PREMIUM_PLANS,
+  premiumCheckoutPath,
+  TRADING_ACADEMY_PRODUCT_LABEL,
+  type PremiumPlanId
+} from "../lib/premiumPlans";
 import { formatMoney } from "../lib/validation";
 
 const premiumPerks = [
@@ -10,25 +17,25 @@ const premiumPerks = [
   "Build risk management and trade review habits",
   "Learn trading psychology and execution discipline",
   "Study futures, leverage, liquidation, and derivatives",
-  "Review Premium market examples and trading signals",
+  "Review Trading Academy market examples and signals",
   "Request individual strategy support",
   "Access 1-on-1 learning guidance when available"
 ];
 
 const comparisonRows = [
-  { feature: "Crypto basics", free: true, premium: true },
-  { feature: "Wallet safety and self-custody", free: true, premium: true },
-  { feature: "Beginner guides and market foundations", free: true, premium: true },
-  { feature: "Limited educational content", free: true, premium: true },
-  { feature: "Trading Academy access", free: false, premium: true },
-  { feature: "Advanced trading strategies", free: false, premium: true },
-  { feature: "Technical analysis education", free: false, premium: true },
-  { feature: "Risk management masterclass", free: false, premium: true },
-  { feature: "Trading psychology", free: false, premium: true },
-  { feature: "Futures and derivatives education", free: false, premium: true },
-  { feature: "Premium trading signals", free: false, premium: true },
-  { feature: "Individual trading strategy support", free: false, premium: true },
-  { feature: "1-on-1 training access", free: false, premium: true }
+  { feature: "Crypto basics", basic: true, academy: true },
+  { feature: "Wallet safety and self-custody", basic: true, academy: true },
+  { feature: "Beginner guides and market foundations", basic: true, academy: true },
+  { feature: "Limited educational content", basic: true, academy: true },
+  { feature: "Advanced trading lessons", basic: false, academy: true },
+  { feature: "Trading strategies", basic: false, academy: true },
+  { feature: "Technical analysis education", basic: false, academy: true },
+  { feature: "Risk management masterclass", basic: false, academy: true },
+  { feature: "Trading psychology", basic: false, academy: true },
+  { feature: "Futures and derivatives education", basic: false, academy: true },
+  { feature: "Trading Academy signals", basic: false, academy: true },
+  { feature: "Individual trading strategy support", basic: false, academy: true },
+  { feature: "1-on-1 training access", basic: false, academy: true }
 ];
 
 export function Premium() {
@@ -44,13 +51,13 @@ export function Premium() {
           <p className="eyebrow">Trading Academy</p>
           <h1>Join the ASEKE TRADE Trading Academy</h1>
           <p className="muted">
-            Premium unlocks advanced trading education, risk management frameworks, trading psychology,
-            futures and derivatives lessons, Premium signals, individual strategy support, and 1-on-1 guidance.
+            Trading Academy unlocks advanced trading education, risk management frameworks, trading psychology,
+            futures and derivatives lessons, educational market signals, individual strategy support, and 1-on-1 guidance.
           </p>
         </div>
         <span className="status-pill premium">
           <Crown size={15} />
-          {isAdmin ? "Admin" : isPremium ? `Active until ${premiumUntil}` : "Premium"}
+          {isAdmin ? "Admin" : isPremium ? `Active until ${premiumUntil}` : TRADING_ACADEMY_PRODUCT_LABEL}
         </span>
       </section>
 
@@ -73,7 +80,7 @@ export function Premium() {
             </li>
             <li>
               <X size={17} />
-              Trading Academy, signals, strategy support, and 1-on-1 guidance are Premium
+              Trading Academy signals, strategy support, and 1-on-1 guidance are paid access
             </li>
           </ul>
           <Link className="ghost-button full-width" to="/guides">
@@ -84,7 +91,7 @@ export function Premium() {
         {PREMIUM_PLANS.map((plan) => (
           <article className={plan.featured ? "pricing-card featured" : "pricing-card"} key={plan.id}>
             <p className="eyebrow">{plan.badge}</p>
-            <h2>Trading Academy</h2>
+            <h2>{formatTradingAcademyPlan(plan.durationLabel)}</h2>
             <p className="price-line">
               {formatMoney(plan.priceCents)}
               <span> / {plan.durationLabel}</span>
@@ -100,7 +107,9 @@ export function Premium() {
             </ul>
             <Link className="primary-button full-width" to={planLink(plan.id)}>
               <WalletCards size={17} />
-              Join Trading Academy - {plan.durationLabel} / {formatPremiumPrice(plan.priceCents)}
+              {plan.durationMonths === 12 ? "Get 1 Year of Trading Academy" : "Get 1 Month of Trading Academy"}
+              {" - "}
+              {formatPremiumPrice(plan.priceCents)}
             </Link>
           </article>
         ))}
@@ -109,12 +118,12 @@ export function Premium() {
       <section className="section-panel page-stack">
         <div className="lesson-title-line">
           <div>
-            <p className="eyebrow">Premium Perks</p>
+            <p className="eyebrow">Academy Access</p>
             <h2>What the Trading Academy includes</h2>
           </div>
           <span className="status-pill premium">
             <Sparkles size={15} />
-            Premium education
+            Advanced education
           </span>
         </div>
         <div className="premium-perk-grid">
@@ -130,19 +139,19 @@ export function Premium() {
       <section className="section-panel page-stack">
         <div>
           <p className="eyebrow">Comparison</p>
-          <h2>Free foundations vs Premium Trading Academy</h2>
+          <h2>Basic vs Trading Academy</h2>
         </div>
-        <div className="comparison-table" role="table" aria-label="Free and Premium comparison">
+        <div className="comparison-table" role="table" aria-label="Basic and Trading Academy comparison">
           <div className="comparison-row comparison-head" role="row">
             <span role="columnheader">Feature</span>
-            <span role="columnheader">Free</span>
-            <span role="columnheader">Premium</span>
+            <span role="columnheader">Basic</span>
+            <span role="columnheader">Trading Academy</span>
           </div>
           {comparisonRows.map((row) => (
             <div className="comparison-row" role="row" key={row.feature}>
               <span role="cell">{row.feature}</span>
-              <span role="cell">{row.free ? <Check size={17} /> : <X size={17} />}</span>
-              <span role="cell">{row.premium ? <Check size={17} /> : <X size={17} />}</span>
+              <span role="cell">{row.basic ? <Check size={17} /> : <X size={17} />}</span>
+              <span role="cell">{row.academy ? <Check size={17} /> : <X size={17} />}</span>
             </div>
           ))}
         </div>
@@ -154,7 +163,7 @@ export function Premium() {
           <h2>Educational access, verified securely</h2>
         </div>
         <p>
-          Premium content is educational only and does not guarantee profits. Access unlocks only after a
+          Trading Academy content is educational only and does not guarantee profits. Access unlocks only after a
           verified on-chain payment or a successful account balance purchase, with expiry tracked on your profile.
         </p>
         <ShieldCheck size={32} aria-hidden="true" />

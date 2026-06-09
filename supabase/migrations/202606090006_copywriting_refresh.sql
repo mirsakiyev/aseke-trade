@@ -2,7 +2,7 @@ update public.courses
 set description = case slug
   when 'crypto-basics' then 'Start from zero. Learn crypto, blockchain, wallets, exchanges, and safe self-custody before risking real capital.'
   when 'investing-market-research' then 'Learn project research, tokenomics, market cycles, and stronger market judgment before entering trades.'
-  when 'trading-academy' then 'Premium trading education for market structure, technical analysis, risk, psychology, futures, derivatives, and strategy.'
+  when 'trading-academy' then 'Trading Academy education for market structure, technical analysis, risk, psychology, futures, derivatives, and strategy.'
   when 'defi-on-chain-intelligence' then 'Learn how DeFi works and how on-chain data can support stronger market awareness and trading context.'
   when 'blockchain-development' then 'A builder-focused introduction to blockchain concepts, smart contracts, and development fundamentals.'
   else description

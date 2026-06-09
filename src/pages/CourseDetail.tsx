@@ -109,19 +109,19 @@ export function CourseDetail() {
           <p>{course.description}</p>
           <div className="card-meta">
             <span>{course.difficulty}</span>
-            <span>{course.is_premium ? "Premium subscription" : formatMoney(course.price_cents)}</span>
-            <span>{course.is_premium ? "Premium course" : "Free course"}</span>
+            <span>{course.is_premium ? "Trading Academy access" : formatMoney(course.price_cents)}</span>
+            <span>{course.is_premium ? "Trading Academy course" : "Free course"}</span>
           </div>
         </div>
 
         {!hasAccess && (
           <aside className="access-panel">
             <LockKeyhole size={26} />
-            <h2>{user ? "Premium access required" : "Login to continue"}</h2>
+            <h2>{user ? "Trading Academy required" : "Login to continue"}</h2>
             <p>
               {user
-                ? "Upgrade to Premium to join the Trading Academy and unlock advanced trading education for this path."
-                : "Create an account or sign in to track progress and unlock eligible Premium education."}
+                ? "Join Trading Academy to unlock advanced trading education for this path."
+                : "Create an account or sign in to track progress and unlock eligible Trading Academy education."}
             </p>
             <div className="inline-actions">
               {user ? (
@@ -166,12 +166,12 @@ export function CourseDetail() {
                       <div className="lesson-title-line">
                         <h3>{guide.title}</h3>
                         <span className={locked || guide.is_premium ? "status-pill premium" : "status-pill free"}>
-                          {locked ? "Locked" : guide.is_premium ? "Premium" : "Free"}
+                          {locked ? "Requires Trading Academy" : guide.is_premium ? "Trading Academy" : "Free"}
                         </span>
                       </div>
                       <p>
                         {locked
-                          ? "This guide is part of the Premium Trading Academy path."
+                          ? "This guide is part of the Trading Academy path."
                           : guide.description}
                       </p>
                       <Link className="ghost-button compact" to={`/guides/${guide.slug}`}>
@@ -203,11 +203,11 @@ export function CourseDetail() {
                         <div className="lesson-title-line">
                           <h3>{lesson.title}</h3>
                           {lesson.is_preview && <span className="status-pill free">Preview</span>}
-                          {lesson.is_premium && !lesson.is_preview && <span className="status-pill premium">Premium</span>}
+                          {lesson.is_premium && !lesson.is_preview && <span className="status-pill premium">Trading Academy</span>}
                         </div>
                         <p>
                           {locked
-                            ? "This lesson unlocks with Premium access or a verified purchase."
+                            ? "This lesson unlocks with Trading Academy access or a verified purchase."
                             : lesson.content}
                         </p>
                         {!locked && user && (

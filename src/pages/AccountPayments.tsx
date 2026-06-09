@@ -14,7 +14,7 @@ import {
   statusTone
 } from "../lib/cryptoPayments";
 import { formatUsd } from "../lib/accountStatus";
-import { formatPlanDuration, PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
+import { formatPlanDuration, formatTradingAcademyPlan, normalizeMembershipLabel, PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
 import { formatMoney } from "../lib/validation";
 import type { AccountBalanceTransaction, CryptoPayment } from "../types/content";
 
@@ -92,7 +92,7 @@ export function AccountPayments() {
           <p className="eyebrow">Account</p>
           <h1>Balance and payment history</h1>
           <p className="muted">
-            Top up your account, review crypto deposits, and track verified Premium access.
+            Top up your account, review crypto deposits, and track verified Trading Academy access.
           </p>
         </div>
         <span className="status-pill premium">
@@ -191,7 +191,7 @@ export function AccountPayments() {
                     </span>
                     <h2>
                       {payment.product_type === "premium"
-                        ? `${PREMIUM_PRODUCT_LABEL} - ${formatPlanDuration(payment.plan_duration_months)}`
+                        ? formatTradingAcademyPlan(formatPlanDuration(payment.plan_duration_months))
                         : formatStableAmount(payment.expected_amount, payment.asset)}
                     </h2>
                     <p className="muted">
@@ -202,7 +202,7 @@ export function AccountPayments() {
                       <p className="muted">
                         Price {formatMoney(payment.fiat_amount_cents ?? Math.round(Number(payment.expected_amount) * 100))}
                         {payment.premium_expires_at
-                          ? ` - Premium until ${new Date(payment.premium_expires_at).toLocaleDateString()}`
+                          ? ` - Trading Academy access until ${new Date(payment.premium_expires_at).toLocaleDateString()}`
                           : ""}
                       </p>
                     )}
@@ -223,7 +223,7 @@ export function AccountPayments() {
               <p className="muted">
                 You have no payments yet. Top up your balance or join the Trading Academy when you are ready.
               </p>
-              <Link className="primary-button" to="/premium">
+              <Link className="primary-button" to="/trading-academy">
                 Join Trading Academy
               </Link>
             </section>
@@ -236,7 +236,7 @@ export function AccountPayments() {
               <ul className="plain-list">
                 {transactions.map((transaction) => (
                   <li key={transaction.id}>
-                    <strong>{transaction.description ?? transaction.transaction_type}</strong>
+                    <strong>{displayTransactionDescription(transaction)}</strong>
                     <span>
                       {formatLedgerAmount(transaction.amount_cents)} - {new Date(transaction.created_at).toLocaleString()}
                     </span>
@@ -329,7 +329,17 @@ function formatLedgerAmount(cents: number): string {
 function paymentDisplayLabel(payment: CryptoPayment): string {
   if (payment.payment_type === "deposit") return "Deposit";
   if (payment.product_type === "premium") {
-    return `${PREMIUM_PRODUCT_LABEL} ${formatPlanDuration(payment.plan_duration_months)}`.trim();
+    return formatTradingAcademyPlan(formatPlanDuration(payment.plan_duration_months));
   }
-  return payment.product_label ?? "Purchase";
+  return normalizeMembershipLabel(payment.product_label ?? "Purchase");
+}
+
+function displayTransactionDescription(transaction: AccountBalanceTransaction): string {
+  const description = transaction.description ?? transaction.transaction_type;
+  if (transaction.product_type === "premium" || transaction.plan_id) {
+    const duration = formatPlanDuration(transaction.plan_duration_months);
+    return duration ? `${formatTradingAcademyPlan(duration)} purchase` : `${PREMIUM_PRODUCT_LABEL} purchase`;
+  }
+
+  return normalizeMembershipLabel(description);
 }

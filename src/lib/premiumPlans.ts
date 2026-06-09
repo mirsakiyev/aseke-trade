@@ -1,4 +1,7 @@
-export const PREMIUM_PRODUCT_LABEL = "Premium";
+export const TRADING_ACADEMY_PRODUCT_LABEL = "Trading Academy";
+
+// Internal premium IDs are retained so existing checkout URLs, records, and access logic keep working.
+export const PREMIUM_PRODUCT_LABEL = TRADING_ACADEMY_PRODUCT_LABEL;
 
 export const PREMIUM_PLANS = [
   {
@@ -7,9 +10,9 @@ export const PREMIUM_PLANS = [
     durationMonths: 1,
     durationLabel: "1 month",
     priceCents: 1000,
-    badge: "Starter month",
+    badge: "Starter access",
     featured: false,
-    description: "Start the Trading Academy with one month of Premium access."
+    description: "Start with one month of Trading Academy access."
   },
   {
     id: "premium_1_year",
@@ -19,7 +22,7 @@ export const PREMIUM_PLANS = [
     priceCents: 5000,
     badge: "Best value",
     featured: true,
-    description: "Stay active for a full year of advanced trading education and support."
+    description: "Stay active for a full year of Trading Academy education and support."
   }
 ] as const;
 
@@ -36,9 +39,19 @@ export function formatPremiumPrice(cents: number): string {
 
 export function formatPlanDuration(months: number | null | undefined): string {
   if (!months) return "";
-  if (months === 1) return "1 month";
   if (months === 12) return "1 year";
+  if (months === 1) return "1 month";
   return `${months} months`;
+}
+
+export function formatTradingAcademyPlan(durationLabel: string): string {
+  if (!durationLabel) return TRADING_ACADEMY_PRODUCT_LABEL;
+  return `${TRADING_ACADEMY_PRODUCT_LABEL} - ${durationLabel}`;
+}
+
+export function normalizeMembershipLabel(value: string | null | undefined): string {
+  if (!value) return TRADING_ACADEMY_PRODUCT_LABEL;
+  return value.replace(/\bPremium\b/g, TRADING_ACADEMY_PRODUCT_LABEL);
 }
 
 export function premiumCheckoutPath(planId: PremiumPlanId): string {

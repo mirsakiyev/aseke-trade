@@ -36,7 +36,7 @@ export function Login() {
         <div>
           <p className="eyebrow">Account Access</p>
           <h1>Login to ASEKE TRADE</h1>
-          <p className="muted">Access your dashboard, saved guides, learning progress, and premium content.</p>
+          <p className="muted">Access your dashboard, saved guides, learning progress, and Trading Academy content.</p>
         </div>
 
         {!isConfigured && (

@@ -13,7 +13,7 @@ import {
   statusTone,
   submitCryptoTx
 } from "../lib/cryptoPayments";
-import { formatPlanDuration, PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
+import { formatPlanDuration, normalizeMembershipLabel, PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
 import { formatMoney } from "../lib/validation";
 import type { CryptoPayment as CryptoPaymentRecord } from "../types/content";
 
@@ -64,7 +64,7 @@ export function CryptoPayment() {
       return payment.payment_type === "deposit"
         ? "Payment completed. Your balance has been updated."
         : payment.product_type === "premium"
-          ? "Payment completed. Your Premium access has been updated."
+          ? "Payment completed. Your Trading Academy access has been updated."
           : "Payment completed. Content access has been updated.";
     }
 
@@ -94,7 +94,7 @@ export function CryptoPayment() {
       ? PREMIUM_PRODUCT_LABEL
       : payment?.payment_type === "deposit"
         ? "Account balance deposit"
-        : payment?.product_label ?? "Premium content purchase";
+        : normalizeMembershipLabel(payment?.product_label ?? "Trading Academy content purchase");
   const durationLabel = payment?.product_type === "premium" ? formatPlanDuration(payment.plan_duration_months) : "";
   const rawAddress = payment ? paymentAddress(payment) : "";
   const addressWarning = payment ? addressFormatWarning(payment) : null;
@@ -206,7 +206,7 @@ export function CryptoPayment() {
             </div>
             {payment.premium_expires_at && (
               <div>
-                <dt>Premium until</dt>
+                <dt>Trading Academy access until</dt>
                 <dd>{new Date(payment.premium_expires_at).toLocaleDateString()}</dd>
               </div>
             )}
@@ -238,7 +238,7 @@ export function CryptoPayment() {
             </p>
             <p>
               <ShieldAlert size={16} />
-              Wrong-network transfers may be lost and cannot unlock balance or Premium access.
+              Wrong-network transfers may be lost and cannot unlock balance or Trading Academy access.
             </p>
             <p>
               <ShieldAlert size={16} />
@@ -251,7 +251,7 @@ export function CryptoPayment() {
               <p className="eyebrow">Transaction verification</p>
               <h2>Paste transaction ID after sending</h2>
               <p className="muted">
-                ASEKE TRADE checks the exact blockchain transaction before crediting balance or activating Premium.
+                ASEKE TRADE checks the exact blockchain transaction before crediting balance or activating Trading Academy access.
               </p>
             </div>
             <form className="stack-form" onSubmit={submitHash}>

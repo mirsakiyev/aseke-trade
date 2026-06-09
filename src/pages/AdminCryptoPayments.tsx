@@ -381,11 +381,11 @@ export function AdminCryptoPayments() {
                   <dd>{payment.confirmed_at ? new Date(payment.confirmed_at).toLocaleString() : "-"}</dd>
                 </div>
                 <div>
-                  <dt>Premium starts</dt>
+                  <dt>Trading Academy starts</dt>
                   <dd>{payment.premium_starts_at ? new Date(payment.premium_starts_at).toLocaleString() : "-"}</dd>
                 </div>
                 <div>
-                  <dt>Premium expires</dt>
+                  <dt>Trading Academy expires</dt>
                   <dd>{payment.premium_expires_at ? new Date(payment.premium_expires_at).toLocaleString() : "-"}</dd>
                 </div>
               </dl>
