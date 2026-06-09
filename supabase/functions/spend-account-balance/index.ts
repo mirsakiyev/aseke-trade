@@ -40,7 +40,21 @@ Deno.serve(async (request) => {
     });
 
     if (error) {
-      throw new ApiError(400, "balance_purchase_failed", error.message);
+      console.error("Balance purchase RPC failed", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+
+      return jsonResponse(
+        {
+          error: "balance_purchase_failed",
+          message: "Failed to complete balance purchase.",
+          details: safeBalancePurchaseDetail(error.message)
+        },
+        400
+      );
     }
 
     const result = Array.isArray(data) ? data[0] : data;
@@ -49,3 +63,12 @@ Deno.serve(async (request) => {
     return handleError(error);
   }
 });
+
+function safeBalancePurchaseDetail(message: string): string {
+  if (/insufficient account balance/i.test(message)) return "Insufficient account balance.";
+  if (/premium plan is not active/i.test(message)) return "The selected Premium plan is not active.";
+  if (/already has access/i.test(message)) return "This account already has access.";
+  if (/required|choose|cannot include|not purchasable/i.test(message)) return message;
+
+  return "Transaction failed before completion. Check Supabase Edge Function logs for details.";
+}

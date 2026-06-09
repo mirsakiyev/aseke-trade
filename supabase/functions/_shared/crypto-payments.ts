@@ -186,6 +186,38 @@ export function handleError(error: unknown): Response {
   return jsonResponse({ error: "Crypto payment request failed.", code: "internal_error", request_id: requestId }, 500);
 }
 
+function supabaseErrorMessage(error: unknown): string {
+  if (!error || typeof error !== "object") return "";
+
+  const dbError = error as {
+    code?: unknown;
+    message?: unknown;
+    hint?: unknown;
+  };
+  const parts = [dbError.code, dbError.message, dbError.hint]
+    .map((part) => (typeof part === "string" ? part.trim() : ""))
+    .filter(Boolean);
+
+  return [...new Set(parts)].join(" ");
+}
+
+function logSupabaseError(context: string, error: unknown): void {
+  console.error(context, {
+    detail: supabaseErrorMessage(error),
+    error
+  });
+}
+
+function paymentMethodSyncError(action: "checked" | "prepared" | "activated", error: unknown): ApiError {
+  const detail = supabaseErrorMessage(error);
+  const suffix = detail ? ` Database detail: ${detail}` : "";
+  return new ApiError(
+    500,
+    "payment_method_sync_failed",
+    `Crypto payment methods could not be ${action}.${suffix}`
+  );
+}
+
 export function getServiceClient(): SupabaseClient {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
   const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")?.trim();
@@ -274,7 +306,8 @@ export async function syncConfiguredPaymentMethods(supabase: SupabaseClient): Pr
       .maybeSingle();
 
     if (lookupError) {
-      throw new ApiError(500, "payment_method_sync_failed", "Crypto payment methods could not be checked.");
+      logSupabaseError("Crypto payment method lookup failed", lookupError);
+      throw paymentMethodSyncError("checked", lookupError);
     }
 
     if (!existing) {
@@ -288,7 +321,8 @@ export async function syncConfiguredPaymentMethods(supabase: SupabaseClient): Pr
       });
 
       if (insertError) {
-        throw new ApiError(500, "payment_method_sync_failed", "Crypto payment methods could not be prepared.");
+        logSupabaseError("Crypto payment method insert failed", insertError);
+        throw paymentMethodSyncError("prepared", insertError);
       }
 
       continue;
@@ -305,7 +339,8 @@ export async function syncConfiguredPaymentMethods(supabase: SupabaseClient): Pr
         .eq("id", method.id);
 
       if (updateError) {
-        throw new ApiError(500, "payment_method_sync_failed", "Crypto payment methods could not be activated.");
+        logSupabaseError("Crypto payment method activation failed", updateError);
+        throw paymentMethodSyncError("activated", updateError);
       }
     }
   }

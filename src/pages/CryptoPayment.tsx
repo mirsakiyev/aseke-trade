@@ -4,9 +4,11 @@ import { Link, useParams } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import {
+  addressFormatWarning,
   cryptoStatusMessages,
   fetchCryptoPayment,
   formatStableAmount,
+  paymentAddress,
   paymentQrUrl,
   statusTone,
   submitCryptoTx
@@ -94,10 +96,12 @@ export function CryptoPayment() {
         ? "Account balance deposit"
         : payment?.product_label ?? "Premium content purchase";
   const durationLabel = payment?.product_type === "premium" ? formatPlanDuration(payment.plan_duration_months) : "";
+  const rawAddress = payment ? paymentAddress(payment) : "";
+  const addressWarning = payment ? addressFormatWarning(payment) : null;
 
   const copyAddress = async () => {
     if (!payment) return;
-    await navigator.clipboard.writeText(payment.receive_address);
+    await navigator.clipboard.writeText(paymentAddress(payment));
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };
@@ -168,6 +172,9 @@ export function CryptoPayment() {
           <div className="payment-qr-frame">
             <img src={paymentQrUrl(payment)} alt={`${payment.asset} ${payment.network} payment QR code`} />
           </div>
+          <p className="soft-notice">
+            Scan or copy the address only. Confirm the amount, asset, and network separately before sending.
+          </p>
 
           <dl className="detail-list">
             <div>
@@ -183,6 +190,10 @@ export function CryptoPayment() {
             <div>
               <dt>Amount</dt>
               <dd>{formatStableAmount(payment.expected_amount, payment.asset)}</dd>
+            </div>
+            <div>
+              <dt>Asset</dt>
+              <dd>{payment.asset}</dd>
             </div>
             <div>
               <dt>Price</dt>
@@ -209,13 +220,14 @@ export function CryptoPayment() {
           <div>
             <p className="eyebrow">Receive Address</p>
             <div className="address-copy-box">
-              <code>{payment.receive_address}</code>
+              <code>{rawAddress}</code>
               <button className="icon-button" type="button" onClick={() => void copyAddress()}>
                 <Clipboard size={16} />
                 <span className="sr-only">Copy address</span>
               </button>
             </div>
             {copied && <p className="form-success">Address copied.</p>}
+            {addressWarning && <p className="warning-box">{addressWarning}</p>}
           </div>
 
           <div className="payment-warning-list">

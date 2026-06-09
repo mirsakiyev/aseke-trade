@@ -118,9 +118,36 @@ export function statusTone(status: CryptoPaymentStatus): "premium" | "free" | "d
   return "premium";
 }
 
+export function paymentAddress(payment: CryptoPayment): string {
+  return sanitizeWalletAddress(payment.receive_address, payment.network);
+}
+
+export function addressFormatWarning(payment: CryptoPayment): string | null {
+  const address = paymentAddress(payment);
+
+  if (payment.network === "TRC20" && !address.startsWith("T")) {
+    return "The displayed TRON address format looks unusual. Contact support before sending funds.";
+  }
+
+  if (payment.network === "ERC20" && !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    return "The displayed Ethereum address format looks unusual. Contact support before sending funds.";
+  }
+
+  return null;
+}
+
 export function paymentQrUrl(payment: CryptoPayment): string {
-  const qrValue = `${payment.receive_address}?amount=${payment.expected_amount}&asset=${payment.asset}&network=${payment.network}`;
+  const qrValue = paymentAddress(payment);
   return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(qrValue)}`;
+}
+
+function sanitizeWalletAddress(address: string, network: CryptoNetwork): string {
+  const trimmedAddress = address.trim();
+  const withoutScheme = network === "TRC20"
+    ? trimmedAddress.replace(/^tron:/i, "")
+    : trimmedAddress.replace(/^ethereum:/i, "");
+
+  return withoutScheme.split(/[?#]/)[0]?.trim() ?? "";
 }
 
 export async function fetchCheckoutItem(itemType: string | undefined, itemId: string | undefined): Promise<CheckoutItem | null> {
@@ -337,10 +364,22 @@ async function functionErrorMessage(error: { message?: string; context?: unknown
 
   if (context instanceof Response) {
     try {
-      const payload = (await context.clone().json()) as { error?: unknown; message?: unknown; code?: unknown };
-      const message = typeof payload.error === "string" ? payload.error : typeof payload.message === "string" ? payload.message : "";
+      const payload = (await context.clone().json()) as {
+        code?: unknown;
+        details?: unknown;
+        error?: unknown;
+        message?: unknown;
+      };
+      const message = typeof payload.message === "string"
+        ? payload.message
+        : typeof payload.error === "string"
+          ? payload.error
+          : "";
+      const details = typeof payload.details === "string" ? payload.details : "";
       const code = typeof payload.code === "string" ? payload.code : "";
-      return message ? `${message}${code ? ` (${code})` : ""}` : fallback;
+      return message
+        ? `${message}${details && details !== message ? ` ${details}` : ""}${code ? ` (${code})` : ""}`
+        : fallback;
     } catch {
       return fallback;
     }
