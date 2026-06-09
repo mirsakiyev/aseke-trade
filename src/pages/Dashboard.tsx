@@ -128,8 +128,7 @@ export function Dashboard() {
           </span>
           <h2>Access</h2>
           <p className="muted">
-            Premium content unlocks when Supabase confirms premium profile status, admin role, or a paid
-            purchase record.
+            Premium content unlocks for admins or while your verified Premium subscription expiry date is active.
           </p>
           <div className="inline-actions">
             <Link className="text-link" to="/premium">

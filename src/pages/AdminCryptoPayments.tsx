@@ -2,6 +2,8 @@ import { Edit3, Plus, RefreshCw, Save, Search, ShieldCheck } from "lucide-react"
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { LoadingState } from "../components/LoadingState";
 import { cryptoStatusMessages, formatStableAmount, statusTone } from "../lib/cryptoPayments";
+import { formatPlanDuration, PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
+import { formatMoney } from "../lib/validation";
 import { supabase } from "../lib/supabase";
 import type { CryptoAsset, CryptoNetwork, CryptoPayment, CryptoPaymentMethod, CryptoPaymentStatus } from "../types/content";
 
@@ -88,6 +90,9 @@ export function AdminCryptoPayments() {
       const searchable = [
         payment.id,
         payment.user_id,
+        payment.product_label,
+        payment.product_type,
+        payment.plan_id,
         payment.course_id,
         payment.guide_id,
         payment.tx_hash,
@@ -322,11 +327,23 @@ export function AdminCryptoPayments() {
                   <h2>{formatStableAmount(payment.expected_amount, payment.asset)}</h2>
                 </div>
                 <span className="status-pill premium">
-                  {payment.asset} {payment.network}
+                  {payment.product_type === "premium" ? PREMIUM_PRODUCT_LABEL : `${payment.asset} ${payment.network}`}
                 </span>
               </div>
 
               <dl className="payment-admin-details">
+                <div>
+                  <dt>Product</dt>
+                  <dd>{payment.product_type === "premium" ? PREMIUM_PRODUCT_LABEL : payment.product_label ?? payment.product_type}</dd>
+                </div>
+                <div>
+                  <dt>Plan</dt>
+                  <dd>{payment.plan_id ? `${payment.plan_id} (${formatPlanDuration(payment.plan_duration_months)})` : "-"}</dd>
+                </div>
+                <div>
+                  <dt>Price</dt>
+                  <dd>{payment.fiat_amount_cents ? formatMoney(payment.fiat_amount_cents) : "-"}</dd>
+                </div>
                 <div>
                   <dt>User</dt>
                   <dd>{payment.user_id}</dd>
@@ -362,6 +379,14 @@ export function AdminCryptoPayments() {
                 <div>
                   <dt>Confirmed</dt>
                   <dd>{payment.confirmed_at ? new Date(payment.confirmed_at).toLocaleString() : "-"}</dd>
+                </div>
+                <div>
+                  <dt>Premium starts</dt>
+                  <dd>{payment.premium_starts_at ? new Date(payment.premium_starts_at).toLocaleString() : "-"}</dd>
+                </div>
+                <div>
+                  <dt>Premium expires</dt>
+                  <dd>{payment.premium_expires_at ? new Date(payment.premium_expires_at).toLocaleString() : "-"}</dd>
                 </div>
               </dl>
 

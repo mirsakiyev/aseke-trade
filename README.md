@@ -11,7 +11,7 @@ ASEKE TRADE is a premium crypto education platform founded by Aslan Mirsakiyev, 
 - Protected user dashboard
 - Admin-only panel for guides, courses, modules, lessons, users, and premium access
 - Supabase Row Level Security policies for role and purchase-based access
-- Secure crypto checkout, account balance deposits, and server-side on-chain verification
+- Secure Premium subscriptions, crypto checkout, account balance deposits, and server-side on-chain verification
 
 ## Local Setup
 
@@ -94,22 +94,23 @@ After signing out and back in, the Admin navigation item will appear.
 ## Roles and Access
 
 - `user`: can read free content and manage their own dashboard records.
-- `premium`: can access premium guides and premium course lessons.
+- `premium`: can access premium guides and premium course lessons until `premium_until` expires.
 - `admin`: can manage content, users, purchases, and premium access.
 
 Premium lesson access is granted only when Supabase confirms at least one of these:
 
-- the user is `premium`
+- the user has a future `premium_until` date
 - the user is `admin`
 - the user has a valid `paid`, `active`, or `granted` purchase record
 - the user has verified `premium_access` from a confirmed crypto payment
+- the user has an active Premium subscription record
 
 ## Crypto Payment Integration
 
-Crypto checkout and balance deposits are implemented with Supabase Edge Functions. Keep blockchain
-API keys, receiving addresses, and the service role key in Supabase secrets, not Vite or Netlify
-browser variables. See [`docs/crypto-payments.md`](docs/crypto-payments.md) for deployment and
-testing.
+Crypto checkout, Premium subscriptions, balance deposits, and balance-based Premium purchases are
+implemented with Supabase Edge Functions. Keep blockchain API keys, receiving addresses, and
+`SERVICE_ROLE_KEY` in Supabase secrets, not Vite or Netlify browser variables. See
+[`docs/crypto-payments.md`](docs/crypto-payments.md) for deployment and testing.
 
 ## Netlify Deployment
 

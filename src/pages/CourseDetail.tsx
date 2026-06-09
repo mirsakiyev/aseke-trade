@@ -5,6 +5,7 @@ import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { loadCourseBySlug, loadPurchasedCourseIds } from "../lib/contentApi";
 import { supabase } from "../lib/supabase";
+import { premiumCheckoutPath } from "../lib/premiumPlans";
 import { formatMoney } from "../lib/validation";
 import type { Course } from "../types/content";
 
@@ -108,7 +109,7 @@ export function CourseDetail() {
           <p>{course.description}</p>
           <div className="card-meta">
             <span>{course.difficulty}</span>
-            <span>{formatMoney(course.price_cents)}</span>
+            <span>{course.is_premium ? "Premium subscription" : formatMoney(course.price_cents)}</span>
             <span>{course.is_premium ? "Premium course" : "Free course"}</span>
           </div>
         </div>
@@ -119,14 +120,14 @@ export function CourseDetail() {
             <h2>{user ? "Premium access required" : "Login to continue"}</h2>
             <p>
               {user
-                ? "Your account needs premium status or a verified course purchase to unlock the protected guides."
+                ? "Your account needs an active Premium subscription to unlock the protected guides."
                 : "Create an account or sign in to track progress and unlock eligible premium content."}
             </p>
             <div className="inline-actions">
               {user ? (
-                <Link className="primary-button" to={`/checkout/course/${course.id}`}>
+                <Link className="primary-button" to={premiumCheckoutPath("premium_1_month")}>
                   <WalletCards size={17} />
-                  Buy with Crypto
+                  View Premium Plans
                   <ArrowRight size={17} />
                 </Link>
               ) : (

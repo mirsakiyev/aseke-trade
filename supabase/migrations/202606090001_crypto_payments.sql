@@ -54,7 +54,7 @@ create table if not exists public.premium_access (
   course_id uuid references public.courses(id) on delete cascade,
   guide_id uuid references public.guides(id) on delete cascade,
   payment_id uuid not null references public.crypto_payments(id) on delete cascade,
-  access_type text not null default 'lifetime',
+  access_type text not null default 'verified_purchase',
   created_at timestamptz not null default now(),
   check ((course_id is not null and guide_id is null) or (course_id is null and guide_id is not null))
 );

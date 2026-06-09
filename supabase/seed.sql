@@ -38,7 +38,7 @@ values
     'trading-academy',
     'The premium trading path for technical analysis, risk control, futures, derivatives, psychology, and execution.',
     'Advanced',
-    19900,
+    0,
     true,
     false,
     3
@@ -163,9 +163,9 @@ values
   (
     '20000000-0000-4000-8000-000000000006',
     '10000000-0000-4000-8000-000000000003',
-    'Trading Foundations: Spot, Margin & Futures',
-    'trading-foundations-spot-margin-futures',
-    'Compare spot, margin, and futures markets before learning technical setups or leverage-based execution.',
+    'Trading Foundations: Charts, Orders & Market Structure',
+    'trading-foundations-charts-orders-market-structure',
+    'Build the chart-reading foundation for market structure, order types, levels, and execution planning.',
     'Coming soon.',
     'Trading Academy',
     'Beginner / Intermediate',
@@ -205,9 +205,9 @@ values
   (
     '20000000-0000-4000-8000-000000000009',
     '10000000-0000-4000-8000-000000000003',
-    'Futures Trading & Leverage',
-    'futures-trading-leverage',
-    'Learn liquidation risk, margin modes, funding, leverage limits, and how futures can amplify mistakes.',
+    'Futures Trading: Leverage, Liquidation & Strategy',
+    'futures-trading-leverage-liquidation-strategy',
+    'Learn liquidation risk, margin modes, funding, leverage limits, and safer futures strategy planning.',
     'Coming soon.',
     'Trading Academy',
     'Intermediate / Advanced',
@@ -219,9 +219,9 @@ values
   (
     '20000000-0000-4000-8000-000000000010',
     '10000000-0000-4000-8000-000000000003',
-    'Advanced Derivatives & Strategy',
-    'advanced-derivatives-strategy',
-    'Explore advanced derivatives concepts, hedging, scenario planning, and structured trading frameworks.',
+    'Advanced Derivatives: Options & Margin',
+    'advanced-derivatives-options-margin',
+    'Explore options, margin, hedging, scenario planning, and structured derivatives concepts.',
     'Coming soon.',
     'Trading Academy',
     'Advanced / Expert',
@@ -233,9 +233,9 @@ values
   (
     '20000000-0000-4000-8000-000000000011',
     '10000000-0000-4000-8000-000000000003',
-    'Trading Psychology & Execution',
-    'trading-psychology-execution',
-    'Improve decision quality around patience, journaling, execution errors, tilt, and process consistency.',
+    'Trading Psychology: Discipline Over Emotions',
+    'trading-psychology-discipline-over-emotions',
+    'Improve decision quality around patience, journaling, execution mistakes, tilt, and process consistency.',
     'Coming soon.',
     'Trading Academy',
     'Beginner / Intermediate / Advanced',
@@ -320,12 +320,12 @@ where slug not in (
   'portfolio-building-investing',
   'crypto-market-cycles',
   'tokenomics-project-research',
-  'trading-foundations-spot-margin-futures',
+  'trading-foundations-charts-orders-market-structure',
   'technical-analysis-masterclass',
   'risk-management-masterclass',
-  'futures-trading-leverage',
-  'advanced-derivatives-strategy',
-  'trading-psychology-execution',
+  'futures-trading-leverage-liquidation-strategy',
+  'advanced-derivatives-options-margin',
+  'trading-psychology-discipline-over-emotions',
   'defi-fundamentals',
   'on-chain-analysis',
   'blockchain-development-basics'
@@ -333,7 +333,7 @@ where slug not in (
 and is_archived = false;
 
 update public.guides
-set price_cents = 4900,
+set price_cents = 0,
     updated_at = now()
 where is_premium = true
   and price_cents = 0;

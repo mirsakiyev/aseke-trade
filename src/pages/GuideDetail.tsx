@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { loadGuideBySlug, loadPurchasedCourseIds, loadPurchasedGuideIds } from "../lib/contentApi";
+import { premiumCheckoutPath } from "../lib/premiumPlans";
 import type { Guide } from "../types/content";
 
 export function GuideDetail() {
@@ -113,14 +114,14 @@ export function GuideDetail() {
             <h2>{user ? "Premium guide locked" : "Login to continue"}</h2>
             <p>
               {user
-                ? "This guide belongs to the premium Trading Academy path. Upgrade or use a verified course purchase to unlock it."
+                ? "This guide belongs to the Premium Trading Academy path. Upgrade to unlock it until your subscription expires."
                 : "Create an account or sign in to unlock eligible premium education and track your progress."}
             </p>
             <div className="inline-actions">
               {user ? (
-                <Link className="primary-button" to={`/checkout/guide/${guide.id}`}>
+                <Link className="primary-button" to={premiumCheckoutPath("premium_1_month")}>
                   <WalletCards size={17} />
-                  Buy with Crypto
+                  Get Premium
                   <ArrowRight size={17} />
                 </Link>
               ) : (

@@ -13,6 +13,7 @@ import {
   formatStableAmount,
   statusTone
 } from "../lib/cryptoPayments";
+import { formatPlanDuration, PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
 import { formatMoney } from "../lib/validation";
 import type { AccountBalance, AccountBalanceTransaction, CryptoPayment } from "../types/content";
 
@@ -155,11 +156,23 @@ export function AccountPayments() {
                       <Clock3 size={15} />
                       {cryptoStatusMessages[payment.status]}
                     </span>
-                    <h2>{formatStableAmount(payment.expected_amount, payment.asset)}</h2>
+                    <h2>
+                      {payment.product_type === "premium"
+                        ? `${PREMIUM_PRODUCT_LABEL} - ${formatPlanDuration(payment.plan_duration_months)}`
+                        : formatStableAmount(payment.expected_amount, payment.asset)}
+                    </h2>
                     <p className="muted">
-                      {payment.payment_type === "deposit" ? "Deposit" : "Purchase"} - {payment.asset} {payment.network} -
+                      {paymentDisplayLabel(payment)} - {payment.asset} {payment.network} -
                       Created {new Date(payment.created_at).toLocaleString()}
                     </p>
+                    {payment.product_type === "premium" && (
+                      <p className="muted">
+                        Price {formatMoney(payment.fiat_amount_cents ?? Math.round(Number(payment.expected_amount) * 100))}
+                        {payment.premium_expires_at
+                          ? ` - Premium until ${new Date(payment.premium_expires_at).toLocaleDateString()}`
+                          : ""}
+                      </p>
+                    )}
                   </div>
                   <div className="inline-actions">
                     <Link className="ghost-button compact" to={`/payment/${payment.id}`}>
@@ -206,4 +219,12 @@ export function AccountPayments() {
 function formatLedgerAmount(cents: number): string {
   const prefix = cents > 0 ? "+" : "-";
   return `${prefix}${formatMoney(Math.abs(cents))}`;
+}
+
+function paymentDisplayLabel(payment: CryptoPayment): string {
+  if (payment.payment_type === "deposit") return "Deposit";
+  if (payment.product_type === "premium") {
+    return `${PREMIUM_PRODUCT_LABEL} ${formatPlanDuration(payment.plan_duration_months)}`.trim();
+  }
+  return payment.product_label ?? "Purchase";
 }

@@ -62,7 +62,7 @@ export function Courses() {
               <h2>{course.title}</h2>
               <p>{course.description}</p>
               <div className="card-meta">
-                <span>{formatMoney(course.price_cents)}</span>
+                <span>{course.is_premium ? "Premium subscription" : formatMoney(course.price_cents)}</span>
                 <span>
                   {course.guides.length > 0
                     ? `${course.guides.length} guides`

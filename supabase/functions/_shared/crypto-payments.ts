@@ -15,6 +15,8 @@ const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvw
 
 export type SupportedAsset = "USDT" | "USDC";
 export type SupportedNetwork = "TRC20" | "ERC20";
+export type ProductType = "premium" | "course" | "guide" | "deposit";
+export type PremiumPlanId = "premium_1_month" | "premium_1_year";
 export type PaymentStatus =
   | "pending"
   | "submitted"
@@ -42,6 +44,14 @@ export interface CryptoPaymentRow {
   course_id: string | null;
   guide_id: string | null;
   payment_type: "purchase" | "deposit";
+  product_type: ProductType;
+  product_label: string | null;
+  plan_id: PremiumPlanId | null;
+  plan_duration_months: number | null;
+  fiat_amount_cents: number | null;
+  fiat_currency: "USD";
+  premium_starts_at: string | null;
+  premium_expires_at: string | null;
   payment_method_id: string;
   expected_amount: string | number;
   received_amount: string | number | null;
@@ -71,6 +81,14 @@ interface VerificationResult {
   receivedAmount?: string;
   confirmations?: number;
   reason?: string;
+}
+
+interface PremiumPlanConfig {
+  id: PremiumPlanId;
+  productLabel: "Premium";
+  durationMonths: number;
+  durationLabel: string;
+  priceCents: number;
 }
 
 export class ApiError extends Error {
@@ -114,6 +132,23 @@ export const paymentMethodConfigs: PaymentMethodConfig[] = [
   }
 ];
 
+export const premiumPlanConfigs: PremiumPlanConfig[] = [
+  {
+    id: "premium_1_month",
+    productLabel: "Premium",
+    durationMonths: 1,
+    durationLabel: "1 month",
+    priceCents: 1000
+  },
+  {
+    id: "premium_1_year",
+    productLabel: "Premium",
+    durationMonths: 12,
+    durationLabel: "1 year",
+    priceCents: 5000
+  }
+];
+
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -129,13 +164,26 @@ export function handleOptions(request: Request): Response | null {
 }
 
 export function handleError(error: unknown): Response {
-  console.error(error);
+  const requestId = crypto.randomUUID();
 
   if (error instanceof ApiError) {
-    return jsonResponse({ error: error.message, code: error.code }, error.status);
+    console.error("Crypto payment API error", {
+      requestId,
+      status: error.status,
+      code: error.code,
+      message: error.message
+    });
+    return jsonResponse({ error: error.message, code: error.code, request_id: requestId }, error.status);
   }
 
-  return jsonResponse({ error: "Crypto payment request failed.", code: "internal_error" }, 500);
+  const message = error instanceof Error ? error.message : "Unknown server error";
+  console.error("Crypto payment internal error", {
+    requestId,
+    message,
+    stack: error instanceof Error ? error.stack : undefined
+  });
+
+  return jsonResponse({ error: "Crypto payment request failed.", code: "internal_error", request_id: requestId }, 500);
 }
 
 export function getServiceClient(): SupabaseClient {
@@ -294,6 +342,17 @@ export function centsToStableAmount(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
+export function getPremiumPlan(planId: unknown): PremiumPlanConfig {
+  const normalizedPlanId = String(planId ?? "").trim();
+  const plan = premiumPlanConfigs.find((item) => item.id === normalizedPlanId);
+
+  if (!plan) {
+    throw new ApiError(400, "invalid_premium_plan", "Choose a valid Premium plan.");
+  }
+
+  return plan;
+}
+
 export function normalizeDepositAmount(amount: unknown): {
   expectedAmount: string;
   amountCents: number;
@@ -329,10 +388,31 @@ export async function resolveCheckoutItem(
 ): Promise<{
   courseId: string | null;
   guideId: string | null;
+  productType: ProductType;
+  productLabel: string;
+  planId: PremiumPlanId | null;
+  planDurationMonths: number | null;
   title: string;
   expectedAmount: string;
   amountCents: number;
 }> {
+  const productType = String(body.product_type ?? "").trim().toLowerCase();
+  if (productType === "premium") {
+    const plan = getPremiumPlan(body.plan_id);
+
+    return {
+      courseId: null,
+      guideId: null,
+      productType: "premium",
+      productLabel: plan.productLabel,
+      planId: plan.id,
+      planDurationMonths: plan.durationMonths,
+      title: plan.productLabel,
+      expectedAmount: centsToStableAmount(plan.priceCents),
+      amountCents: plan.priceCents
+    };
+  }
+
   const courseId = typeof body.course_id === "string" ? body.course_id.trim() : "";
   const guideId = typeof body.guide_id === "string" ? body.guide_id.trim() : "";
 
@@ -359,6 +439,10 @@ export async function resolveCheckoutItem(
     return {
       courseId: course.id,
       guideId: null,
+      productType: "course",
+      productLabel: course.title,
+      planId: null,
+      planDurationMonths: null,
       title: course.title,
       expectedAmount: centsToStableAmount(course.price_cents),
       amountCents: course.price_cents
@@ -394,6 +478,10 @@ export async function resolveCheckoutItem(
   return {
     courseId: null,
     guideId: guide.id,
+    productType: "guide",
+    productLabel: guide.title,
+    planId: null,
+    planDurationMonths: null,
     title: guide.title,
     expectedAmount: centsToStableAmount(priceCents),
     amountCents: priceCents
@@ -478,6 +566,18 @@ async function finalizeConfirmedPayment(supabase: SupabaseClient, payment: Crypt
     return;
   }
 
+  if (payment.product_type === "premium") {
+    const { error } = await supabase.rpc("activate_premium_subscription_from_payment", {
+      target_payment_id: payment.id
+    });
+
+    if (error) {
+      throw new ApiError(500, "premium_subscription_failed", "Premium subscription could not be activated.");
+    }
+
+    return;
+  }
+
   await grantAccessFromPayment(supabase, payment);
 }
 
@@ -540,7 +640,7 @@ async function grantAccessFromPayment(supabase: SupabaseClient, payment: CryptoP
       course_id: payment.course_id,
       guide_id: payment.guide_id,
       payment_id: payment.id,
-      access_type: "lifetime"
+      access_type: "verified_purchase"
     });
 
     if (accessInsertError && accessInsertError.code !== "23505") {

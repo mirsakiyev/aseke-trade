@@ -21,15 +21,22 @@ Deno.serve(async (request) => {
     const body = (await request.json()) as Record<string, unknown>;
     const itemType = String(body.item_type ?? "").trim();
     const itemId = String(body.item_id ?? "").trim();
+    const productType = String(body.product_type ?? "").trim();
+    const planId = String(body.plan_id ?? "").trim();
 
-    if ((itemType !== "course" && itemType !== "guide") || !itemId) {
-      throw new ApiError(400, "invalid_balance_purchase_item", "Choose one course or guide.");
+    if (productType === "premium" || itemType === "premium") {
+      if (!planId) {
+        throw new ApiError(400, "plan_id_required", "Choose a Premium plan.");
+      }
+    } else if ((itemType !== "course" && itemType !== "guide") || !itemId) {
+      throw new ApiError(400, "invalid_balance_purchase_item", "Choose Premium, one course, or one guide.");
     }
 
     const { data, error } = await supabase.rpc("spend_account_balance_for_user", {
       target_user_id: user.id,
       target_course_id: itemType === "course" ? itemId : null,
-      target_guide_id: itemType === "guide" ? itemId : null
+      target_guide_id: itemType === "guide" ? itemId : null,
+      target_plan_id: productType === "premium" || itemType === "premium" ? planId : null
     });
 
     if (error) {

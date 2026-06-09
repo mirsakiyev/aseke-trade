@@ -11,6 +11,7 @@ import {
   spendAccountBalance,
   type CheckoutItem
 } from "../lib/cryptoPayments";
+import { PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
 import { formatMoney } from "../lib/validation";
 import type { AccountBalance } from "../types/content";
 
@@ -59,9 +60,13 @@ export function CryptoCheckout() {
     };
   }, [user]);
 
-  const checkoutType = useMemo(() => (itemType === "guide" ? "guide" : "course"), [itemType]);
+  const checkoutType = useMemo(() => {
+    if (itemType === "premium") return "premium";
+    return itemType === "guide" ? "guide" : "course";
+  }, [itemType]);
   const availableBalance = balance?.balance_cents ?? 0;
   const canPayWithBalance = Boolean(item && item.price_cents > 0 && availableBalance >= item.price_cents);
+  const isPremiumCheckout = item?.itemType === "premium";
 
   const createPayment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -73,7 +78,8 @@ export function CryptoCheckout() {
     try {
       const response = await createCryptoPayment({
         itemType: checkoutType,
-        itemId: item.id,
+        itemId: item.itemType === "premium" ? undefined : item.id,
+        planId: item.plan_id,
         asset: selectedMethod.asset,
         network: selectedMethod.network
       });
@@ -94,7 +100,8 @@ export function CryptoCheckout() {
     try {
       await spendAccountBalance({
         itemType: checkoutType,
-        itemId: item.id
+        itemId: item.itemType === "premium" ? undefined : item.id,
+        planId: item.plan_id
       });
       navigate("/account/payments");
     } catch (error) {
@@ -132,8 +139,12 @@ export function CryptoCheckout() {
       <section className="page-title-row">
         <div>
           <p className="eyebrow">Crypto Checkout</p>
-          <h1>{item.title}</h1>
-          <p className="muted">{item.description}</p>
+          <h1>{isPremiumCheckout ? PREMIUM_PRODUCT_LABEL : item.title}</h1>
+          <p className="muted">
+            {isPremiumCheckout
+              ? `Product: ${PREMIUM_PRODUCT_LABEL}. Duration: ${item.duration_label}. Price: ${formatMoney(item.price_cents)}.`
+              : item.description}
+          </p>
         </div>
         <span className="status-pill premium">
           <WalletCards size={15} />
@@ -164,7 +175,7 @@ export function CryptoCheckout() {
           <section className="section-panel checkout-method-panel">
             <div>
               <p className="eyebrow">Select Network</p>
-              <h2>Buy with crypto</h2>
+              <h2>{isPremiumCheckout ? "Pay for Premium with crypto" : "Buy with crypto"}</h2>
             </div>
 
             <div className="payment-method-grid" role="radiogroup" aria-label="Payment method">
@@ -189,9 +200,15 @@ export function CryptoCheckout() {
             <p className="eyebrow">Payment Summary</p>
             <dl className="detail-list">
               <div>
-                <dt>Item</dt>
-                <dd>{item.title}</dd>
+                <dt>Product</dt>
+                <dd>{isPremiumCheckout ? PREMIUM_PRODUCT_LABEL : item.title}</dd>
               </div>
+              {isPremiumCheckout && (
+                <div>
+                  <dt>Duration</dt>
+                  <dd>{item.duration_label}</dd>
+                </div>
+              )}
               <div>
                 <dt>Price</dt>
                 <dd>{formatMoney(item.price_cents)}</dd>
@@ -213,7 +230,9 @@ export function CryptoCheckout() {
               </p>
               <p>
                 <AlertTriangle size={16} />
-                Access unlocks only after blockchain verification.
+                {isPremiumCheckout
+                  ? "Premium starts or extends only after blockchain verification."
+                  : "Access unlocks only after blockchain verification."}
               </p>
               <p>
                 <AlertTriangle size={16} />

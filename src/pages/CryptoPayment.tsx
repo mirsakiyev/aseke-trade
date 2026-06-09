@@ -11,6 +11,8 @@ import {
   statusTone,
   submitCryptoTx
 } from "../lib/cryptoPayments";
+import { formatPlanDuration, PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
+import { formatMoney } from "../lib/validation";
 import type { CryptoPayment as CryptoPaymentRecord } from "../types/content";
 
 export function CryptoPayment() {
@@ -59,7 +61,9 @@ export function CryptoPayment() {
     if (payment.status === "confirmed") {
       return payment.payment_type === "deposit"
         ? "Deposit confirmed. Account balance credited."
-        : "Payment confirmed. Premium access unlocked.";
+        : payment.product_type === "premium"
+          ? "Premium subscription confirmed."
+          : "Payment confirmed. Content access unlocked.";
     }
 
     return cryptoStatusMessages[payment.status];
@@ -82,6 +86,14 @@ export function CryptoPayment() {
       setIsSubmitting(false);
     }
   };
+
+  const productLabel =
+    payment?.product_type === "premium"
+      ? PREMIUM_PRODUCT_LABEL
+      : payment?.payment_type === "deposit"
+        ? "Account balance deposit"
+        : payment?.product_label ?? "Premium content purchase";
+  const durationLabel = payment?.product_type === "premium" ? formatPlanDuration(payment.plan_duration_months) : "";
 
   const copyAddress = async () => {
     if (!payment) return;
@@ -137,8 +149,10 @@ export function CryptoPayment() {
           <p className="eyebrow">Crypto Payment</p>
           <h1>{formatStableAmount(payment.expected_amount, payment.asset)}</h1>
           <p className="muted">
-            {payment.payment_type === "deposit" ? "Account balance deposit" : "Premium content purchase"} -{" "}
-            {payment.asset} on {payment.network}. Use the exact network and token shown here.
+            {payment.product_type === "premium"
+              ? `Product: ${PREMIUM_PRODUCT_LABEL}. Duration: ${durationLabel}. Price: ${formatMoney(payment.fiat_amount_cents ?? Math.round(Number(payment.expected_amount) * 100))}.`
+              : `${productLabel} - ${payment.asset} on ${payment.network}.`}{" "}
+            Use the exact network and token shown here.
           </p>
         </div>
         <span className={`status-pill ${statusTone(payment.status)}`}>
@@ -157,13 +171,33 @@ export function CryptoPayment() {
 
           <dl className="detail-list">
             <div>
+              <dt>Product</dt>
+              <dd>{productLabel}</dd>
+            </div>
+            {payment.product_type === "premium" && (
+              <div>
+                <dt>Duration</dt>
+                <dd>{durationLabel}</dd>
+              </div>
+            )}
+            <div>
               <dt>Amount</dt>
               <dd>{formatStableAmount(payment.expected_amount, payment.asset)}</dd>
+            </div>
+            <div>
+              <dt>Price</dt>
+              <dd>{formatMoney(payment.fiat_amount_cents ?? Math.round(Number(payment.expected_amount) * 100))}</dd>
             </div>
             <div>
               <dt>Network</dt>
               <dd>{payment.network}</dd>
             </div>
+            {payment.premium_expires_at && (
+              <div>
+                <dt>Premium until</dt>
+                <dd>{new Date(payment.premium_expires_at).toLocaleDateString()}</dd>
+              </div>
+            )}
             <div>
               <dt>Expires in</dt>
               <dd>{payment.status === "confirmed" ? "Confirmed" : expiresIn}</dd>

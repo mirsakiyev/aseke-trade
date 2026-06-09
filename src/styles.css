@@ -2053,6 +2053,12 @@ select:focus {
   line-height: 1.1;
 }
 
+.price-line span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .check-list,
 .plain-list,
 .admin-list {
@@ -2072,6 +2078,59 @@ select:focus {
 
 .check-list svg {
   color: var(--teal);
+}
+
+.premium-plan-grid {
+  align-items: stretch;
+}
+
+.premium-perk-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.premium-perk {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 72px;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.045);
+  color: var(--platinum-soft);
+}
+
+.premium-perk svg,
+.comparison-row svg {
+  color: var(--teal);
+}
+
+.comparison-table {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.comparison-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(86px, 0.35fr) minmax(112px, 0.45fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.035);
+}
+
+.comparison-head {
+  color: #f7fbfc;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(229, 228, 226, 0.08);
 }
 
 .detail-list {
@@ -2292,6 +2351,10 @@ select:focus {
     grid-template-columns: 1fr 1fr;
   }
 
+  .premium-perk-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .risk-band {
     grid-template-columns: 1fr;
   }
@@ -2371,6 +2434,11 @@ select:focus {
   .market-showcase,
   .form-row,
   .site-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .premium-perk-grid,
+  .comparison-row {
     grid-template-columns: 1fr;
   }
 

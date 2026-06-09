@@ -28,7 +28,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 function profileHasPremium(profile: Profile | null): boolean {
   if (!profile) return false;
-  if (profile.role === "admin" || profile.role === "premium") return true;
+  if (profile.role === "admin") return true;
   if (!profile.premium_until) return false;
   return new Date(profile.premium_until).getTime() > Date.now();
 }

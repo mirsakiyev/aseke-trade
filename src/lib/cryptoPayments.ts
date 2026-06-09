@@ -9,6 +9,7 @@ import type {
   CryptoPaymentStatus,
   Guide
 } from "../types/content";
+import { getPremiumPlan, PREMIUM_PRODUCT_LABEL, type PremiumPlanId } from "./premiumPlans";
 import { supabase } from "./supabase";
 
 export interface PaymentMethodChoice {
@@ -20,12 +21,16 @@ export interface PaymentMethodChoice {
 
 export interface CheckoutItem {
   id: string;
-  itemType: "course" | "guide";
+  itemType: "course" | "guide" | "premium";
   title: string;
   description: string;
   price_cents: number;
   is_premium: boolean;
   course_id?: string | null;
+  product_label?: string;
+  plan_id?: PremiumPlanId;
+  plan_duration_months?: number;
+  duration_label?: string;
 }
 
 interface CreatePaymentResponse {
@@ -33,6 +38,10 @@ interface CreatePaymentResponse {
   item: {
     title: string;
     amount_cents: number;
+    product_type?: string;
+    product_label?: string;
+    plan_id?: PremiumPlanId | null;
+    plan_duration_months?: number | null;
   };
   method: {
     asset: CryptoAsset;
@@ -50,7 +59,9 @@ interface SpendAccountBalanceResponse {
   result: {
     transaction_id: string;
     balance_cents: number;
-    purchase_id: string;
+    purchase_id: string | null;
+    subscription_id?: string | null;
+    premium_expires_at?: string | null;
   };
 }
 
@@ -113,7 +124,25 @@ export function paymentQrUrl(payment: CryptoPayment): string {
 }
 
 export async function fetchCheckoutItem(itemType: string | undefined, itemId: string | undefined): Promise<CheckoutItem | null> {
-  if (!itemId || (itemType !== "course" && itemType !== "guide")) return null;
+  if (!itemId || (itemType !== "course" && itemType !== "guide" && itemType !== "premium")) return null;
+
+  if (itemType === "premium") {
+    const plan = getPremiumPlan(itemId);
+    if (!plan) return null;
+
+    return {
+      id: plan.id,
+      itemType,
+      title: PREMIUM_PRODUCT_LABEL,
+      description: `${plan.durationLabel} ASEKE TRADE Premium subscription.`,
+      price_cents: plan.priceCents,
+      is_premium: true,
+      product_label: PREMIUM_PRODUCT_LABEL,
+      plan_id: plan.id,
+      plan_duration_months: plan.durationMonths,
+      duration_label: plan.durationLabel
+    };
+  }
 
   if (!supabase) {
     return sampleCheckoutItem(itemType, itemId);
@@ -161,15 +190,25 @@ export async function fetchCheckoutItem(itemType: string | undefined, itemId: st
 }
 
 export async function createCryptoPayment(input: {
-  itemType: "course" | "guide";
-  itemId: string;
+  itemType: "course" | "guide" | "premium";
+  itemId?: string;
+  planId?: PremiumPlanId;
   asset: CryptoAsset;
   network: CryptoNetwork;
 }): Promise<CreatePaymentResponse> {
   const body =
-    input.itemType === "course"
-      ? { course_id: input.itemId, asset: input.asset, network: input.network }
-      : { guide_id: input.itemId, asset: input.asset, network: input.network };
+    input.itemType === "premium"
+      ? {
+          payment_type: "purchase",
+          product_type: "premium",
+          product_label: PREMIUM_PRODUCT_LABEL,
+          plan_id: input.planId,
+          asset: input.asset,
+          network: input.network
+        }
+      : input.itemType === "course"
+        ? { course_id: input.itemId, asset: input.asset, network: input.network }
+        : { guide_id: input.itemId, asset: input.asset, network: input.network };
 
   return invokeCryptoFunction<CreatePaymentResponse>("create-crypto-payment", body);
 }
@@ -188,13 +227,24 @@ export async function createCryptoDeposit(input: {
 }
 
 export async function spendAccountBalance(input: {
-  itemType: "course" | "guide";
-  itemId: string;
+  itemType: "course" | "guide" | "premium";
+  itemId?: string;
+  planId?: PremiumPlanId;
 }): Promise<SpendAccountBalanceResponse["result"]> {
-  const response = await invokeCryptoFunction<SpendAccountBalanceResponse>("spend-account-balance", {
-    item_type: input.itemType,
-    item_id: input.itemId
-  });
+  const body =
+    input.itemType === "premium"
+      ? {
+          item_type: "premium",
+          product_type: "premium",
+          product_label: PREMIUM_PRODUCT_LABEL,
+          plan_id: input.planId
+        }
+      : {
+          item_type: input.itemType,
+          item_id: input.itemId
+        };
+
+  const response = await invokeCryptoFunction<SpendAccountBalanceResponse>("spend-account-balance", body);
   return response.result;
 }
 
@@ -269,7 +319,8 @@ async function invokeCryptoFunction<T>(functionName: string, body: Record<string
   });
 
   if (error) {
-    throw new Error(error.message);
+    const message = await functionErrorMessage(error);
+    throw new Error(message);
   }
 
   const possibleError = data as { error?: unknown };
@@ -278,6 +329,24 @@ async function invokeCryptoFunction<T>(functionName: string, body: Record<string
   }
 
   return data as T;
+}
+
+async function functionErrorMessage(error: { message?: string; context?: unknown }): Promise<string> {
+  const fallback = error.message || "Edge Function request failed.";
+  const context = error.context;
+
+  if (context instanceof Response) {
+    try {
+      const payload = (await context.clone().json()) as { error?: unknown; message?: unknown; code?: unknown };
+      const message = typeof payload.error === "string" ? payload.error : typeof payload.message === "string" ? payload.message : "";
+      const code = typeof payload.code === "string" ? payload.code : "";
+      return message ? `${message}${code ? ` (${code})` : ""}` : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
 }
 
 function sampleCheckoutItem(itemType: "course" | "guide", itemId: string): CheckoutItem | null {

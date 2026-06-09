@@ -30,6 +30,10 @@ Deno.serve(async (request) => {
         ? {
             courseId: null,
             guideId: null,
+            productType: "deposit" as const,
+            productLabel: "Account balance deposit",
+            planId: null,
+            planDurationMonths: null,
             title: "Account balance deposit",
             ...normalizeDepositAmount(body.amount)
           }
@@ -43,6 +47,12 @@ Deno.serve(async (request) => {
         course_id: item.courseId,
         guide_id: item.guideId,
         payment_type: paymentType,
+        product_type: item.productType,
+        product_label: item.productLabel,
+        plan_id: item.planId,
+        plan_duration_months: item.planDurationMonths,
+        fiat_amount_cents: item.amountCents,
+        fiat_currency: "USD",
         payment_method_id: method.row.id,
         expected_amount: item.expectedAmount,
         asset,
@@ -62,7 +72,11 @@ Deno.serve(async (request) => {
       payment: data,
       item: {
         title: item.title,
-        amount_cents: item.amountCents
+        amount_cents: item.amountCents,
+        product_type: item.productType,
+        product_label: item.productLabel,
+        plan_id: item.planId,
+        plan_duration_months: item.planDurationMonths
       },
       method: {
         asset,

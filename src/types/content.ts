@@ -30,6 +30,9 @@ export interface Profile {
   created_at: string;
 }
 
+export type PremiumPlanId = "premium_1_month" | "premium_1_year";
+export type PaymentProductType = "premium" | "course" | "guide" | "deposit";
+
 export interface Guide {
   id: string;
   course_id: string | null;
@@ -120,6 +123,14 @@ export interface CryptoPayment {
   course_id: string | null;
   guide_id: string | null;
   payment_type: "purchase" | "deposit";
+  product_type: PaymentProductType;
+  product_label: string | null;
+  plan_id: PremiumPlanId | null;
+  plan_duration_months: number | null;
+  fiat_amount_cents: number | null;
+  fiat_currency: "USD";
+  premium_starts_at: string | null;
+  premium_expires_at: string | null;
   payment_method_id: string;
   expected_amount: string | number;
   received_amount: string | number | null;
@@ -161,10 +172,32 @@ export interface AccountBalanceTransaction {
   crypto_payment_id: string | null;
   course_id: string | null;
   guide_id: string | null;
+  product_type: PaymentProductType | null;
+  product_label: string | null;
+  plan_id: PremiumPlanId | null;
+  plan_duration_months: number | null;
+  premium_subscription_id: string | null;
   transaction_type: "deposit" | "purchase" | "refund" | "adjustment";
   amount_cents: number;
   description: string | null;
   created_at: string;
+}
+
+export interface PremiumSubscription {
+  id: string;
+  user_id: string;
+  product_type: "premium";
+  product_label: "Premium";
+  plan_id: PremiumPlanId;
+  plan_duration_months: number;
+  starts_at: string;
+  expires_at: string;
+  price_cents: number;
+  status: "pending" | "active" | "expired" | "cancelled" | "failed";
+  crypto_payment_id: string | null;
+  balance_transaction_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SavedGuide {
