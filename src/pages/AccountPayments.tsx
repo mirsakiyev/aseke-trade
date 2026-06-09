@@ -3,25 +3,26 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
+import { useAccountStatus } from "../hooks/useAccountStatus";
 import {
   createCryptoDeposit,
   cryptoPaymentMethods,
   cryptoStatusMessages,
-  fetchAccountBalance,
   fetchAccountBalanceTransactions,
   fetchUserCryptoPayments,
   formatStableAmount,
   statusTone
 } from "../lib/cryptoPayments";
+import { formatUsd } from "../lib/accountStatus";
 import { formatPlanDuration, PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
 import { formatMoney } from "../lib/validation";
-import type { AccountBalance, AccountBalanceTransaction, CryptoPayment } from "../types/content";
+import type { AccountBalanceTransaction, CryptoPayment } from "../types/content";
 
 export function AccountPayments() {
   const { user } = useAuth();
+  const accountStatus = useAccountStatus();
   const navigate = useNavigate();
   const [payments, setPayments] = useState<CryptoPayment[]>([]);
-  const [balance, setBalance] = useState<AccountBalance | null>(null);
   const [transactions, setTransactions] = useState<AccountBalanceTransaction[]>([]);
   const [selectedMethod, setSelectedMethod] = useState(cryptoPaymentMethods[0]);
   const [depositAmount, setDepositAmount] = useState("50.00");
@@ -41,12 +42,10 @@ export function AccountPayments() {
 
     Promise.all([
       fetchUserCryptoPayments(user.id),
-      fetchAccountBalance(user.id),
       fetchAccountBalanceTransactions(user.id)
-    ]).then(([nextPayments, nextBalance, nextTransactions]) => {
+    ]).then(([nextPayments, nextTransactions]) => {
       if (!mounted) return;
       setPayments(nextPayments);
-      setBalance(nextBalance);
       setTransactions(nextTransactions);
       setIsLoading(false);
     });
@@ -87,7 +86,7 @@ export function AccountPayments() {
         </div>
         <span className="status-pill premium">
           <WalletCards size={15} />
-          {formatMoney(balance?.balance_cents ?? 0)}
+          {accountStatus.balanceLabel}
         </span>
       </section>
 
@@ -100,9 +99,10 @@ export function AccountPayments() {
           <section className="checkout-grid">
             <article className="section-panel">
               <p className="eyebrow">Available Balance</p>
-              <h2>{formatMoney(balance?.balance_cents ?? 0)}</h2>
+              <h2>{accountStatus.balanceLabel}</h2>
               <p className="muted">
-                Verified deposits credit this balance. Balance purchases deduct from it and create an audit entry.
+                Plan: {accountStatus.planLabel}. Verified deposits credit this balance. Balance purchases deduct from it
+                and create an audit entry.
               </p>
             </article>
 
@@ -218,7 +218,7 @@ export function AccountPayments() {
 
 function formatLedgerAmount(cents: number): string {
   const prefix = cents > 0 ? "+" : "-";
-  return `${prefix}${formatMoney(Math.abs(cents))}`;
+  return `${prefix}${formatUsd(Math.abs(cents))}`;
 }
 
 function paymentDisplayLabel(payment: CryptoPayment): string {

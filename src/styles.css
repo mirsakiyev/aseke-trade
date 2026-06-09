@@ -304,6 +304,46 @@ p {
   gap: 0.55rem;
 }
 
+.account-chip {
+  max-width: min(36vw, 460px);
+}
+
+.account-summary-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.account-email {
+  overflow: hidden;
+  max-width: clamp(8rem, 14vw, 15rem);
+  text-overflow: ellipsis;
+}
+
+.account-summary-meta {
+  color: var(--muted);
+}
+
+.account-plan-tag {
+  flex-shrink: 0;
+  padding: 0.16rem 0.45rem;
+  border: 1px solid rgba(184, 214, 222, 0.36);
+  border-radius: 999px;
+  background: rgba(184, 214, 222, 0.08);
+  color: var(--platinum-soft);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.account-plan-tag.premium {
+  border-color: rgba(229, 228, 226, 0.56);
+  background: rgba(229, 228, 226, 0.14);
+  color: var(--platinum);
+}
+
 .mobile-actions {
   display: none;
 }
@@ -1723,6 +1763,20 @@ p {
   gap: 1rem;
 }
 
+.manual-tx-details {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.045);
+}
+
+.manual-tx-details h2 {
+  margin: 0;
+  font-size: clamp(1.15rem, 2vw, 1.5rem);
+}
+
 .payment-method-grid {
   display: grid;
   gap: 0.7rem;
@@ -2331,6 +2385,23 @@ select:focus {
     width: 100%;
   }
 
+  .mobile-actions .account-chip {
+    grid-column: 1 / -1;
+  }
+
+  .account-chip {
+    max-width: 100%;
+  }
+
+  .account-summary-text {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .account-email {
+    max-width: 44vw;
+  }
+
   .feature-grid,
   .content-grid,
   .pricing-grid,
@@ -2388,6 +2459,16 @@ select:focus {
 
   .mobile-actions {
     grid-template-columns: 1fr;
+  }
+
+  .account-summary-text {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .account-email {
+    max-width: 100%;
   }
 
   .page {

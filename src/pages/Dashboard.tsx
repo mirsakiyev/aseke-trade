@@ -1,8 +1,9 @@
-import { BookMarked, Crown, GraduationCap, ShieldCheck, UserCircle2 } from "lucide-react";
+import { ArrowUpRight, BookMarked, Crown, GraduationCap, ShieldCheck, UserCircle2, WalletCards } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
+import { useAccountStatus } from "../hooks/useAccountStatus";
 import { supabase } from "../lib/supabase";
 import type { Guide, Lesson, LessonProgress, Purchase, SavedGuide } from "../types/content";
 
@@ -33,7 +34,8 @@ function normalizeLessonProgress(row: LessonProgressRow): LessonProgress {
 }
 
 export function Dashboard() {
-  const { user, profile, isPremium, isAdmin } = useAuth();
+  const { user, profile } = useAuth();
+  const accountStatus = useAccountStatus();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [savedGuides, setSavedGuides] = useState<SavedGuide[]>([]);
   const [progress, setProgress] = useState<LessonProgress[]>([]);
@@ -88,9 +90,9 @@ export function Dashboard() {
           <h1>Learning account</h1>
           <p className="muted">Your profile, access status, saved guides, and course progress.</p>
         </div>
-        <span className={isPremium || isAdmin ? "status-pill premium" : "status-pill free"}>
+        <span className={accountStatus.isPremiumActive ? "status-pill premium" : "status-pill free"}>
           <Crown size={15} />
-          {isAdmin ? "Admin" : isPremium ? "Premium" : "Free"}
+          {accountStatus.planLabel}
         </span>
       </section>
 
@@ -112,30 +114,38 @@ export function Dashboard() {
               <dd>{user?.email}</dd>
             </div>
             <div>
-              <dt>Status</dt>
-              <dd>{profile?.role ?? "user"}</dd>
+              <dt>Available Balance</dt>
+              <dd>{accountStatus.balanceLabel}</dd>
             </div>
             <div>
-              <dt>Premium until</dt>
-              <dd>{profile?.premium_until ? new Date(profile.premium_until).toLocaleDateString() : "Not active"}</dd>
+              <dt>Current Plan</dt>
+              <dd>{accountStatus.planLabel}</dd>
             </div>
+            {accountStatus.isPremiumActive && accountStatus.premiumUntilLabel && (
+              <div>
+                <dt>Premium Expires</dt>
+                <dd>{accountStatus.premiumUntilLabel}</dd>
+              </div>
+            )}
           </dl>
         </article>
 
         <article className="section-panel">
           <span className="feature-icon">
-            <ShieldCheck size={21} />
+            <WalletCards size={21} />
           </span>
-          <h2>Access</h2>
+          <h2>Account access</h2>
           <p className="muted">
-            Premium content unlocks for admins or while your verified Premium subscription expiry date is active.
+            Keep funds ready for Premium purchases and manage your access from one place.
           </p>
           <div className="inline-actions">
-            <Link className="text-link" to="/premium">
-              Manage premium
+            <Link className="primary-button compact" to="/account/payments">
+              <ArrowUpRight size={16} />
+              Top up balance
             </Link>
-            <Link className="text-link" to="/account/payments">
-              Payment history
+            <Link className="ghost-button compact" to="/premium">
+              <ShieldCheck size={16} />
+              {accountStatus.isPremiumActive ? "Extend Premium" : "Upgrade Premium"}
             </Link>
           </div>
         </article>

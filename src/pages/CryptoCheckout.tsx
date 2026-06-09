@@ -3,24 +3,24 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
+import { useAccountStatus } from "../hooks/useAccountStatus";
 import {
   createCryptoPayment,
   cryptoPaymentMethods,
-  fetchAccountBalance,
   fetchCheckoutItem,
   spendAccountBalance,
   type CheckoutItem
 } from "../lib/cryptoPayments";
+import { formatUsd } from "../lib/accountStatus";
 import { PREMIUM_PRODUCT_LABEL } from "../lib/premiumPlans";
 import { formatMoney } from "../lib/validation";
-import type { AccountBalance } from "../types/content";
 
 export function CryptoCheckout() {
   const { itemType, itemId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const accountStatus = useAccountStatus();
   const [item, setItem] = useState<CheckoutItem | null>(null);
-  const [balance, setBalance] = useState<AccountBalance | null>(null);
   const [selectedMethod, setSelectedMethod] = useState(cryptoPaymentMethods[0]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -41,30 +41,11 @@ export function CryptoCheckout() {
     };
   }, [itemId, itemType]);
 
-  useEffect(() => {
-    let mounted = true;
-
-    if (!user) {
-      setBalance(null);
-      return () => {
-        mounted = false;
-      };
-    }
-
-    fetchAccountBalance(user.id).then((nextBalance) => {
-      if (mounted) setBalance(nextBalance);
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
-
   const checkoutType = useMemo(() => {
     if (itemType === "premium") return "premium";
     return itemType === "guide" ? "guide" : "course";
   }, [itemType]);
-  const availableBalance = balance?.balance_cents ?? 0;
+  const availableBalance = accountStatus.balanceCents;
   const canPayWithBalance = Boolean(item && item.price_cents > 0 && availableBalance >= item.price_cents);
   const isPremiumCheckout = item?.itemType === "premium";
 
@@ -219,7 +200,7 @@ export function CryptoCheckout() {
               </div>
               <div>
                 <dt>Account balance</dt>
-                <dd>{formatMoney(availableBalance)}</dd>
+                <dd>{formatUsd(availableBalance)}</dd>
               </div>
             </dl>
 

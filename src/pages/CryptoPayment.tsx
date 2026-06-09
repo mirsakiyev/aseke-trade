@@ -73,7 +73,7 @@ export function CryptoPayment() {
 
   const submitHash = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!payment || !txHash.trim()) return;
+    if (!payment || !txHash.trim() || isTerminalPaymentStatus(payment.status)) return;
 
     setIsSubmitting(true);
     setMessage(null);
@@ -107,15 +107,16 @@ export function CryptoPayment() {
   };
 
   const recheckPayment = async () => {
-    if (!payment?.tx_hash) {
-      await refreshPayment();
-      return;
-    }
+    if (!payment) return;
 
     setIsSubmitting(true);
     setMessage(null);
     try {
-      setPayment(await submitCryptoTx(payment.id, payment.tx_hash));
+      if (payment.tx_hash) {
+        setPayment(await submitCryptoTx(payment.id, payment.tx_hash));
+      } else {
+        await refreshPayment();
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Payment status could not be refreshed.");
     } finally {
@@ -245,29 +246,46 @@ export function CryptoPayment() {
             </p>
           </div>
 
-          <form className="stack-form" onSubmit={submitHash}>
-            <label>
-              Transaction hash
-              <input
-                value={txHash}
-                onChange={(event) => setTxHash(event.target.value)}
-                placeholder={payment.network === "ERC20" ? "0x..." : "TRON transaction ID"}
-                disabled={payment.status === "confirmed"}
-              />
-            </label>
-            <div className="inline-actions">
-              <button className="primary-button" type="submit" disabled={isSubmitting || payment.status === "confirmed"}>
-                <Send size={17} />
-                {isSubmitting ? "Checking" : "I have paid"}
-              </button>
-              <button className="ghost-button" type="button" onClick={() => void recheckPayment()} disabled={isSubmitting}>
-                <RefreshCw size={17} />
-                Refresh
-              </button>
+          <div className="manual-tx-details">
+            <div>
+              <p className="eyebrow">Transaction verification</p>
+              <h2>Paste transaction ID after sending</h2>
+              <p className="muted">
+                ASEKE TRADE verifies the exact blockchain transaction before crediting balance or activating Premium.
+              </p>
             </div>
-          </form>
+            <form className="stack-form" onSubmit={submitHash}>
+              <label>
+                Transaction hash
+                <input
+                  value={txHash}
+                  onChange={(event) => setTxHash(event.target.value)}
+                  placeholder={payment.network === "ERC20" ? "0x..." : "TRON transaction ID"}
+                  disabled={isTerminalPaymentStatus(payment.status)}
+                />
+              </label>
+              <div className="inline-actions">
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={isSubmitting || isTerminalPaymentStatus(payment.status)}
+                >
+                  <Send size={17} />
+                  {isSubmitting ? "Checking" : "Verify transaction"}
+                </button>
+                <button className="ghost-button" type="button" onClick={() => void recheckPayment()} disabled={isSubmitting}>
+                  <RefreshCw size={17} />
+                  Refresh status
+                </button>
+              </div>
+            </form>
+          </div>
         </article>
       </section>
     </main>
   );
+}
+
+function isTerminalPaymentStatus(status: CryptoPaymentRecord["status"]): boolean {
+  return ["confirmed", "underpaid", "overpaid", "expired", "failed", "duplicate"].includes(status);
 }

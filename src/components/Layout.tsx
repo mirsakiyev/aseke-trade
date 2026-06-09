@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { BtcTicker } from "./BtcTicker";
 import { useAuth } from "../contexts/AuthContext";
+import { useAccountStatus } from "../hooks/useAccountStatus";
 import { applyRandomHoverCharts } from "../utils/hoverCharts";
 
 const navItems = [
@@ -29,7 +30,8 @@ const navItems = [
 ];
 
 export function Layout() {
-  const { user, profile, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
+  const accountStatus = useAccountStatus();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -89,8 +91,7 @@ export function Layout() {
             {user ? (
               <>
                 <Link to="/dashboard" className="account-chip" onClick={closeMenu}>
-                  <LockKeyhole size={15} />
-                  <span>{profile?.role ?? "user"}</span>
+                  <AccountSummary accountStatus={accountStatus} />
                 </Link>
                 <button className="ghost-button compact" type="button" onClick={handleSignOut}>
                   <LogOut size={16} />
@@ -114,8 +115,7 @@ export function Layout() {
           {user ? (
             <>
               <Link to="/dashboard" className="account-chip">
-                <LockKeyhole size={15} />
-                <span>{profile?.role ?? "user"}</span>
+                <AccountSummary accountStatus={accountStatus} />
               </Link>
               <button className="ghost-button compact" type="button" onClick={handleSignOut}>
                 <LogOut size={16} />
@@ -151,6 +151,21 @@ export function Layout() {
         </p>
       </footer>
     </div>
+  );
+}
+
+function AccountSummary({ accountStatus }: { accountStatus: ReturnType<typeof useAccountStatus> }) {
+  return (
+    <>
+      <LockKeyhole size={15} />
+      <span className="account-summary-text">
+        <span className="account-email">{accountStatus.email}</span>
+        <span className="account-summary-meta">Balance: {accountStatus.balanceLabel}</span>
+        <span className={accountStatus.isPremiumActive ? "account-plan-tag premium" : "account-plan-tag"}>
+          {accountStatus.planLabel}
+        </span>
+      </span>
+    </>
   );
 }
 

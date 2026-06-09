@@ -547,7 +547,7 @@ export async function verifyPaymentById(
     throw new ApiError(400, "tx_hash_required", "Submit a transaction hash before verification.");
   }
 
-  const duplicate = await findConfirmedDuplicate(supabase, payment);
+  const duplicate = await findDuplicateTxHash(supabase, payment);
   if (duplicate) {
     return updatePaymentStatus(supabase, payment.id, "duplicate");
   }
@@ -616,13 +616,14 @@ async function finalizeConfirmedPayment(supabase: SupabaseClient, payment: Crypt
   await grantAccessFromPayment(supabase, payment);
 }
 
-async function findConfirmedDuplicate(supabase: SupabaseClient, payment: CryptoPaymentRow): Promise<boolean> {
+async function findDuplicateTxHash(supabase: SupabaseClient, payment: CryptoPaymentRow): Promise<boolean> {
+  if (!payment.tx_hash) return false;
+
   const { data, error } = await supabase
     .from("crypto_payments")
     .select("id")
     .eq("tx_hash", payment.tx_hash)
     .neq("id", payment.id)
-    .eq("status", "confirmed")
     .limit(1);
 
   if (error) {
@@ -636,7 +637,7 @@ async function updatePaymentStatus(
   supabase: SupabaseClient,
   paymentId: string,
   status: PaymentStatus,
-  extras: Partial<Pick<CryptoPaymentRow, "received_amount" | "confirmed_at">> = {}
+  extras: Partial<Pick<CryptoPaymentRow, "received_amount" | "confirmed_at" | "submitted_at" | "tx_hash">> = {}
 ): Promise<CryptoPaymentRow> {
   const { data, error } = await supabase
     .from("crypto_payments")
@@ -806,6 +807,10 @@ async function etherscanProxy(action: string, txHash?: string): Promise<Record<s
   if (txHash) params.set("txhash", txHash);
 
   const response = await fetch(`https://api.etherscan.io/v2/api?${params.toString()}`);
+  if (response.status === 429) {
+    throw new ApiError(429, "etherscan_rate_limited", "Blockchain explorer is rate limited. Try again shortly.");
+  }
+
   if (!response.ok) {
     throw new ApiError(502, "etherscan_request_failed", "Etherscan verification request failed.");
   }
@@ -832,6 +837,10 @@ async function tronPost(path: string, body: Record<string, unknown>): Promise<Re
     },
     body: JSON.stringify(body)
   });
+
+  if (response.status === 429) {
+    throw new ApiError(429, "trongrid_rate_limited", "Blockchain explorer is rate limited. Try again shortly.");
+  }
 
   if (!response.ok) {
     throw new ApiError(502, "trongrid_request_failed", "TronGrid verification request failed.");
