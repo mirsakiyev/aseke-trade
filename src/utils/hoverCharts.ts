@@ -1,8 +1,16 @@
 type ChartTone = "default" | "danger" | "success";
 
-const chartTileSize = "280px 76px";
-const chartWidth = 360;
-const chartHeight = 96;
+interface ChartProfile {
+  width: number;
+  height: number;
+  volatility: number;
+}
+
+const compactChartProfile = {
+  width: 280,
+  height: 76,
+  volatility: 1
+} satisfies ChartProfile;
 
 const hoverTargetSelector = [
   ".feature-card",
@@ -29,9 +37,9 @@ const dangerText = /\b(cancel|decline|delete|remove|revoke|go back|back to|back)
 const successText = /\b(proceed|continue|complete|confirm|approve|grant|save|submit|success|done)\b/i;
 
 const chartGlows = {
-  default: "rgba(229, 228, 226, 0.18)",
-  danger: "rgba(255, 107, 107, 0.22)",
-  success: "rgba(126, 224, 167, 0.22)"
+  default: "rgba(142, 202, 224, 0.2)",
+  danger: "rgba(255, 107, 107, 0.2)",
+  success: "rgba(126, 224, 167, 0.2)"
 } satisfies Record<ChartTone, string>;
 
 const candleColors = {
@@ -42,16 +50,20 @@ const candleColors = {
 export function applyRandomHoverCharts() {
   const assignCharts = () => {
     document.querySelectorAll<HTMLElement>(hoverTargetSelector).forEach((element) => {
-      if (element.dataset.hoverChartReady === "true") {
+      const profile = getChartProfile(element);
+      const signature = `${Math.round(profile.width)}x${Math.round(profile.height)}:${profile.volatility}`;
+
+      if (element.dataset.hoverChartReady === "true" && element.dataset.hoverChartSignature === signature) {
         return;
       }
 
       const tone = getChartTone(element);
       element.dataset.hoverChartReady = "true";
+      element.dataset.hoverChartSignature = signature;
       element.dataset.hoverChartTone = tone;
-      element.style.setProperty("--hover-chart-overlay", createChartOverlay(tone));
+      element.style.setProperty("--hover-chart-overlay", createChartOverlay(tone, profile));
       element.style.setProperty("--hover-chart-glow", chartGlows[tone]);
-      element.style.setProperty("--hover-chart-size", chartTileSize);
+      element.style.setProperty("--hover-chart-size", `${Math.round(profile.width)}px ${Math.round(profile.height)}px`);
     });
   };
 
@@ -59,6 +71,7 @@ export function applyRandomHoverCharts() {
   const frame = window.requestAnimationFrame(assignCharts);
   const timer = window.setTimeout(assignCharts, 650);
   const observer = new MutationObserver(assignCharts);
+  window.addEventListener("resize", assignCharts);
 
   observer.observe(document.body, {
     childList: true,
@@ -68,6 +81,7 @@ export function applyRandomHoverCharts() {
   return () => {
     window.cancelAnimationFrame(frame);
     window.clearTimeout(timer);
+    window.removeEventListener("resize", assignCharts);
     observer.disconnect();
   };
 }
@@ -87,11 +101,27 @@ function getChartTone(element: HTMLElement): ChartTone {
   return "default";
 }
 
-function createChartOverlay(tone: ChartTone) {
-  const candles = createRandomCandles(tone);
+function getChartProfile(element: HTMLElement): ChartProfile {
+  const isSurface = element.matches(
+    ".feature-card, .content-card, .pricing-card, .section-panel, .module-card, .access-panel, .chart-card, .charts-learning-cta, .risk-band, .course-hero > div, .quiz-recommendation-card"
+  );
+
+  if (!isSurface) {
+    return compactChartProfile;
+  }
+
+  const width = clamp(Math.round(element.offsetWidth || compactChartProfile.width), compactChartProfile.width, 900);
+  const height = clamp(Math.round(element.offsetHeight || compactChartProfile.height), compactChartProfile.height, 520);
+  const volatility = clamp(1 + (height - compactChartProfile.height) / 210, 1, 2.8);
+
+  return { width, height, volatility };
+}
+
+function createChartOverlay(tone: ChartTone, profile: ChartProfile) {
+  const candles = createRandomCandles(tone, profile);
 
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${chartWidth} ${chartHeight}" preserveAspectRatio="none">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${profile.width} ${profile.height}" preserveAspectRatio="xMidYMid meet">
       ${candles}
     </svg>
   `;
@@ -99,34 +129,43 @@ function createChartOverlay(tone: ChartTone) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-function createRandomCandles(tone: ChartTone) {
-  const candleCount = 12;
+function createRandomCandles(tone: ChartTone, profile: ChartProfile) {
   const bodyWidth = 10;
   const edgePadding = bodyWidth / 2 + 4;
-  const spacing = (chartWidth - edgePadding * 2) / (candleCount - 1);
+  const candleCount = clamp(Math.round(profile.width / 23), 12, 36);
+  const spacing = (profile.width - edgePadding * 2) / (candleCount - 1);
   const bullishBias = tone === "success" ? 0.72 : tone === "danger" ? 0.28 : 0.5;
-  let previousClose = randomBetween(38, 58);
+  const centerY = profile.height / 2;
+  const topLimit = Math.max(8, profile.height * 0.09);
+  const bottomLimit = Math.min(profile.height - 8, profile.height * 0.91);
+  const openRange = profile.height * 0.16 * profile.volatility;
+  const moveMin = 7 * profile.volatility;
+  const moveMax = 17 * profile.volatility;
+  const wickMin = 5 * profile.volatility;
+  const wickMax = 13 * profile.volatility;
+  let previousClose = randomBetween(centerY - openRange * 0.5, centerY + openRange * 0.5);
 
   return Array.from({ length: candleCount }, (_, index) => {
     const centerX = Math.round(edgePadding + spacing * index);
-    const open = clamp(previousClose + randomBetween(-11, 11), 18, 78);
+    const open = clamp(previousClose + randomBetween(-11, 11) * profile.volatility, topLimit, bottomLimit);
     const bullish = Math.random() < bullishBias;
-    const shock = Math.random() > 0.76 ? randomBetween(8, 16) : 0;
-    const bodyMove = (randomBetween(7, 18) + shock) * (bullish ? -1 : 1);
-    const close = clamp(open + bodyMove + randomBetween(-4, 4) + (48 - open) * 0.08, 16, 80);
+    const shock = Math.random() > 0.76 ? randomBetween(7, 14) * profile.volatility : 0;
+    const bodyMove = (randomBetween(moveMin, moveMax) + shock) * (bullish ? -1 : 1);
+    const meanReversion = (centerY - open) * 0.055;
+    const close = clamp(open + bodyMove + randomBetween(-4, 4) * profile.volatility + meanReversion, topLimit, bottomLimit);
     const top = Math.min(open, close);
     const bottom = Math.max(open, close);
-    const high = Math.max(8, top - randomBetween(5, 14));
-    const low = Math.min(88, bottom + randomBetween(5, 14));
+    const high = Math.max(4, top - randomBetween(wickMin, wickMax));
+    const low = Math.min(profile.height - 4, bottom + randomBetween(wickMin, wickMax));
     const bodyTop = Math.min(open, close);
     const bodyHeight = Math.max(5, Math.abs(open - close));
     const color = close < open ? candleColors.bullish : candleColors.bearish;
 
-    previousClose = close + randomBetween(-5, 5);
+    previousClose = close + randomBetween(-5, 5) * profile.volatility;
 
     return `
-      <line x1="${centerX}" y1="${Math.round(high)}" x2="${centerX}" y2="${Math.round(low)}" stroke="${color}" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
-      <rect x="${Math.round(centerX - bodyWidth / 2)}" y="${Math.round(bodyTop)}" width="${bodyWidth}" height="${Math.round(bodyHeight)}" rx="2" fill="${color}" fill-opacity=".14" stroke="${color}" stroke-opacity=".64" stroke-width="1.8"/>
+      <line x1="${centerX}" y1="${Math.round(high)}" x2="${centerX}" y2="${Math.round(low)}" stroke="${color}" stroke-opacity=".36" stroke-width="2" stroke-linecap="round"/>
+      <rect x="${Math.round(centerX - bodyWidth / 2)}" y="${Math.round(bodyTop)}" width="${bodyWidth}" height="${Math.round(bodyHeight)}" rx="2" fill="${color}" fill-opacity=".1" stroke="${color}" stroke-opacity=".48" stroke-width="1.8"/>
     `;
   }).join("");
 }
