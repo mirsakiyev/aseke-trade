@@ -1,4 +1,4 @@
-import { Edit3, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from "lucide-react";
+import { CalendarClock, Edit3, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
@@ -15,6 +15,7 @@ import {
   type Guide,
   type GuideCategory,
   type Lesson,
+  type PremiumSubscription,
   type Profile,
   type Purchase
 } from "../types/content";
@@ -39,6 +40,7 @@ const blankGuideForm = {
   category: "Crypto Basics" as GuideCategory,
   difficulty: "Beginner" as Difficulty,
   estimated_read_time: "8",
+  xp_reward: "75",
   price_cents: "0",
   is_premium: false,
   is_archived: false,
@@ -72,6 +74,15 @@ const blankLessonForm = {
   is_premium: true
 };
 
+const blankSubscriptionForm = {
+  user_id: "",
+  starts_at: toDateTimeLocalValue(new Date()),
+  expires_at: "",
+  duration_count: "30",
+  duration_unit: "days",
+  admin_note: ""
+};
+
 export function Admin() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>("guides");
@@ -81,6 +92,7 @@ export function Admin() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [premiumSubscriptions, setPremiumSubscriptions] = useState<PremiumSubscription[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [message, setMessage] = useState<string | null>(null);
 
@@ -95,6 +107,9 @@ export function Admin() {
 
   const [lessonForm, setLessonForm] = useState(blankLessonForm);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
+
+  const [subscriptionForm, setSubscriptionForm] = useState(blankSubscriptionForm);
+  const [editingSubscriptionId, setEditingSubscriptionId] = useState<string | null>(null);
 
   const courseNameById = useMemo(
     () => new Map(courses.map((course) => [course.id, course.title])),
@@ -113,6 +128,16 @@ export function Admin() {
     () => new Map(modules.map((module) => [module.id, module.title])),
     [modules]
   );
+  const profileNameById = useMemo(
+    () =>
+      new Map(
+        profiles.map((profile) => [
+          profile.id,
+          profile.full_name ?? profile.username ?? profile.id.slice(0, 8)
+        ])
+      ),
+    [profiles]
+  );
 
   const refreshAdminData = useCallback(async () => {
     if (!supabase) {
@@ -123,15 +148,23 @@ export function Admin() {
     setIsLoading(true);
     setMessage(null);
 
-    const [guideResult, courseResult, moduleResult, lessonResult, profileResult, purchaseResult] =
-      await Promise.all([
-        supabase.from("guides").select("*").order("created_at", { ascending: false }),
-        supabase.from("courses").select("*").order("created_at", { ascending: false }),
-        supabase.from("course_modules").select("*").order("sort_order", { ascending: true }),
-        supabase.from("lessons").select("*").order("sort_order", { ascending: true }),
-        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-        supabase.from("purchases").select("*").order("created_at", { ascending: false })
-      ]);
+    const [
+      guideResult,
+      courseResult,
+      moduleResult,
+      lessonResult,
+      profileResult,
+      purchaseResult,
+      subscriptionResult
+    ] = await Promise.all([
+      supabase.from("guides").select("*").order("created_at", { ascending: false }),
+      supabase.from("courses").select("*").order("created_at", { ascending: false }),
+      supabase.from("course_modules").select("*").order("sort_order", { ascending: true }),
+      supabase.from("lessons").select("*").order("sort_order", { ascending: true }),
+      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+      supabase.from("purchases").select("*").order("created_at", { ascending: false }),
+      supabase.from("premium_subscriptions").select("*").order("created_at", { ascending: false })
+    ]);
 
     if (
       guideResult.error ||
@@ -139,7 +172,8 @@ export function Admin() {
       moduleResult.error ||
       lessonResult.error ||
       profileResult.error ||
-      purchaseResult.error
+      purchaseResult.error ||
+      subscriptionResult.error
     ) {
       setMessage("Some admin data could not be loaded. Check your admin role and RLS policies.");
     }
@@ -158,6 +192,7 @@ export function Admin() {
     setLessons((lessonResult.data ?? []) as Lesson[]);
     setProfiles((profileResult.data ?? []) as Profile[]);
     setPurchases((purchaseResult.data ?? []) as Purchase[]);
+    setPremiumSubscriptions((subscriptionResult.data ?? []) as PremiumSubscription[]);
     setIsLoading(false);
   }, []);
 
@@ -175,6 +210,12 @@ export function Admin() {
       return;
     }
 
+    const xpReward = Number(guideForm.xp_reward);
+    if (!Number.isFinite(xpReward) || xpReward < 50 || xpReward > 100) {
+      setMessage("Guide XP reward must be between 50 and 100.");
+      return;
+    }
+
     const payload = {
       course_id: guideForm.course_id || null,
       title: sanitizePlainText(guideForm.title, 160),
@@ -184,6 +225,7 @@ export function Admin() {
       category: categoryByCourseId.get(guideForm.course_id) ?? guideForm.category,
       difficulty: guideForm.difficulty,
       estimated_read_time: Number(guideForm.estimated_read_time),
+      xp_reward: xpReward,
       price_cents: Number(guideForm.price_cents),
       is_premium: guideForm.is_premium,
       is_archived: guideForm.is_archived,
@@ -284,6 +326,58 @@ export function Admin() {
     }
   };
 
+  const saveSubscription = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const startsAt = dateTimeLocalToIso(subscriptionForm.starts_at) ?? new Date().toISOString();
+    const expiresAt = dateTimeLocalToIso(subscriptionForm.expires_at);
+    const durationCount = Number(subscriptionForm.duration_count);
+
+    if (!editingSubscriptionId && !subscriptionForm.user_id) {
+      setMessage("Choose a user for the Trading Academy subscription.");
+      return;
+    }
+
+    if (editingSubscriptionId && !expiresAt) {
+      setMessage("Choose an end date when updating a subscription.");
+      return;
+    }
+
+    if (expiresAt && new Date(expiresAt).getTime() <= new Date(startsAt).getTime()) {
+      setMessage("End date must be after start date.");
+      return;
+    }
+
+    if (!editingSubscriptionId && !expiresAt && (!Number.isFinite(durationCount) || durationCount <= 0)) {
+      setMessage("Provide an end date or a positive duration.");
+      return;
+    }
+
+    const result = editingSubscriptionId
+      ? await supabase.rpc("admin_update_trading_academy_subscription", {
+          target_subscription_id: editingSubscriptionId,
+          target_starts_at: startsAt,
+          target_expires_at: expiresAt,
+          admin_note: sanitizePlainText(subscriptionForm.admin_note, 500) || null
+        })
+      : await supabase.rpc("admin_issue_trading_academy_subscription", {
+          target_user_id: subscriptionForm.user_id,
+          target_starts_at: startsAt,
+          target_expires_at: expiresAt,
+          duration_count: expiresAt ? null : durationCount,
+          duration_unit: subscriptionForm.duration_unit,
+          admin_note: sanitizePlainText(subscriptionForm.admin_note, 500) || null
+        });
+
+    setMessage(result.error ? "Trading Academy subscription could not be saved." : "Trading Academy subscription saved.");
+    if (!result.error) {
+      setSubscriptionForm(blankSubscriptionForm);
+      setEditingSubscriptionId(null);
+      await refreshAdminData();
+    }
+  };
+
   const deleteRow = async (table: "guides" | "courses" | "course_modules" | "lessons", id: string) => {
     if (!supabase) return;
     if (!window.confirm("Delete this item?")) return;
@@ -294,13 +388,14 @@ export function Admin() {
 
   const grantPremium = async (profileId: string) => {
     if (!supabase) return;
-    const targetProfile = profiles.find((profile) => profile.id === profileId);
-    const premiumUntil = new Date();
-    premiumUntil.setFullYear(premiumUntil.getFullYear() + 1);
-  const { error } = await supabase
-      .from("profiles")
-      .update({ role: targetProfile?.role === "admin" ? "admin" : "premium", premium_until: premiumUntil.toISOString() })
-      .eq("id", profileId);
+    const { error } = await supabase.rpc("admin_issue_trading_academy_subscription", {
+      target_user_id: profileId,
+      target_starts_at: new Date().toISOString(),
+      target_expires_at: null,
+      duration_count: 12,
+      duration_unit: "months",
+      admin_note: "Quick grant from admin users list"
+    });
     setMessage(error ? "Trading Academy access could not be granted." : "Trading Academy access granted for one year.");
     if (!error) await refreshAdminData();
   };
@@ -308,10 +403,20 @@ export function Admin() {
   const revokePremium = async (profileId: string) => {
     if (!supabase) return;
     const targetProfile = profiles.find((profile) => profile.id === profileId);
-    const { error } = await supabase
+    const subscriptionResult = await supabase
+      .from("premium_subscriptions")
+      .update({ status: "cancelled" })
+      .eq("user_id", profileId)
+      .in("status", ["pending", "active"]);
+    const profileResult = await supabase
       .from("profiles")
-      .update({ role: targetProfile?.role === "admin" ? "admin" : "user", premium_until: null })
+      .update({
+        role: targetProfile?.role === "admin" ? "admin" : "user",
+        premium_starts_at: null,
+        premium_until: null
+      })
       .eq("id", profileId);
+    const error = subscriptionResult.error ?? profileResult.error;
     setMessage(error ? "Trading Academy access could not be revoked." : "Trading Academy access revoked.");
     if (!error) await refreshAdminData();
   };
@@ -474,6 +579,16 @@ export function Admin() {
                     />
                   </label>
                   <label>
+                    XP reward
+                    <input
+                      type="number"
+                      min={50}
+                      max={100}
+                      value={guideForm.xp_reward}
+                      onChange={(event) => setGuideForm((form) => ({ ...form, xp_reward: event.target.value }))}
+                    />
+                  </label>
+                  <label>
                     Price cents
                     <input
                       type="number"
@@ -512,7 +627,7 @@ export function Admin() {
                         <strong>{guide.title}</strong>
                       <span>
                         #{guide.sort_order ?? "-"} - {courseNameById.get(guide.course_id ?? "") ?? guide.category} -{" "}
-                        {guide.is_archived ? "Archived" : guide.is_premium ? "Trading Academy" : "Free"} - {guide.price_cents} cents
+                        {guide.is_archived ? "Archived" : guide.is_premium ? "Trading Academy" : "Free"} - {guide.xp_reward} XP - {guide.price_cents} cents
                       </span>
                     </div>
                     <div className="row-actions">
@@ -530,6 +645,7 @@ export function Admin() {
                             category: guide.category,
                             difficulty: guide.difficulty,
                             estimated_read_time: String(guide.estimated_read_time),
+                            xp_reward: String(guide.xp_reward ?? 75),
                             price_cents: String(guide.price_cents ?? 0),
                             is_premium: guide.is_premium,
                             is_archived: Boolean(guide.is_archived),
@@ -876,6 +992,143 @@ export function Admin() {
 
           {activeTab === "users" && (
             <section className="admin-grid">
+              <form className="section-panel stack-form" onSubmit={saveSubscription}>
+                <h2>{editingSubscriptionId ? "Edit Trading Academy access" : "Issue Trading Academy access"}</h2>
+                {!editingSubscriptionId && (
+                  <label>
+                    User
+                    <select
+                      value={subscriptionForm.user_id}
+                      onChange={(event) =>
+                        setSubscriptionForm((form) => ({ ...form, user_id: event.target.value }))
+                      }
+                      required
+                    >
+                      <option value="">Select user</option>
+                      {profiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.full_name ?? profile.username ?? profile.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <div className="form-row">
+                  <label>
+                    Start date
+                    <input
+                      type="datetime-local"
+                      value={subscriptionForm.starts_at}
+                      onChange={(event) =>
+                        setSubscriptionForm((form) => ({ ...form, starts_at: event.target.value }))
+                      }
+                      required
+                    />
+                  </label>
+                  <label>
+                    End date
+                    <input
+                      type="datetime-local"
+                      value={subscriptionForm.expires_at}
+                      onChange={(event) =>
+                        setSubscriptionForm((form) => ({ ...form, expires_at: event.target.value }))
+                      }
+                      required={Boolean(editingSubscriptionId)}
+                    />
+                  </label>
+                </div>
+                {!editingSubscriptionId && (
+                  <div className="form-row">
+                    <label>
+                      Duration
+                      <input
+                        type="number"
+                        min={1}
+                        value={subscriptionForm.duration_count}
+                        onChange={(event) =>
+                          setSubscriptionForm((form) => ({ ...form, duration_count: event.target.value }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Unit
+                      <select
+                        value={subscriptionForm.duration_unit}
+                        onChange={(event) =>
+                          setSubscriptionForm((form) => ({ ...form, duration_unit: event.target.value }))
+                        }
+                      >
+                        <option value="days">Days</option>
+                        <option value="weeks">Weeks</option>
+                        <option value="months">Months</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
+                <label>
+                  Admin note
+                  <textarea
+                    value={subscriptionForm.admin_note}
+                    onChange={(event) =>
+                      setSubscriptionForm((form) => ({ ...form, admin_note: event.target.value }))
+                    }
+                    rows={3}
+                  />
+                </label>
+                <div className="inline-actions">
+                  <button className="primary-button" type="submit">
+                    <CalendarClock size={17} />
+                    Save Access
+                  </button>
+                  {editingSubscriptionId && (
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => {
+                        setEditingSubscriptionId(null);
+                        setSubscriptionForm(blankSubscriptionForm);
+                      }}
+                    >
+                      Cancel edit
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              <AdminList title="Trading Academy Subscriptions">
+                {premiumSubscriptions.map((subscription) => (
+                  <li key={subscription.id}>
+                    <div>
+                      <strong>{profileNameById.get(subscription.user_id) ?? subscription.user_id}</strong>
+                      <span>
+                        {subscription.status} - {formatAdminDate(subscription.starts_at)} to{" "}
+                        {formatAdminDate(subscription.expires_at)}
+                      </span>
+                    </div>
+                    <div className="row-actions">
+                      <button
+                        className="icon-button"
+                        type="button"
+                        onClick={() => {
+                          setEditingSubscriptionId(subscription.id);
+                          setSubscriptionForm({
+                            user_id: subscription.user_id,
+                            starts_at: toDateTimeLocalValue(new Date(subscription.starts_at)),
+                            expires_at: toDateTimeLocalValue(new Date(subscription.expires_at)),
+                            duration_count: String(subscription.plan_duration_months),
+                            duration_unit: "months",
+                            admin_note: subscription.admin_note ?? ""
+                          });
+                        }}
+                      >
+                        <Edit3 size={16} />
+                        <span className="sr-only">Edit subscription</span>
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </AdminList>
+
               <AdminList title="Registered Users">
                 {profiles.map((profile) => (
                   <li key={profile.id}>
@@ -925,4 +1178,27 @@ function AdminList({ title, children }: { title: string; children: ReactNode }) 
       <ul className="admin-list">{children}</ul>
     </article>
   );
+}
+
+function toDateTimeLocalValue(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "";
+
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function dateTimeLocalToIso(value: string): string | null {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toISOString();
+}
+
+function formatAdminDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Invalid date";
+
+  return date.toLocaleDateString();
 }

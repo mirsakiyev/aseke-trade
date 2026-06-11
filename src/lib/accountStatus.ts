@@ -17,6 +17,7 @@ export function formatUsd(cents: number): string {
 export function hasActivePremiumAccess(profile: Profile | null, now = Date.now()): boolean {
   if (!profile) return false;
   if (profile.role === "admin") return true;
+  if (profile.premium_starts_at && new Date(profile.premium_starts_at).getTime() > now) return false;
   if (!profile.premium_until) return false;
 
   return new Date(profile.premium_until).getTime() > now;

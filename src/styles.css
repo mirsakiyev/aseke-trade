@@ -851,6 +851,165 @@ p {
   color: #eef3f6;
 }
 
+.compact-icon {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 0.65rem;
+}
+
+.profile-overview-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.avatar-profile-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.dashboard-avatar {
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  width: 108px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(229, 228, 226, 0.28);
+  border-radius: 50%;
+  background:
+    var(--crypto-gradient),
+    rgba(229, 228, 226, 0.06);
+  color: var(--platinum-soft);
+}
+
+.dashboard-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-upload-button {
+  width: fit-content;
+}
+
+.avatar-upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.level-panel {
+  align-content: start;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.level-hero-line,
+.xp-mini-summary,
+.xp-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.level-hero-line {
+  justify-content: space-between;
+  color: var(--platinum-soft);
+}
+
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 0.65rem;
+  border: 1px solid rgba(246, 248, 250, 0.54);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(246, 248, 250, 0.9), rgba(174, 184, 193, 0.82)),
+    var(--crypto-gradient-hover);
+  color: #050607;
+  font-size: 0.84rem;
+  font-weight: 950;
+}
+
+.level-badge.large {
+  min-height: 44px;
+  padding: 0 0.9rem;
+  font-size: 1.08rem;
+}
+
+.xp-stat-row {
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.guide-quiz-panel,
+.puzzle-panel,
+.puzzle-rules-panel {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.guide-quiz-question {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.guide-quiz-question h3 {
+  margin: 0;
+  color: var(--platinum);
+  font-size: clamp(1.15rem, 2vw, 1.6rem);
+}
+
+.guide-xp-result {
+  gap: 0.65rem;
+}
+
+.guide-xp-result strong,
+.quiz-explanation strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.puzzle-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 1rem;
+}
+
+.puzzle-title-row h1 {
+  font-size: clamp(2.2rem, 5vw, 4.4rem);
+}
+
+.puzzle-prompt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    var(--crypto-gradient),
+    rgba(229, 228, 226, 0.045);
+}
+
+.puzzle-prompt p {
+  margin: 0;
+  color: var(--platinum);
+  font-size: 1.05rem;
+}
+
 .risk-band {
   position: relative;
   isolation: isolate;
@@ -1199,7 +1358,8 @@ p {
   margin: 0;
 }
 
-.quiz-progress-track {
+.quiz-progress-track,
+.xp-progress-track {
   overflow: hidden;
   height: 9px;
   border: 1px solid rgba(229, 228, 226, 0.2);
@@ -1207,7 +1367,8 @@ p {
   background: rgba(0, 0, 0, 0.34);
 }
 
-.quiz-progress-track span {
+.quiz-progress-track span,
+.xp-progress-track span {
   display: block;
   height: 100%;
   border-radius: inherit;
@@ -2499,6 +2660,7 @@ select:focus {
   .pricing-grid,
   .dashboard-grid,
   .dashboard-grid.three,
+  .profile-overview-grid,
   .admin-grid,
   .checkout-grid,
   .payment-grid,
@@ -2514,6 +2676,10 @@ select:focus {
   .course-hero,
   .market-showcase {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .puzzle-grid {
+    grid-template-columns: 1fr;
   }
 
   .premium-perk-grid {
@@ -2593,6 +2759,7 @@ select:focus {
   .pricing-grid,
   .dashboard-grid,
   .dashboard-grid.three,
+  .profile-overview-grid,
   .admin-grid,
   .checkout-grid,
   .payment-grid,
@@ -2674,5 +2841,14 @@ select:focus {
 
   .detail-list dd {
     text-align: left;
+  }
+
+  .avatar-profile-row {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .dashboard-avatar {
+    width: 96px;
   }
 }

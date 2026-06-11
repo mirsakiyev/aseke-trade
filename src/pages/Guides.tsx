@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, BookmarkPlus, Filter, LockKeyhole, Timer } from "lucide-react";
+import { ArrowRight, Award, BookOpen, BookmarkPlus, Filter, LockKeyhole, Timer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
@@ -97,6 +97,10 @@ export function Guides() {
                   <span className="meta-with-icon">
                     <Timer size={15} />
                     {guide.estimated_read_time} min
+                  </span>
+                  <span className="meta-with-icon">
+                    <Award size={15} />
+                    {guide.xp_reward} XP
                   </span>
                 </div>
                 <h2>{guide.title}</h2>

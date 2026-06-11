@@ -26,11 +26,17 @@ export interface Profile {
   full_name: string | null;
   username: string | null;
   role: UserRole;
+  total_xp: number;
+  level: number;
+  premium_starts_at: string | null;
   premium_until: string | null;
+  avatar_url: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 export type PremiumPlanId = "premium_1_month" | "premium_1_year";
+export type PremiumSubscriptionPlanId = PremiumPlanId | "admin_custom";
 export type PaymentProductType = "premium" | "course" | "guide" | "deposit";
 
 export interface Guide {
@@ -43,6 +49,7 @@ export interface Guide {
   category: GuideCategory;
   difficulty: Difficulty;
   estimated_read_time: number;
+  xp_reward: number;
   price_cents: number;
   is_premium: boolean;
   is_archived: boolean;
@@ -51,6 +58,55 @@ export interface Guide {
   created_at: string;
   updated_at: string;
   course?: Pick<Course, "id" | "title" | "slug" | "is_premium"> | null;
+}
+
+export interface GuideQuiz {
+  id: string;
+  guide_id: string;
+  question: string;
+  answer_options: string[];
+}
+
+export interface GuideCompletion {
+  id: string;
+  user_id: string;
+  guide_id: string;
+  guide_quiz_id: string | null;
+  selected_answer: string | null;
+  quiz_passed: boolean;
+  xp_awarded: number;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface XPTransaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  source_type: "guide" | "puzzle_of_day" | "admin_adjustment";
+  source_id: string;
+  description: string | null;
+  created_at: string;
+}
+
+export interface DailyPuzzle {
+  id: string;
+  puzzle_date: string;
+  title: string;
+  prompt: string;
+  category: string;
+  reward_claimed: boolean;
+}
+
+export interface DailyPuzzleSolve {
+  id: string;
+  puzzle_id: string;
+  user_id: string;
+  submitted_answer: string;
+  is_correct: boolean;
+  is_first_solver: boolean;
+  created_at: string;
 }
 
 export interface Course {
@@ -188,7 +244,7 @@ export interface PremiumSubscription {
   user_id: string;
   product_type: "premium";
   product_label: string;
-  plan_id: PremiumPlanId;
+  plan_id: PremiumSubscriptionPlanId;
   plan_duration_months: number;
   starts_at: string;
   expires_at: string;
@@ -196,6 +252,8 @@ export interface PremiumSubscription {
   status: "pending" | "active" | "expired" | "cancelled" | "failed";
   crypto_payment_id: string | null;
   balance_transaction_id: string | null;
+  granted_by: string | null;
+  admin_note: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -96,7 +96,8 @@ function guide(
   category: GuideCategory,
   difficulty: Difficulty,
   sort_order: number,
-  is_premium = false
+  is_premium = false,
+  xp_reward = 75
 ): Guide {
   return {
     id,
@@ -108,6 +109,7 @@ function guide(
     category,
     difficulty,
     estimated_read_time: 8,
+    xp_reward,
     price_cents: 0,
     is_premium,
     is_archived: false,

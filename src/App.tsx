@@ -17,6 +17,7 @@ import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { NotFound } from "./pages/NotFound";
 import { Premium } from "./pages/Premium";
+import { PuzzleOfTheDay } from "./pages/PuzzleOfTheDay";
 import { Register } from "./pages/Register";
 import { ResetPassword } from "./pages/ResetPassword";
 import { Terms } from "./pages/Terms";
@@ -50,6 +51,7 @@ export default function App() {
           }
         />
         <Route path="trading-academy" element={<Premium />} />
+        <Route path="puzzle-of-the-day" element={<PuzzleOfTheDay />} />
         <Route path="premium" element={<Navigate to="/trading-academy" replace />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />

@@ -130,7 +130,7 @@ export async function loadGuides(): Promise<ContentResult<Guide[]>> {
   const { data, error } = await supabase
     .from("guides")
     .select(
-      "id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,price_cents,is_premium,is_archived,sort_order,created_by,created_at,updated_at,course:courses(id,title,slug,is_premium)"
+      "id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,xp_reward,price_cents,is_premium,is_archived,sort_order,created_by,created_at,updated_at,course:courses(id,title,slug,is_premium)"
     )
     .eq("is_archived", false)
     .order("sort_order", { ascending: true })
@@ -152,7 +152,7 @@ export async function loadCourses(): Promise<ContentResult<Course[]>> {
   const { data, error } = await supabase
     .from("courses")
     .select(
-      "id,title,slug,description,difficulty,price_cents,is_premium,is_archived,sort_order,created_at,updated_at,guides(id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,price_cents,is_premium,is_archived,sort_order,created_by,created_at,updated_at),course_modules(id,course_id,title,sort_order,created_at,lessons(id,module_id,title,content,video_url,sort_order,is_preview,is_premium,created_at,updated_at))"
+      "id,title,slug,description,difficulty,price_cents,is_premium,is_archived,sort_order,created_at,updated_at,guides(id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,xp_reward,price_cents,is_premium,is_archived,sort_order,created_by,created_at,updated_at),course_modules(id,course_id,title,sort_order,created_at,lessons(id,module_id,title,content,video_url,sort_order,is_preview,is_premium,created_at,updated_at))"
     )
     .eq("is_archived", false)
     .eq("guides.is_archived", false)
@@ -183,7 +183,7 @@ export async function loadCourseBySlug(slug: string): Promise<ContentResult<Cour
   const { data, error } = await supabase
     .from("courses")
     .select(
-      "id,title,slug,description,difficulty,price_cents,is_premium,is_archived,sort_order,created_at,updated_at,guides(id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,price_cents,is_premium,is_archived,sort_order,created_by,created_at,updated_at),course_modules(id,course_id,title,sort_order,created_at,lessons(id,module_id,title,content,video_url,sort_order,is_preview,is_premium,created_at,updated_at))"
+      "id,title,slug,description,difficulty,price_cents,is_premium,is_archived,sort_order,created_at,updated_at,guides(id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,xp_reward,price_cents,is_premium,is_archived,sort_order,created_by,created_at,updated_at),course_modules(id,course_id,title,sort_order,created_at,lessons(id,module_id,title,content,video_url,sort_order,is_preview,is_premium,created_at,updated_at))"
     )
     .eq("slug", slug)
     .eq("is_archived", false)
@@ -218,7 +218,7 @@ export async function loadGuideBySlug(slug: string): Promise<ContentResult<Guide
   const { data, error } = await supabase
     .from("guides")
     .select(
-      "id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,price_cents,is_premium,is_archived,sort_order,created_by,created_at,updated_at,course:courses(id,title,slug,is_premium)"
+      "id,course_id,title,slug,description,content,category,difficulty,estimated_read_time,xp_reward,price_cents,is_premium,is_archived,sort_order,created_by,created_at,updated_at,course:courses(id,title,slug,is_premium)"
     )
     .eq("slug", slug)
     .eq("is_archived", false)

@@ -29,6 +29,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 function profileHasPremium(profile: Profile | null): boolean {
   if (!profile) return false;
   if (profile.role === "admin") return true;
+  if (profile.premium_starts_at && new Date(profile.premium_starts_at).getTime() > Date.now()) return false;
   if (!profile.premium_until) return false;
   return new Date(profile.premium_until).getTime() > Date.now();
 }
@@ -38,7 +39,7 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id,full_name,username,role,premium_until,created_at")
+    .select("id,full_name,username,role,total_xp,level,premium_starts_at,premium_until,avatar_url,created_at,updated_at")
     .eq("id", userId)
     .maybeSingle();
 
