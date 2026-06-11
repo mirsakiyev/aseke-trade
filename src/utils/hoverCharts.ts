@@ -108,7 +108,7 @@ function getChartTone(element: HTMLElement): ChartTone {
 
 function getChartProfile(element: HTMLElement): ChartProfile {
   const isSurface = element.matches(
-    ".feature-card, .content-card, .pricing-card, .section-panel, .module-card, .access-panel, .chart-card, .charts-learning-cta, .risk-band, .course-hero > div, .quiz-recommendation-card"
+    ".feature-card, .content-card, .pricing-card, .section-panel, .module-card, .access-panel, .chart-card, .charts-learning-cta, .risk-band, .course-hero > div, .quiz-option, .quiz-recommendation-card"
   );
 
   if (!isSurface) {
