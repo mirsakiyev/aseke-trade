@@ -4,12 +4,14 @@ interface ChartProfile {
   width: number;
   height: number;
   volatility: number;
+  fillsElement: boolean;
 }
 
 const compactChartProfile = {
   width: 280,
   height: 76,
-  volatility: 1
+  volatility: 1,
+  fillsElement: false
 } satisfies ChartProfile;
 
 const hoverTargetSelector = [
@@ -63,7 +65,10 @@ export function applyRandomHoverCharts() {
       element.dataset.hoverChartTone = tone;
       element.style.setProperty("--hover-chart-overlay", createChartOverlay(tone, profile));
       element.style.setProperty("--hover-chart-glow", chartGlows[tone]);
-      element.style.setProperty("--hover-chart-size", `${Math.round(profile.width)}px ${Math.round(profile.height)}px`);
+      element.style.setProperty(
+        "--hover-chart-size",
+        profile.fillsElement ? "100% 100%" : `${Math.round(profile.width)}px ${Math.round(profile.height)}px`
+      );
     });
   };
 
@@ -110,11 +115,13 @@ function getChartProfile(element: HTMLElement): ChartProfile {
     return compactChartProfile;
   }
 
-  const width = clamp(Math.round(element.offsetWidth || compactChartProfile.width), compactChartProfile.width, 900);
+  const width = clamp(Math.round(element.offsetWidth || compactChartProfile.width), compactChartProfile.width, 1600);
   const height = clamp(Math.round(element.offsetHeight || compactChartProfile.height), compactChartProfile.height, 520);
-  const volatility = clamp(1 + (height - compactChartProfile.height) / 210, 1, 2.8);
+  const heightBoost = (height - compactChartProfile.height) / 120;
+  const widthBoost = (width - compactChartProfile.width) / 900;
+  const volatility = clamp(1.1 + heightBoost + widthBoost, 1, 3.4);
 
-  return { width, height, volatility };
+  return { width, height, volatility, fillsElement: true };
 }
 
 function createChartOverlay(tone: ChartTone, profile: ChartProfile) {
@@ -132,27 +139,45 @@ function createChartOverlay(tone: ChartTone, profile: ChartProfile) {
 function createRandomCandles(tone: ChartTone, profile: ChartProfile) {
   const bodyWidth = 10;
   const edgePadding = bodyWidth / 2 + 4;
-  const candleCount = clamp(Math.round(profile.width / 23), 12, 36);
+  const candleCount = clamp(Math.round(profile.width / 16), 16, 96);
   const spacing = (profile.width - edgePadding * 2) / (candleCount - 1);
   const bullishBias = tone === "success" ? 0.72 : tone === "danger" ? 0.28 : 0.5;
   const centerY = profile.height / 2;
-  const topLimit = Math.max(8, profile.height * 0.09);
-  const bottomLimit = Math.min(profile.height - 8, profile.height * 0.91);
-  const openRange = profile.height * 0.16 * profile.volatility;
-  const moveMin = 7 * profile.volatility;
-  const moveMax = 17 * profile.volatility;
-  const wickMin = 5 * profile.volatility;
-  const wickMax = 13 * profile.volatility;
-  let previousClose = randomBetween(centerY - openRange * 0.5, centerY + openRange * 0.5);
+  const topLimit = Math.max(7, profile.height * 0.05);
+  const bottomLimit = Math.min(profile.height - 7, profile.height * 0.95);
+  const waveAmplitude = clamp(profile.height * (0.18 + profile.volatility * 0.08), profile.height * 0.22, profile.height * 0.42);
+  const secondaryAmplitude = clamp(profile.height * 0.06 * profile.volatility, 4, profile.height * 0.14);
+  const primaryPhase = randomBetween(0, Math.PI * 2);
+  const secondaryPhase = randomBetween(0, Math.PI * 2);
+  const moveMin = 5.5 * profile.volatility;
+  const moveMax = 11.5 * profile.volatility;
+  const wickMin = 4.5 * profile.volatility;
+  const wickMax = 10 * profile.volatility;
+  let previousClose = clamp(centerY + Math.sin(primaryPhase) * waveAmplitude * 0.35, topLimit, bottomLimit);
 
   return Array.from({ length: candleCount }, (_, index) => {
     const centerX = Math.round(edgePadding + spacing * index);
-    const open = clamp(previousClose + randomBetween(-11, 11) * profile.volatility, topLimit, bottomLimit);
+    const progress = index / Math.max(1, candleCount - 1);
+    const targetY = clamp(
+      centerY +
+        Math.sin(progress * Math.PI * 3.4 + primaryPhase) * waveAmplitude +
+        Math.sin(progress * Math.PI * 8.2 + secondaryPhase) * secondaryAmplitude,
+      topLimit,
+      bottomLimit
+    );
+    const open = clamp(
+      previousClose + (targetY - previousClose) * 0.36 + randomBetween(-4.5, 4.5) * profile.volatility,
+      topLimit,
+      bottomLimit
+    );
     const bullish = Math.random() < bullishBias;
-    const shock = Math.random() > 0.76 ? randomBetween(7, 14) * profile.volatility : 0;
+    const shock = Math.random() > 0.82 ? randomBetween(4, 8) * profile.volatility : 0;
     const bodyMove = (randomBetween(moveMin, moveMax) + shock) * (bullish ? -1 : 1);
-    const meanReversion = (centerY - open) * 0.055;
-    const close = clamp(open + bodyMove + randomBetween(-4, 4) * profile.volatility + meanReversion, topLimit, bottomLimit);
+    const close = clamp(
+      open + bodyMove + (targetY - open) * 0.2 + randomBetween(-2.5, 2.5) * profile.volatility,
+      topLimit,
+      bottomLimit
+    );
     const top = Math.min(open, close);
     const bottom = Math.max(open, close);
     const high = Math.max(4, top - randomBetween(wickMin, wickMax));
