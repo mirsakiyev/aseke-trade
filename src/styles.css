@@ -22,6 +22,7 @@
   --crypto-gradient-hover: linear-gradient(135deg, rgba(224, 241, 248, 0.18), rgba(128, 190, 212, 0.09));
   --crypto-glow: 0 18px 52px rgba(142, 202, 224, 0.085);
   --candlestick-chart-overlay: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 180' preserveAspectRatio='none'%3E%3Cg stroke-linecap='round'%3E%3Cline x1='0' y1='48' x2='0' y2='132' stroke='%237ee0a7' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='-8' y='70' width='16' height='36' rx='2' fill='%237ee0a7' fill-opacity='.14' stroke='%237ee0a7' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='60' y1='58' x2='60' y2='146' stroke='%23ff6b6b' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='52' y='86' width='16' height='36' rx='2' fill='%23ff6b6b' fill-opacity='.14' stroke='%23ff6b6b' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='120' y1='42' x2='120' y2='124' stroke='%237ee0a7' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='112' y='64' width='16' height='34' rx='2' fill='%237ee0a7' fill-opacity='.14' stroke='%237ee0a7' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='180' y1='64' x2='180' y2='150' stroke='%23ff6b6b' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='172' y='90' width='16' height='38' rx='2' fill='%23ff6b6b' fill-opacity='.14' stroke='%23ff6b6b' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='240' y1='44' x2='240' y2='130' stroke='%237ee0a7' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='232' y='66' width='16' height='40' rx='2' fill='%237ee0a7' fill-opacity='.14' stroke='%237ee0a7' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='300' y1='60' x2='300' y2='154' stroke='%23ff6b6b' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='292' y='88' width='16' height='42' rx='2' fill='%23ff6b6b' fill-opacity='.14' stroke='%23ff6b6b' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='360' y1='50' x2='360' y2='136' stroke='%237ee0a7' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='352' y='72' width='16' height='36' rx='2' fill='%237ee0a7' fill-opacity='.14' stroke='%237ee0a7' stroke-opacity='.64' stroke-width='1.8'/%3E%3Cline x1='420' y1='56' x2='420' y2='144' stroke='%23ff6b6b' stroke-opacity='.5' stroke-width='2'/%3E%3Crect x='412' y='84' width='16' height='40' rx='2' fill='%23ff6b6b' fill-opacity='.14' stroke='%23ff6b6b' stroke-opacity='.64' stroke-width='1.8'/%3E%3C/g%3E%3C/svg%3E");
+  --candlestick-chart-overlay: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20360%2096%22%20preserveAspectRatio%3D%22none%22%3E%3Cg%20stroke-linecap%3D%22round%22%3E%3Cline%20x1%3D%2214%22%20y1%3D%2220%22%20x2%3D%2214%22%20y2%3D%2276%22%20stroke%3D%22%237ee0a7%22%20stroke-opacity%3D%22.5%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%229%22%20y%3D%2234%22%20width%3D%2210%22%20height%3D%2224%22%20rx%3D%222%22%20fill%3D%22%237ee0a7%22%20fill-opacity%3D%22.14%22%20stroke%3D%22%237ee0a7%22%20stroke-opacity%3D%22.64%22%20stroke-width%3D%221.8%22%2F%3E%3Cline%20x1%3D%2280%22%20y1%3D%2218%22%20x2%3D%2280%22%20y2%3D%2282%22%20stroke%3D%22%23ff6b6b%22%20stroke-opacity%3D%22.5%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%2275%22%20y%3D%2240%22%20width%3D%2210%22%20height%3D%2226%22%20rx%3D%222%22%20fill%3D%22%23ff6b6b%22%20fill-opacity%3D%22.14%22%20stroke%3D%22%23ff6b6b%22%20stroke-opacity%3D%22.64%22%20stroke-width%3D%221.8%22%2F%3E%3Cline%20x1%3D%22146%22%20y1%3D%2212%22%20x2%3D%22146%22%20y2%3D%2272%22%20stroke%3D%22%237ee0a7%22%20stroke-opacity%3D%22.5%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%22141%22%20y%3D%2228%22%20width%3D%2210%22%20height%3D%2226%22%20rx%3D%222%22%20fill%3D%22%237ee0a7%22%20fill-opacity%3D%22.14%22%20stroke%3D%22%237ee0a7%22%20stroke-opacity%3D%22.64%22%20stroke-width%3D%221.8%22%2F%3E%3Cline%20x1%3D%22214%22%20y1%3D%2222%22%20x2%3D%22214%22%20y2%3D%2286%22%20stroke%3D%22%23ff6b6b%22%20stroke-opacity%3D%22.5%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%22209%22%20y%3D%2244%22%20width%3D%2210%22%20height%3D%2228%22%20rx%3D%222%22%20fill%3D%22%23ff6b6b%22%20fill-opacity%3D%22.14%22%20stroke%3D%22%23ff6b6b%22%20stroke-opacity%3D%22.64%22%20stroke-width%3D%221.8%22%2F%3E%3Cline%20x1%3D%22282%22%20y1%3D%2216%22%20x2%3D%22282%22%20y2%3D%2276%22%20stroke%3D%22%237ee0a7%22%20stroke-opacity%3D%22.5%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%22277%22%20y%3D%2232%22%20width%3D%2210%22%20height%3D%2226%22%20rx%3D%222%22%20fill%3D%22%237ee0a7%22%20fill-opacity%3D%22.14%22%20stroke%3D%22%237ee0a7%22%20stroke-opacity%3D%22.64%22%20stroke-width%3D%221.8%22%2F%3E%3Cline%20x1%3D%22346%22%20y1%3D%2224%22%20x2%3D%22346%22%20y2%3D%2282%22%20stroke%3D%22%23ff6b6b%22%20stroke-opacity%3D%22.5%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%22341%22%20y%3D%2242%22%20width%3D%2210%22%20height%3D%2224%22%20rx%3D%222%22%20fill%3D%22%23ff6b6b%22%20fill-opacity%3D%22.14%22%20stroke%3D%22%23ff6b6b%22%20stroke-opacity%3D%22.64%22%20stroke-width%3D%221.8%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
   --btc-chart-overlay: var(--candlestick-chart-overlay);
 }
 
@@ -404,7 +405,7 @@ p {
 
 .primary-button:not(.compact):hover {
   background:
-    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / 260px 78px repeat-x,
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 280px 76px) repeat-x,
     var(--crypto-gradient-hover),
     linear-gradient(135deg, #f8fbfc, #aeb8c1 52%, #e9edf0);
 }
@@ -432,7 +433,7 @@ p {
 
 .ghost-button:not(.compact):hover {
   background:
-    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / 260px 78px repeat-x,
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 280px 76px) repeat-x,
     var(--crypto-gradient),
     rgba(229, 228, 226, 0.05);
 }
@@ -453,7 +454,7 @@ p {
 
 .platinum-button:not(.compact):hover {
   background:
-    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / 260px 78px repeat-x,
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 280px 76px) repeat-x,
     var(--crypto-gradient-hover),
     rgba(229, 228, 226, 0.12);
 }
@@ -764,7 +765,7 @@ p {
   content: "";
   background:
     linear-gradient(180deg, rgba(10, 12, 15, 0.16), rgba(10, 12, 15, 0.42)),
-    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 360px 128px) repeat-x;
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 280px 76px) repeat;
   filter: drop-shadow(0 0 8px var(--hover-chart-glow, rgba(229, 228, 226, 0.2)));
   opacity: 0;
   pointer-events: none;
@@ -1120,7 +1121,7 @@ p {
 .filter-pill:hover {
   border-color: rgba(229, 228, 226, 0.45);
   background:
-    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / 180px 56px repeat-x,
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 280px 76px) repeat-x,
     var(--crypto-gradient),
     rgba(229, 228, 226, 0.13);
   color: var(--platinum);
@@ -1613,7 +1614,7 @@ p {
   content: "";
   background:
     linear-gradient(180deg, rgba(5, 6, 7, 0.1), rgba(5, 6, 7, 0.45)),
-    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / 270px 86px repeat-x;
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 280px 76px) repeat;
   opacity: 0;
   pointer-events: none;
   transition: opacity 160ms ease;
