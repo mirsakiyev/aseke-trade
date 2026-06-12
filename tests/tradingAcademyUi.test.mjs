@@ -25,6 +25,14 @@ test("leaderboard renders public avatars with fallback support", () => {
   assert.match(dashboardSource, /resolvePublicAvatarUrl\(row\.avatar_url\)/);
   assert.match(dashboardSource, /onError=\{\(\) => setHasImageError\(true\)\}/);
   assert.match(dashboardSource, /<UserRound size=\{16\}/);
+  assert.match(dashboardSource, /leaderboard\.slice\(0,\s*3\)/);
+  assert.match(dashboardSource, /setIsLeaderboardExpanded/);
+});
+
+test("academy dashboard includes a subscriber risk calculator", () => {
+  assert.match(dashboardSource, /RiskCalculatorPanel/);
+  assert.match(dashboardSource, /calculateRisk/);
+  assert.match(dashboardSource, /risk-calculator-panel/);
 });
 
 test("charts market picker is a compact toolbar above the TradingView chart", () => {

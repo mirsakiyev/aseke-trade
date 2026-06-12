@@ -254,7 +254,7 @@ export function AdminTradingAcademy() {
       ? await supabase.from("trading_signals").update(payload).eq("id", existingSignal.id)
       : await supabase.from("trading_signals").insert(payload);
 
-    setMessage(result.error ? "Trading signal could not be saved." : "Trading signal saved.");
+    setMessage(result.error ? "Trading signal could not be saved." : "Trading signal saved. Premium users will be notified.");
     if (!result.error) {
       resetSignalForm();
       await refreshAdminData();
@@ -669,7 +669,7 @@ function AdminSignalRow({
       return;
     }
 
-    setMessage(successMessage);
+    setMessage(`${successMessage} Premium users will be notified.`);
     await onUpdated();
   };
 

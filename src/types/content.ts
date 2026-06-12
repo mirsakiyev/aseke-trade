@@ -35,6 +35,29 @@ export interface Profile {
   updated_at?: string;
 }
 
+export type InboxTargetAudience = "all" | "basic" | "premium" | "specific_user";
+export type InboxMessageType =
+  | "market_outlook"
+  | "trading_signal"
+  | "account_update"
+  | "security_update"
+  | "community_message";
+
+export interface InboxMessage {
+  id: string;
+  user_id: string | null;
+  target_audience: InboxTargetAudience;
+  type: InboxMessageType;
+  title: string;
+  summary: string | null;
+  message: string;
+  related_signal_id: string | null;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+  sent_by_admin_id: string | null;
+}
+
 export type PremiumPlanId = "premium_1_month" | "premium_1_year";
 export type PremiumSubscriptionPlanId = PremiumPlanId | "admin_custom";
 export type PaymentProductType = "premium" | "course" | "guide" | "deposit";

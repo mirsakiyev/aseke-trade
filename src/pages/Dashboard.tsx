@@ -1,22 +1,36 @@
 import {
   ArrowUpRight,
   Award,
+  Bell,
   BookMarked,
   Camera,
   Crown,
   GraduationCap,
+  Mail,
+  MailOpen,
+  Save,
   ShieldCheck,
   UserCircle2,
   WalletCards
 } from "lucide-react";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { useAccountStatus } from "../hooks/useAccountStatus";
 import { getProgressToNextLevel } from "../lib/levels";
+import { fetchInboxMessages, inboxTypeLabels, markInboxMessageRead } from "../lib/notificationsApi";
 import { supabase } from "../lib/supabase";
-import type { Guide, Lesson, LessonProgress, Purchase, SavedGuide, XPTransaction } from "../types/content";
+import { sanitizePlainText } from "../lib/validation";
+import type {
+  Guide,
+  InboxMessage,
+  Lesson,
+  LessonProgress,
+  Purchase,
+  SavedGuide,
+  XPTransaction
+} from "../types/content";
 
 type MaybeArray<T> = T | T[] | null | undefined;
 type SavedGuideRow = Omit<SavedGuide, "guides"> & {
@@ -25,9 +39,18 @@ type SavedGuideRow = Omit<SavedGuide, "guides"> & {
 type LessonProgressRow = Omit<LessonProgress, "lessons"> & {
   lessons?: MaybeArray<Pick<Lesson, "title">>;
 };
+type InboxFilter = "all" | "unread" | "market_outlook" | "trading_signal" | "account" | "community_message";
 
 const avatarTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const maxAvatarSizeBytes = 2 * 1024 * 1024;
+const inboxFilters: Array<{ value: InboxFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "unread", label: "Unread" },
+  { value: "market_outlook", label: "Outlook" },
+  { value: "trading_signal", label: "Signals" },
+  { value: "account", label: "Account" },
+  { value: "community_message", label: "Community" }
+];
 
 function firstRelation<T>(relation: MaybeArray<T>): T | null {
   return Array.isArray(relation) ? relation[0] ?? null : relation ?? null;
@@ -54,12 +77,32 @@ export function Dashboard() {
   const [savedGuides, setSavedGuides] = useState<SavedGuide[]>([]);
   const [progress, setProgress] = useState<LessonProgress[]>([]);
   const [xpTransactions, setXPTransactions] = useState<XPTransaction[]>([]);
+  const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>([]);
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
+  const [selectedInboxMessageId, setSelectedInboxMessageId] = useState<string | null>(null);
+  const [inboxError, setInboxError] = useState<string | null>(null);
   const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+  const [displayNameInput, setDisplayNameInput] = useState("");
+  const [nameMessage, setNameMessage] = useState<string | null>(null);
+  const [isNameSaving, setIsNameSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [error, setError] = useState<string | null>(null);
   const totalXP = profile?.total_xp ?? 0;
   const levelProgress = getProgressToNextLevel(totalXP);
+  const unreadInboxCount = inboxMessages.filter((message) => !message.is_read).length;
+  const filteredInboxMessages = useMemo(
+    () => inboxMessages.filter((message) => matchesInboxFilter(message, inboxFilter)),
+    [inboxFilter, inboxMessages]
+  );
+  const selectedInboxMessage = useMemo(
+    () => filteredInboxMessages.find((message) => message.id === selectedInboxMessageId) ?? null,
+    [filteredInboxMessages, selectedInboxMessageId]
+  );
+
+  useEffect(() => {
+    setDisplayNameInput(profile?.full_name ?? profile?.username ?? user?.email?.split("@")[0] ?? "");
+  }, [profile?.full_name, profile?.username, user?.email]);
 
   useEffect(() => {
     let mounted = true;
@@ -88,18 +131,23 @@ export function Dashboard() {
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(5)
-    ]).then(([purchaseResult, savedResult, progressResult, xpResult]) => {
+        .limit(5),
+      fetchInboxMessages()
+        .then((data) => ({ data, error: null }))
+        .catch((loadError: unknown) => ({ data: [] as InboxMessage[], error: loadError }))
+    ]).then(([purchaseResult, savedResult, progressResult, xpResult, inboxResult]) => {
       if (!mounted) return;
 
       if (purchaseResult.error || savedResult.error || progressResult.error || xpResult.error) {
         setError("Some dashboard data could not be loaded.");
       }
+      setInboxError(inboxResult.error ? "Inbox messages could not be loaded." : null);
 
       setPurchases((purchaseResult.data ?? []) as Purchase[]);
       setSavedGuides(((savedResult.data ?? []) as SavedGuideRow[]).map(normalizeSavedGuide));
       setProgress(((progressResult.data ?? []) as LessonProgressRow[]).map(normalizeLessonProgress));
       setXPTransactions((xpResult.data ?? []) as XPTransaction[]);
+      setInboxMessages(inboxResult.data);
       setIsLoading(false);
     });
 
@@ -161,12 +209,58 @@ export function Dashboard() {
     setIsAvatarUploading(false);
   };
 
+  const saveDisplayName = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!supabase || !user) {
+      setNameMessage("Login with Supabase connected to change your name.");
+      return;
+    }
+
+    const fullName = sanitizePlainText(displayNameInput, 40);
+    if (fullName.length < 2) {
+      setNameMessage("Display name must be at least 2 characters.");
+      return;
+    }
+
+    setIsNameSaving(true);
+    setNameMessage(null);
+
+    const { error: updateError } = await supabase.from("profiles").update({ full_name: fullName }).eq("id", user.id);
+
+    if (updateError) {
+      setNameMessage("Display name could not be updated.");
+    } else {
+      setNameMessage("Display name updated.");
+      await refreshProfile();
+    }
+
+    setIsNameSaving(false);
+  };
+
+  const openInboxMessage = async (message: InboxMessage) => {
+    setSelectedInboxMessageId(message.id);
+    if (message.is_read) return;
+
+    setInboxMessages((messages) =>
+      messages.map((currentMessage) =>
+        currentMessage.id === message.id ? { ...currentMessage, is_read: true } : currentMessage
+      )
+    );
+
+    try {
+      await markInboxMessageRead(message.id);
+    } catch {
+      setInboxError("Inbox read status could not be saved.");
+    }
+  };
+
   return (
     <main className="page page-stack">
       <section className="page-title-row">
         <div>
           <p className="eyebrow">Dashboard</p>
-          <h1>Learning account</h1>
+          <h1>Account Dashboard</h1>
           <p className="muted">
             Continue your trading education, manage your balance, and track your Trading Academy access.
           </p>
@@ -184,10 +278,11 @@ export function Dashboard() {
           <div className="avatar-profile-row">
             <div className="dashboard-avatar" aria-label="Profile avatar">
               {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="" />
+                <img src={profile.avatar_url} alt="Profile avatar" />
               ) : (
                 <UserCircle2 size={74} aria-hidden="true" />
               )}
+              <span className="avatar-level-badge">LVL {levelProgress.level}</span>
             </div>
             <div>
               <span className="feature-icon compact-icon">
@@ -202,10 +297,25 @@ export function Dashboard() {
             </div>
           </div>
           {avatarMessage && <p className="soft-notice">{avatarMessage}</p>}
+          <form className="display-name-form" onSubmit={saveDisplayName}>
+            <label>
+              Display name
+              <input
+                value={displayNameInput}
+                onChange={(event) => setDisplayNameInput(event.target.value)}
+                maxLength={40}
+              />
+            </label>
+            <button className="ghost-button compact" type="submit" disabled={isNameSaving}>
+              <Save size={16} />
+              {isNameSaving ? "Saving" : "Save"}
+            </button>
+          </form>
+          {nameMessage && <p className="soft-notice">{nameMessage}</p>}
           <dl className="detail-list">
             <div>
               <dt>Name</dt>
-              <dd>{profile?.full_name ?? user?.email ?? "Account"}</dd>
+              <dd>{profile?.full_name ?? profile?.username ?? user?.email ?? "Account"}</dd>
             </div>
             <div>
               <dt>Email</dt>
@@ -228,22 +338,23 @@ export function Dashboard() {
           </dl>
         </article>
 
-        <article className="section-panel level-panel">
-          <span className="feature-icon">
-            <Award size={21} />
-          </span>
-          <h2>Learning Level</h2>
-          <div className="level-hero-line">
-            <span className="level-badge large">LVL {levelProgress.level}</span>
-            <span>{totalXP} total XP</span>
+        <article className="section-panel level-panel compact-level-panel">
+          <div className="level-compact-header">
+            <span className="feature-icon compact-icon">
+              <Award size={21} />
+            </span>
+            <div>
+              <h2>Learning Level</h2>
+              <span>{totalXP} total XP</span>
+            </div>
+            <span className="level-badge">LVL {levelProgress.level}</span>
           </div>
           <div className="xp-progress-track" aria-label={`${levelProgress.progressPercent}% to next level`}>
             <span style={{ width: `${levelProgress.progressPercent}%` }} />
           </div>
-          <div className="xp-stat-row">
-            <span>{levelProgress.xpIntoLevel}/{levelProgress.xpRequiredForNextLevel} XP</span>
-            <span>{levelProgress.xpRemainingForNextLevel} XP to LVL {levelProgress.level + 1}</span>
-          </div>
+          <p className="level-next-line">
+            {levelProgress.xpIntoLevel}/{levelProgress.xpRequiredForNextLevel} XP - {levelProgress.xpRemainingForNextLevel} XP to LVL {levelProgress.level + 1}
+          </p>
         </article>
 
         <article className="section-panel">
@@ -267,6 +378,87 @@ export function Dashboard() {
             </Link>
           </div>
         </article>
+      </section>
+
+      <section className="section-panel inbox-panel">
+        <div className="lesson-title-line">
+          <div>
+            <p className="eyebrow">Inbox</p>
+            <h2>Account notifications</h2>
+          </div>
+          <span className={unreadInboxCount ? "status-pill premium" : "status-pill free"}>
+            <Bell size={15} />
+            {unreadInboxCount} unread
+          </span>
+        </div>
+
+        <div className="inbox-filter-row" aria-label="Inbox filters">
+          {inboxFilters.map((filter) => (
+            <button
+              className={inboxFilter === filter.value ? "filter-pill active" : "filter-pill"}
+              type="button"
+              onClick={() => setInboxFilter(filter.value)}
+              key={filter.value}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+
+        {inboxError && <p className="warning-box">{inboxError}</p>}
+
+        {isLoading ? (
+          <LoadingState label="Loading inbox" />
+        ) : filteredInboxMessages.length ? (
+          <div className="inbox-layout">
+            <div className="inbox-list" role="list">
+              {filteredInboxMessages.map((message) => (
+                <button
+                  className={`inbox-row ${selectedInboxMessage?.id === message.id ? "active" : ""} ${message.is_read ? "read" : "unread"}`}
+                  type="button"
+                  onClick={() => void openInboxMessage(message)}
+                  role="listitem"
+                  key={message.id}
+                >
+                  <span className="inbox-row-top">
+                    <span className="inbox-icon-frame">
+                      {message.is_read ? <MailOpen size={16} /> : <Mail size={16} />}
+                    </span>
+                    <strong>{message.title}</strong>
+                    <span>{inboxTypeLabels[message.type]}</span>
+                  </span>
+                  <span>{message.summary ?? formatInboxPreview(message.message)}</span>
+                  <time>{formatDashboardDate(message.created_at)}</time>
+                </button>
+              ))}
+            </div>
+
+            {selectedInboxMessage ? (
+              <article className="inbox-detail-panel">
+                <div className="inbox-detail-heading">
+                  <span className="status-pill premium">{inboxTypeLabels[selectedInboxMessage.type]}</span>
+                  <time>{formatDashboardDate(selectedInboxMessage.created_at)}</time>
+                </div>
+                <h3>{selectedInboxMessage.title}</h3>
+                {selectedInboxMessage.summary && <p className="muted">{selectedInboxMessage.summary}</p>}
+                <p>{selectedInboxMessage.message}</p>
+                {selectedInboxMessage.related_signal_id && (
+                  <p className="muted">Signal ID: {selectedInboxMessage.related_signal_id}</p>
+                )}
+              </article>
+            ) : (
+              <div className="inbox-detail-panel inbox-detail-empty">
+                <MailOpen size={22} aria-hidden="true" />
+                <p className="muted">Select a notification to read it.</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="compact-empty-state">
+            <MailOpen size={20} aria-hidden="true" />
+            <p className="muted">No notifications in this view.</p>
+          </div>
+        )}
       </section>
 
       {isLoading ? (
@@ -358,4 +550,22 @@ export function Dashboard() {
       )}
     </main>
   );
+}
+
+function matchesInboxFilter(message: InboxMessage, filter: InboxFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "unread") return !message.is_read;
+  if (filter === "account") return message.type === "account_update" || message.type === "security_update";
+  return message.type === filter;
+}
+
+function formatInboxPreview(value: string): string {
+  return value.length > 120 ? `${value.slice(0, 117)}...` : value;
+}
+
+function formatDashboardDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown date";
+
+  return date.toLocaleString();
 }

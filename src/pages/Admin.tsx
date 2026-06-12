@@ -1,8 +1,9 @@
-import { CalendarClock, Crown, Edit3, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from "lucide-react";
+import { Bell, CalendarClock, Crown, Edit3, LineChart, Plus, RefreshCw, Send, ShieldCheck, Trash2, WalletCards } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
+import { inboxAudienceLabels, inboxTypeLabels, sendAdminNotification } from "../lib/notificationsApi";
 import { supabase } from "../lib/supabase";
 import { sanitizePlainText, slugify, validateSlug } from "../lib/validation";
 import {
@@ -14,13 +15,15 @@ import {
   type Difficulty,
   type Guide,
   type GuideCategory,
+  type InboxMessageType,
+  type InboxTargetAudience,
   type Lesson,
   type PremiumSubscription,
   type Profile,
   type Purchase
 } from "../types/content";
 
-type AdminTab = "guides" | "courses" | "lessons" | "users";
+type AdminTab = "guides" | "courses" | "lessons" | "inbox" | "users";
 
 type FlatCourse = Omit<Course, "modules" | "guides">;
 type FlatModule = {
@@ -83,6 +86,21 @@ const blankSubscriptionForm = {
   admin_note: ""
 };
 
+const blankNotificationForm = {
+  type: "market_outlook" as InboxMessageType,
+  targetAudience: "premium" as InboxTargetAudience,
+  userId: "",
+  title: "",
+  summary: "",
+  message: ""
+};
+const manualNotificationTypes: InboxMessageType[] = [
+  "market_outlook",
+  "account_update",
+  "security_update",
+  "community_message"
+];
+
 export function Admin() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>("guides");
@@ -110,6 +128,7 @@ export function Admin() {
 
   const [subscriptionForm, setSubscriptionForm] = useState(blankSubscriptionForm);
   const [editingSubscriptionId, setEditingSubscriptionId] = useState<string | null>(null);
+  const [notificationForm, setNotificationForm] = useState(blankNotificationForm);
 
   const courseNameById = useMemo(
     () => new Map(courses.map((course) => [course.id, course.title])),
@@ -378,6 +397,31 @@ export function Admin() {
     }
   };
 
+  const saveNotification = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!user) return;
+
+    try {
+      await sendAdminNotification({
+        type: notificationForm.type,
+        targetAudience: notificationForm.targetAudience,
+        userId: notificationForm.targetAudience === "specific_user" ? notificationForm.userId : undefined,
+        title: notificationForm.title,
+        summary: notificationForm.summary,
+        message: notificationForm.message,
+        sentByAdminId: user.id
+      });
+      setNotificationForm({
+        ...blankNotificationForm,
+        type: notificationForm.type,
+        targetAudience: defaultAudienceForNotificationType(notificationForm.type)
+      });
+      setMessage("Notification sent.");
+    } catch (notificationError) {
+      setMessage(notificationError instanceof Error ? notificationError.message : "Notification could not be sent.");
+    }
+  };
+
   const deleteRow = async (table: "guides" | "courses" | "course_modules" | "lessons", id: string) => {
     if (!supabase) return;
     if (!window.confirm("Delete this item?")) return;
@@ -454,7 +498,7 @@ export function Admin() {
       {message && <p className="soft-notice">{message}</p>}
 
       <section className="tab-bar" aria-label="Admin sections">
-        {(["guides", "courses", "lessons", "users"] as AdminTab[]).map((tab) => (
+        {(["guides", "courses", "lessons", "inbox", "users"] as AdminTab[]).map((tab) => (
           <button
             className={activeTab === tab ? "filter-pill active" : "filter-pill"}
             type="button"
@@ -994,6 +1038,147 @@ export function Admin() {
             </section>
           )}
 
+          {activeTab === "inbox" && (
+            <section className="admin-grid notification-admin-grid">
+              <form className="section-panel stack-form" onSubmit={saveNotification}>
+                <div className="compact-tool-heading">
+                  <span className="feature-icon">
+                    <Bell size={20} />
+                  </span>
+                  <div>
+                    <h2>Send notification</h2>
+                    <p className="muted">Market outlook alerts are premium-only. Trading signal alerts are automatic.</p>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <label>
+                    Type
+                    <select
+                      value={notificationForm.type}
+                      onChange={(event) => {
+                        const type = event.target.value as InboxMessageType;
+                        setNotificationForm((form) => ({
+                          ...form,
+                          type,
+                          targetAudience: defaultAudienceForNotificationType(type),
+                          userId: ""
+                        }));
+                      }}
+                    >
+                      {manualNotificationTypes.map((type) => (
+                        <option value={type} key={type}>
+                          {inboxTypeLabels[type]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Audience
+                    <select
+                      value={notificationForm.targetAudience}
+                      onChange={(event) => {
+                        const targetAudience = event.target.value as InboxTargetAudience;
+                        setNotificationForm((form) => ({
+                          ...form,
+                          targetAudience,
+                          userId: targetAudience === "specific_user" ? form.userId : ""
+                        }));
+                      }}
+                    >
+                      {notificationAudienceOptions(notificationForm.type).map((audience) => (
+                        <option value={audience} key={audience}>
+                          {inboxAudienceLabels[audience]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                {notificationForm.targetAudience === "specific_user" && (
+                  <label>
+                    User
+                    <select
+                      value={notificationForm.userId}
+                      onChange={(event) => setNotificationForm((form) => ({ ...form, userId: event.target.value }))}
+                      required
+                    >
+                      <option value="">Select user</option>
+                      {profiles.map((profile) => (
+                        <option value={profile.id} key={profile.id}>
+                          {profile.full_name ?? profile.username ?? profile.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                <label>
+                  Title
+                  <input
+                    value={notificationForm.title}
+                    onChange={(event) => setNotificationForm((form) => ({ ...form, title: event.target.value }))}
+                    maxLength={180}
+                    required
+                  />
+                </label>
+                <label>
+                  Summary
+                  <input
+                    value={notificationForm.summary}
+                    onChange={(event) => setNotificationForm((form) => ({ ...form, summary: event.target.value }))}
+                    maxLength={260}
+                  />
+                </label>
+                <label>
+                  Message
+                  <textarea
+                    value={notificationForm.message}
+                    onChange={(event) => setNotificationForm((form) => ({ ...form, message: event.target.value }))}
+                    maxLength={2400}
+                    rows={6}
+                    required
+                  />
+                </label>
+                <button className="primary-button full-width" type="submit">
+                  <Send size={17} />
+                  Send Notification
+                </button>
+              </form>
+
+              <AdminList title="Delivery Rules">
+                <li>
+                  <div>
+                    <strong>Market Outlook</strong>
+                    <span>Sent to premium users only.</span>
+                  </div>
+                  <Crown size={18} />
+                </li>
+                <li>
+                  <div>
+                    <strong>Trading Signal</strong>
+                    <span>Sent automatically to premium users when a signal is created or updated.</span>
+                  </div>
+                  <LineChart size={18} />
+                </li>
+                <li>
+                  <div>
+                    <strong>Community</strong>
+                    <span>Sent to all logged-in users.</span>
+                  </div>
+                  <Bell size={18} />
+                </li>
+                <li>
+                  <div>
+                    <strong>Account and Security</strong>
+                    <span>Available for all, basic, or a specific user.</span>
+                  </div>
+                  <ShieldCheck size={18} />
+                </li>
+              </AdminList>
+            </section>
+          )}
+
           {activeTab === "users" && (
             <section className="admin-grid">
               <form className="section-panel stack-form" onSubmit={saveSubscription}>
@@ -1182,6 +1367,18 @@ function AdminList({ title, children }: { title: string; children: ReactNode }) 
       <ul className="admin-list">{children}</ul>
     </article>
   );
+}
+
+function defaultAudienceForNotificationType(type: InboxMessageType): InboxTargetAudience {
+  if (type === "market_outlook" || type === "trading_signal") return "premium";
+  if (type === "community_message") return "all";
+  return "all";
+}
+
+function notificationAudienceOptions(type: InboxMessageType): InboxTargetAudience[] {
+  if (type === "market_outlook" || type === "trading_signal") return ["premium"];
+  if (type === "community_message") return ["all"];
+  return ["all", "basic", "specific_user"];
 }
 
 function toDateTimeLocalValue(date: Date): string {

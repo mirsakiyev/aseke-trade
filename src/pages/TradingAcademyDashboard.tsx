@@ -1,8 +1,10 @@
 import {
+  Calculator,
   Crown,
   Headphones,
   LineChart,
   RefreshCw,
+  RotateCcw,
   SearchCheck,
   Send,
   Trophy,
@@ -14,6 +16,12 @@ import { useAuth } from "../contexts/AuthContext";
 import { useAccountStatus } from "../hooks/useAccountStatus";
 import { formatUsd } from "../lib/accountStatus";
 import { resolvePublicAvatarUrl } from "../lib/avatarUrls";
+import {
+  calculateRisk,
+  type PositionSizeMode,
+  type RiskCalculatorResult,
+  type RiskDirection
+} from "../lib/riskCalculator";
 import {
   AML_CHECK_PRICE_CENTS,
   fetchTradingAcademyLeaderboard,
@@ -56,6 +64,36 @@ const blankSupportForm = {
   priority: "normal" as PremiumSupportPriority
 };
 
+type RiskCalculatorFormState = {
+  symbol: string;
+  direction: RiskDirection;
+  accountBalance: string;
+  riskPercent: string;
+  entryPrice: string;
+  stopLossPrice: string;
+  takeProfit1: string;
+  takeProfit2: string;
+  takeProfit3: string;
+  leverage: string;
+  positionSizeMode: PositionSizeMode;
+  manualPositionSize: string;
+};
+
+const blankRiskForm: RiskCalculatorFormState = {
+  symbol: "BTC/USDT",
+  direction: "long",
+  accountBalance: "",
+  riskPercent: "1",
+  entryPrice: "",
+  stopLossPrice: "",
+  takeProfit1: "",
+  takeProfit2: "",
+  takeProfit3: "",
+  leverage: "1",
+  positionSizeMode: "auto",
+  manualPositionSize: ""
+};
+
 export function TradingAcademyDashboard() {
   const { user, profile } = useAuth();
   const accountStatus = useAccountStatus();
@@ -72,6 +110,10 @@ export function TradingAcademyDashboard() {
   const [supportForm, setSupportForm] = useState(blankSupportForm);
   const [supportMessage, setSupportMessage] = useState<string | null>(null);
   const [isSupportSubmitting, setIsSupportSubmitting] = useState(false);
+  const [isLeaderboardExpanded, setIsLeaderboardExpanded] = useState(false);
+  const [riskForm, setRiskForm] = useState<RiskCalculatorFormState>(blankRiskForm);
+  const [riskResult, setRiskResult] = useState<RiskCalculatorResult | null>(null);
+  const [riskErrors, setRiskErrors] = useState<string[]>([]);
 
   const loadDashboard = useCallback(async () => {
     if (!user) return;
@@ -110,6 +152,10 @@ export function TradingAcademyDashboard() {
   const pastTrades = useMemo(
     () => signals.filter((signal) => TRADING_SIGNAL_FINAL_STATUSES.includes(signal.status)),
     [signals]
+  );
+  const visibleLeaderboard = useMemo(
+    () => (isLeaderboardExpanded ? leaderboard : leaderboard.slice(0, 3)),
+    [isLeaderboardExpanded, leaderboard]
   );
 
   const submitAml = async (event: FormEvent<HTMLFormElement>) => {
@@ -193,6 +239,42 @@ export function TradingAcademyDashboard() {
     }
   };
 
+  const submitRiskCalculation = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const calculation = calculateRisk({
+      symbol: sanitizePlainText(riskForm.symbol, 24),
+      direction: riskForm.direction,
+      accountBalance: numberFromInput(riskForm.accountBalance),
+      riskPercent: numberFromInput(riskForm.riskPercent),
+      entryPrice: numberFromInput(riskForm.entryPrice),
+      stopLossPrice: numberFromInput(riskForm.stopLossPrice),
+      takeProfitPrices: [riskForm.takeProfit1, riskForm.takeProfit2, riskForm.takeProfit3].map(numberFromInput),
+      leverage: numberFromInput(riskForm.leverage),
+      positionSizeMode: riskForm.positionSizeMode,
+      manualPositionSize: numberFromInput(riskForm.manualPositionSize)
+    });
+
+    if (!calculation.ok) {
+      setRiskResult(null);
+      setRiskErrors(calculation.errors);
+      return;
+    }
+
+    setRiskErrors([]);
+    setRiskResult(calculation.result);
+  };
+
+  const updateRiskForm = (field: keyof RiskCalculatorFormState, value: string) => {
+    setRiskForm((form) => ({ ...form, [field]: value }));
+  };
+
+  const resetRiskCalculator = () => {
+    setRiskForm(blankRiskForm);
+    setRiskResult(null);
+    setRiskErrors([]);
+  };
+
   return (
     <main className="page page-stack trading-academy-dashboard">
       <section className="page-title-row">
@@ -231,7 +313,7 @@ export function TradingAcademyDashboard() {
             </div>
             {leaderboard.length ? (
               <ol className="leaderboard-list">
-                {leaderboard.map((row) => (
+                {visibleLeaderboard.map((row) => (
                   <li className={`leaderboard-row ${leaderboardRankTone(row.rank)}`} key={row.member_key}>
                     <span className="leaderboard-rank">#{row.rank}</span>
                     <LeaderboardAvatar row={row} />
@@ -246,13 +328,22 @@ export function TradingAcademyDashboard() {
             ) : (
               <p className="muted">No Trading Academy users are ranked yet.</p>
             )}
+            {leaderboard.length > 3 && (
+              <button
+                className="ghost-button compact leaderboard-toggle"
+                type="button"
+                onClick={() => setIsLeaderboardExpanded((expanded) => !expanded)}
+              >
+                {isLeaderboardExpanded ? "Show top 3" : `Show all ${leaderboard.length}`}
+              </button>
+            )}
           </section>
 
           <section className="section-panel academy-signal-section">
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Trading Signals</p>
-                <h2>Trading Signals by ASEKE TRADE</h2>
+                <h2>Trading Signal by ASEKE TRADE</h2>
               </div>
               <LineChart size={28} aria-hidden="true" />
             </div>
@@ -291,6 +382,16 @@ export function TradingAcademyDashboard() {
               </div>
             )}
           </section>
+
+          <RiskCalculatorPanel
+            errors={riskErrors}
+            form={riskForm}
+            isLocked={!accountStatus.isPremiumActive}
+            onChange={updateRiskForm}
+            onReset={resetRiskCalculator}
+            onSubmit={submitRiskCalculation}
+            result={riskResult}
+          />
 
           <section className="dashboard-grid academy-tools-grid">
             <article className="section-panel stack-form academy-tool-panel">
@@ -447,6 +548,244 @@ export function TradingAcademyDashboard() {
         </>
       )}
     </main>
+  );
+}
+
+function RiskCalculatorPanel({
+  errors,
+  form,
+  isLocked,
+  onChange,
+  onReset,
+  onSubmit,
+  result
+}: {
+  errors: string[];
+  form: RiskCalculatorFormState;
+  isLocked: boolean;
+  onChange: (field: keyof RiskCalculatorFormState, value: string) => void;
+  onReset: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  result: RiskCalculatorResult | null;
+}) {
+  return (
+    <section className="section-panel risk-calculator-panel">
+      <div className="lesson-title-line">
+        <div>
+          <p className="eyebrow">Risk Calculator</p>
+          <h2>Position plan</h2>
+        </div>
+        <Calculator size={28} aria-hidden="true" />
+      </div>
+
+      {isLocked ? (
+        <div className="compact-empty-state">
+          <Crown size={20} aria-hidden="true" />
+          <p className="muted">Risk Calculator is available to Trading Academy subscribers.</p>
+        </div>
+      ) : (
+        <div className="risk-calculator-layout">
+          <form className="risk-calculator-form stack-form" onSubmit={onSubmit}>
+            <div className="risk-form-grid">
+              <label>
+                Pair
+                <input value={form.symbol} onChange={(event) => onChange("symbol", event.target.value)} maxLength={24} />
+              </label>
+              <label>
+                Direction
+                <select value={form.direction} onChange={(event) => onChange("direction", event.target.value)}>
+                  <option value="long">Long</option>
+                  <option value="short">Short</option>
+                </select>
+              </label>
+              <label>
+                Account balance
+                <input
+                  inputMode="decimal"
+                  value={form.accountBalance}
+                  onChange={(event) => onChange("accountBalance", event.target.value)}
+                  placeholder="1000"
+                />
+              </label>
+              <label>
+                Risk %
+                <input
+                  inputMode="decimal"
+                  value={form.riskPercent}
+                  onChange={(event) => onChange("riskPercent", event.target.value)}
+                  placeholder="1"
+                />
+              </label>
+              <label>
+                Entry
+                <input
+                  inputMode="decimal"
+                  value={form.entryPrice}
+                  onChange={(event) => onChange("entryPrice", event.target.value)}
+                  placeholder="63404"
+                />
+              </label>
+              <label>
+                Stop loss
+                <input
+                  inputMode="decimal"
+                  value={form.stopLossPrice}
+                  onChange={(event) => onChange("stopLossPrice", event.target.value)}
+                  placeholder="62555"
+                />
+              </label>
+              <label>
+                TP1
+                <input
+                  inputMode="decimal"
+                  value={form.takeProfit1}
+                  onChange={(event) => onChange("takeProfit1", event.target.value)}
+                  placeholder="64444"
+                />
+              </label>
+              <label>
+                TP2
+                <input
+                  inputMode="decimal"
+                  value={form.takeProfit2}
+                  onChange={(event) => onChange("takeProfit2", event.target.value)}
+                  placeholder="65555"
+                />
+              </label>
+              <label>
+                TP3
+                <input
+                  inputMode="decimal"
+                  value={form.takeProfit3}
+                  onChange={(event) => onChange("takeProfit3", event.target.value)}
+                  placeholder="66666"
+                />
+              </label>
+              <label>
+                Leverage
+                <input
+                  inputMode="decimal"
+                  value={form.leverage}
+                  onChange={(event) => onChange("leverage", event.target.value)}
+                  placeholder="5"
+                />
+              </label>
+              <label>
+                Size mode
+                <select
+                  value={form.positionSizeMode}
+                  onChange={(event) => onChange("positionSizeMode", event.target.value)}
+                >
+                  <option value="auto">Auto size</option>
+                  <option value="manual">Manual size</option>
+                </select>
+              </label>
+              {form.positionSizeMode === "manual" && (
+                <label>
+                  Position size
+                  <input
+                    inputMode="decimal"
+                    value={form.manualPositionSize}
+                    onChange={(event) => onChange("manualPositionSize", event.target.value)}
+                    placeholder="0.05"
+                  />
+                </label>
+              )}
+            </div>
+            {errors.length > 0 && (
+              <ul className="risk-message-list warning">
+                {errors.map((riskError) => (
+                  <li key={riskError}>{riskError}</li>
+                ))}
+              </ul>
+            )}
+            <div className="inline-actions">
+              <button className="primary-button compact" type="submit">
+                <Calculator size={17} />
+                Calculate
+              </button>
+              <button className="ghost-button compact" type="button" onClick={onReset}>
+                <RotateCcw size={17} />
+                Reset
+              </button>
+            </div>
+          </form>
+
+          {result ? (
+            <RiskCalculatorResults result={result} />
+          ) : (
+            <div className="risk-result-empty">
+              <span className="feature-icon">
+                <Calculator size={21} />
+              </span>
+              <strong>Plan before entry</strong>
+              <span>Risk amount, position size, margin, and TP reward will appear here.</span>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RiskCalculatorResults({ result }: { result: RiskCalculatorResult }) {
+  return (
+    <article className="risk-result-panel">
+      <div className="risk-result-heading">
+        <div>
+          <p className="eyebrow">{result.symbol}</p>
+          <h3>{result.direction.toUpperCase()} setup</h3>
+        </div>
+        <span className="level-badge">{formatPercentValue(result.stopDistancePercent)} SL</span>
+      </div>
+      <dl className="risk-result-grid">
+        <div>
+          <dt>Risk amount</dt>
+          <dd>{formatUsdAmount(result.riskAmount)}</dd>
+        </div>
+        <div>
+          <dt>Position size</dt>
+          <dd>{formatRiskNumber(result.positionSizeUnits)}</dd>
+        </div>
+        <div>
+          <dt>Notional value</dt>
+          <dd>{formatUsdAmount(result.notionalPositionValue)}</dd>
+        </div>
+        <div>
+          <dt>Margin required</dt>
+          <dd>{formatUsdAmount(result.marginRequired)}</dd>
+        </div>
+        <div>
+          <dt>Stop distance</dt>
+          <dd>{formatRiskNumber(result.stopDistance)}</dd>
+        </div>
+        <div>
+          <dt>Estimated loss</dt>
+          <dd>{formatUsdAmount(result.estimatedLoss)}</dd>
+        </div>
+      </dl>
+      {result.takeProfits.length > 0 && (
+        <ul className="risk-tp-list">
+          {result.takeProfits.map((takeProfit) => (
+            <li className={takeProfit.profitAmount > 0 ? "positive" : "warning"} key={takeProfit.label}>
+              <strong>
+                {takeProfit.label}: {formatRiskNumber(takeProfit.price)}
+              </strong>
+              <span>
+                {formatUsdAmount(takeProfit.profitAmount)} - {formatRiskNumber(takeProfit.riskReward)}R
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {result.warnings.length > 0 && (
+        <ul className="risk-message-list">
+          {result.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      )}
+    </article>
   );
 }
 
@@ -685,6 +1024,30 @@ function mergeTakeProfitHitState(
     isHit: currentTakeProfit?.isHit ?? originalTakeProfit.isHit,
     hitAt: currentTakeProfit?.hitAt ?? originalTakeProfit.hitAt
   };
+}
+
+function numberFromInput(value: string): number {
+  return Number(value.replace(/,/g, "").trim());
+}
+
+function formatUsdAmount(value: number): string {
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2
+  });
+}
+
+function formatPercentValue(value: number): string {
+  return `${formatRiskNumber(value)}%`;
+}
+
+function formatRiskNumber(value: number): string {
+  if (!Number.isFinite(value)) return "N/A";
+
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: 6
+  });
 }
 
 function formatSignalPrice(value: string | number): string {
