@@ -276,7 +276,6 @@ export interface TradingSignalOriginalSnapshot {
   entryPrice: string | number;
   stopLoss: string | number;
   takeProfits: TradingSignalTakeProfit[];
-  priceAtCreation: string | number;
   notes: string | null;
   createdAt: string;
 }
@@ -353,6 +352,7 @@ export interface TradingAcademyLeaderboardRow {
   rank: number;
   member_key: string;
   display_name: string;
+  avatar_url: string | null;
   level: number;
   total_xp: number;
   joined_at: string;

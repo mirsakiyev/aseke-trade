@@ -10,6 +10,10 @@ const signalReworkMigration = await readFile(
   new URL("../supabase/migrations/202606120003_rework_trading_signals.sql", import.meta.url),
   "utf8"
 );
+const leaderboardAvatarMigration = await readFile(
+  new URL("../supabase/migrations/202606120005_public_leaderboard_avatars.sql", import.meta.url),
+  "utf8"
+);
 
 test("migration defines Trading Academy access, leaderboard, signals, AML, and support models", () => {
   for (const expected of [
@@ -29,6 +33,13 @@ test("leaderboard ranks active Trading Academy subscribers and excludes admins",
   assert.match(migration, /ps\.status in \('pending', 'active'\)/i);
   assert.match(migration, /join public\.profiles as p on p\.id = active_members\.user_id/i);
   assert.match(migration, /where p\.role <> 'admin'/i);
+});
+
+test("leaderboard avatar migration exposes only public avatar URLs", () => {
+  assert.match(leaderboardAvatarMigration, /drop function if exists public\.get_trading_academy_leaderboard\(\)/i);
+  assert.match(leaderboardAvatarMigration, /avatar_url text/i);
+  assert.match(leaderboardAvatarMigration, /nullif\(p\.avatar_url, ''\) as avatar_url/i);
+  assert.doesNotMatch(leaderboardAvatarMigration, /p\.email|wallet|premium_until/i);
 });
 
 test("AML RPC locks balance, checks funds, writes fee ledger, and creates the request", () => {

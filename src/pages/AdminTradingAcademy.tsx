@@ -70,7 +70,6 @@ interface SignalFormState {
   entry_price: string;
   stop_loss: string;
   take_profits: SignalTakeProfitForm[];
-  price_at_creation: string;
   chart_image_url: string;
   notes: string;
 }
@@ -131,7 +130,6 @@ export function AdminTradingAcademy() {
     const leverage = normalizeLeverage(signalForm.leverage);
     const entryPrice = normalizePositiveDecimal(signalForm.entry_price);
     const stopLoss = normalizePositiveDecimal(signalForm.stop_loss);
-    const priceAtCreation = normalizePositiveDecimal(signalForm.price_at_creation);
     const validation = validateTakeProfits(signalForm.take_profits);
 
     if (!symbol) {
@@ -144,8 +142,8 @@ export function AdminTradingAcademy() {
       return;
     }
 
-    if (!entryPrice || !stopLoss || !priceAtCreation) {
-      setMessage("Enter valid decimal prices for entry, stop loss, and creation price.");
+    if (!entryPrice || !stopLoss) {
+      setMessage("Enter valid decimal prices for entry and stop loss.");
       return;
     }
 
@@ -185,8 +183,7 @@ export function AdminTradingAcademy() {
         leverage,
         entry_price: entryPrice,
         stop_loss: stopLoss,
-        take_profits: takeProfits,
-        price_at_creation: priceAtCreation
+        take_profits: takeProfits
       });
 
       if (previousFingerprint !== nextFingerprint) {
@@ -219,12 +216,21 @@ export function AdminTradingAcademy() {
       take_profit_2: takeProfits[1]?.price ?? null,
       take_profit_3: takeProfits[2]?.price ?? null,
       additional_take_profits: takeProfits.slice(3).map((takeProfit) => takeProfit.price),
-      price_at_creation: priceAtCreation,
+      price_at_creation: entryPrice,
       chart_image_url: chartImageUrl,
       notes,
       status,
       updates,
-      final_roi: TRADING_SIGNAL_FINAL_STATUSES.includes(status) ? calculateSignalFinalRoi({ ...existingSignal!, take_profits: takeProfits }) : null
+      final_roi: TRADING_SIGNAL_FINAL_STATUSES.includes(status)
+        ? calculateSignalFinalRoi({
+            ...existingSignal!,
+            direction: signalForm.direction,
+            leverage,
+            entry_price: entryPrice,
+            stop_loss: stopLoss,
+            take_profits: takeProfits
+          })
+        : null
     };
 
     if (!existingSignal) {
@@ -237,7 +243,6 @@ export function AdminTradingAcademy() {
         entryPrice,
         stopLoss,
         takeProfits,
-        priceAtCreation,
         notes,
         createdAt: now
       });
@@ -312,7 +317,6 @@ export function AdminTradingAcademy() {
         isHit: takeProfit.isHit,
         hitAt: takeProfit.hitAt
       })),
-      price_at_creation: String(signal.price_at_creation),
       chart_image_url: signal.chart_image_url ?? "",
       notes: signal.notes ?? ""
     });
@@ -474,17 +478,6 @@ export function AdminTradingAcademy() {
                       inputMode="decimal"
                       value={signalForm.stop_loss}
                       onChange={(event) => setSignalForm((form) => ({ ...form, stop_loss: event.target.value }))}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Creation price
-                    <input
-                      inputMode="decimal"
-                      value={signalForm.price_at_creation}
-                      onChange={(event) =>
-                        setSignalForm((form) => ({ ...form, price_at_creation: event.target.value }))
-                      }
                       required
                     />
                   </label>
@@ -1035,7 +1028,6 @@ function createBlankSignalForm(): SignalFormState {
         hitAt: null
       }
     ],
-    price_at_creation: "",
     chart_image_url: "",
     notes: ""
   };
@@ -1072,7 +1064,6 @@ function buildOriginalSnapshot(input: {
   entryPrice: string | number;
   stopLoss: string | number;
   takeProfits: TradingSignalTakeProfit[];
-  priceAtCreation: string | number;
   notes: string | null;
   createdAt: string;
 }): TradingSignalOriginalSnapshot {
@@ -1084,7 +1075,6 @@ function buildOriginalSnapshot(input: {
     entryPrice: input.entryPrice,
     stopLoss: input.stopLoss,
     takeProfits: input.takeProfits,
-    priceAtCreation: input.priceAtCreation,
     notes: input.notes,
     createdAt: input.createdAt
   };
@@ -1099,7 +1089,6 @@ function buildOriginalSnapshotFromSignal(signal: TradingSignal): TradingSignalOr
     entryPrice: signal.entry_price,
     stopLoss: signal.stop_loss,
     takeProfits: getSignalTakeProfits(signal),
-    priceAtCreation: signal.price_at_creation,
     notes: signal.notes,
     createdAt: signal.created_at
   });
@@ -1116,7 +1105,6 @@ function signalDetailsFingerprint(
         entry_price: string | number;
         stop_loss: string | number;
         take_profits: TradingSignalTakeProfit[];
-        price_at_creation: string | number;
       }
 ): string {
   const takeProfits = "id" in signal ? getSignalTakeProfits(signal) : signal.take_profits;
@@ -1128,7 +1116,6 @@ function signalDetailsFingerprint(
     leverage: Number(signal.leverage ?? 1),
     entryPrice: Number(signal.entry_price),
     stopLoss: Number(signal.stop_loss),
-    priceAtCreation: Number(signal.price_at_creation),
     takeProfits: takeProfits.map((takeProfit) => ({
       price: Number(takeProfit.price),
       positionSizePercent: Number(takeProfit.positionSizePercent)

@@ -62,13 +62,14 @@ export function Charts() {
         </span>
       </section>
 
-      <section className="chart-selector-panel" aria-label="Choose chart asset">
-        <div className="chart-selector-summary">
-          <p className="eyebrow">Select Market</p>
-          <h2>{selectedAsset.title} chart</h2>
-          <span>{selectedAsset.ticker}</span>
+      <section className="chart-market-toolbar" aria-label="Choose chart asset">
+        <div className="chart-market-current">
+          <span>Select Market</span>
+          <strong>{selectedAsset.ticker}</strong>
+          <small>{selectedAsset.title}</small>
         </div>
-        <div className="chart-selector-stack">
+
+        <div className="chart-market-actions">
           <div className="chart-selector" role="tablist" aria-label="Core cryptocurrency chart selector">
             {coreChartAssets.map((asset) => (
               <button
@@ -84,62 +85,65 @@ export function Charts() {
             ))}
           </div>
 
-          <div className="coin-search-panel">
-            <label className="coin-search-label">
-              <Search size={17} aria-hidden="true" />
-              <span className="sr-only">Search top crypto markets</span>
-              <input
-                value={coinSearch}
-                onChange={(event) => setCoinSearch(event.target.value)}
-                placeholder="Search top 200 coins"
-                aria-controls="coin-search-results"
-              />
-            </label>
+          <details className="coin-picker">
+            <summary>Top 200</summary>
+            <div className="coin-search-panel">
+              <label className="coin-search-label">
+                <Search size={17} aria-hidden="true" />
+                <span className="sr-only">Search top crypto markets</span>
+                <input
+                  value={coinSearch}
+                  onChange={(event) => setCoinSearch(event.target.value)}
+                  placeholder="Search top 200 coins"
+                  aria-controls="coin-search-results"
+                />
+              </label>
 
-            <div className="coin-search-meta">
-              <span>Top 200 by market cap</span>
-              <button className="icon-button compact-icon-button" type="button" onClick={() => void loadCoinList()}>
-                <RefreshCw size={15} />
-                <span className="sr-only">Refresh market list</span>
-              </button>
+              <div className="coin-search-meta">
+                <span>Top 200 by market cap</span>
+                <button className="icon-button compact-icon-button" type="button" onClick={() => void loadCoinList()}>
+                  <RefreshCw size={15} />
+                  <span className="sr-only">Refresh market list</span>
+                </button>
+              </div>
+
+              <div className="coin-search-results" id="coin-search-results" role="listbox">
+                {isLoadingCoins ? (
+                  <span className="coin-search-state">Loading markets...</span>
+                ) : coinError ? (
+                  <span className="coin-search-state error">
+                    <AlertCircle size={15} />
+                    {coinError}
+                  </span>
+                ) : filteredCoins.length ? (
+                  filteredCoins.map((coin) => {
+                    const asset = chartAssetFromCoin(coin);
+
+                    return (
+                      <button
+                        className={asset.id === selectedAsset.id ? "coin-option active" : "coin-option"}
+                        type="button"
+                        onClick={() => selectCoin(coin)}
+                        role="option"
+                        aria-selected={asset.id === selectedAsset.id}
+                        key={coin.id}
+                      >
+                        {coin.image && <img src={coin.image} alt="" aria-hidden="true" />}
+                        <span>
+                          <strong>{coin.name}</strong>
+                          <small>
+                            #{coin.rank} {coin.symbol}
+                          </small>
+                        </span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <span className="coin-search-state">No matching markets.</span>
+                )}
+              </div>
             </div>
-
-            <div className="coin-search-results" id="coin-search-results" role="listbox">
-              {isLoadingCoins ? (
-                <span className="coin-search-state">Loading markets...</span>
-              ) : coinError ? (
-                <span className="coin-search-state error">
-                  <AlertCircle size={15} />
-                  {coinError}
-                </span>
-              ) : filteredCoins.length ? (
-                filteredCoins.map((coin) => {
-                  const asset = chartAssetFromCoin(coin);
-
-                  return (
-                    <button
-                      className={asset.id === selectedAsset.id ? "coin-option active" : "coin-option"}
-                      type="button"
-                      onClick={() => selectCoin(coin)}
-                      role="option"
-                      aria-selected={asset.id === selectedAsset.id}
-                      key={coin.id}
-                    >
-                      {coin.image && <img src={coin.image} alt="" aria-hidden="true" />}
-                      <span>
-                        <strong>{coin.name}</strong>
-                        <small>
-                          #{coin.rank} {coin.symbol}
-                        </small>
-                      </span>
-                    </button>
-                  );
-                })
-              ) : (
-                <span className="coin-search-state">No matching markets.</span>
-              )}
-            </div>
-          </div>
+          </details>
         </div>
       </section>
 

@@ -2,17 +2,18 @@ import {
   Crown,
   Headphones,
   LineChart,
-  Medal,
   RefreshCw,
   SearchCheck,
   Send,
-  Trophy
+  Trophy,
+  UserRound
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { useAccountStatus } from "../hooks/useAccountStatus";
 import { formatUsd } from "../lib/accountStatus";
+import { resolvePublicAvatarUrl } from "../lib/avatarUrls";
 import {
   AML_CHECK_PRICE_CENTS,
   fetchTradingAcademyLeaderboard,
@@ -233,6 +234,7 @@ export function TradingAcademyDashboard() {
                 {leaderboard.map((row) => (
                   <li className={`leaderboard-row ${leaderboardRankTone(row.rank)}`} key={row.member_key}>
                     <span className="leaderboard-rank">#{row.rank}</span>
+                    <LeaderboardAvatar row={row} />
                     <span>
                       <strong>{row.display_name}</strong>
                       <small>{row.total_xp} XP</small>
@@ -250,7 +252,7 @@ export function TradingAcademyDashboard() {
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Trading Signals</p>
-                <h2>Admin-posted market setups</h2>
+                <h2>Trading Signals by ASEKE TRADE</h2>
               </div>
               <LineChart size={28} aria-hidden="true" />
             </div>
@@ -290,14 +292,14 @@ export function TradingAcademyDashboard() {
             )}
           </section>
 
-          <section className="dashboard-grid">
+          <section className="dashboard-grid academy-tools-grid">
             <article className="section-panel stack-form academy-tool-panel">
               <div className="compact-tool-heading">
                 <span className="feature-icon">
                   <SearchCheck size={20} />
                 </span>
                 <div>
-                  <h2>Paid AML Check</h2>
+                  <h2>AML Check</h2>
                   <p className="muted">Each request costs {formatUsd(AML_CHECK_PRICE_CENTS)} and is manually reviewed by admin.</p>
                 </div>
               </div>
@@ -340,35 +342,9 @@ export function TradingAcademyDashboard() {
                   {isAmlSubmitting ? "Submitting" : `Submit AML Check - ${formatUsd(AML_CHECK_PRICE_CENTS)}`}
                 </button>
               </form>
+              <CompactAmlHistory requests={amlRequests} />
             </article>
 
-            <article className="section-panel">
-              <h2>AML check history</h2>
-              {amlRequests.length ? (
-                <ul className="plain-list">
-                  {amlRequests.map((request) => (
-                    <li key={request.id}>
-                      <div>
-                        <strong>{request.network} - {shortenAddress(request.address)}</strong>
-                        <span>
-                          {request.status.replace("_", " ")} - {formatDateTime(request.created_at)} -{" "}
-                          {formatUsd(request.amount_charged_cents)}
-                        </span>
-                        {(request.admin_result || request.admin_notes) && (
-                          <span>{request.admin_result ?? request.admin_notes}</span>
-                        )}
-                      </div>
-                      <span className="status-pill free">{request.status.replace("_", " ")}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted">No AML check history yet.</p>
-              )}
-            </article>
-          </section>
-
-          <section className="dashboard-grid">
             <article className="section-panel stack-form academy-tool-panel premium-support-panel">
               <div className="compact-tool-heading">
                 <span className="feature-icon">
@@ -465,33 +441,133 @@ export function TradingAcademyDashboard() {
                   {isSupportSubmitting ? "Sending" : "Send Support Request"}
                 </button>
               </form>
-            </article>
-
-            <article className="section-panel">
-              <h2>Support history</h2>
-              {supportRequests.length ? (
-                <ul className="plain-list">
-                  {supportRequests.map((request) => (
-                    <li key={request.id}>
-                      <div>
-                        <strong>{request.subject}</strong>
-                        <span>
-                          {request.status.replace("_", " ")} - {request.priority} - {formatDateTime(request.created_at)}
-                        </span>
-                        {request.admin_response && <span>{request.admin_response}</span>}
-                      </div>
-                      <Medal size={18} aria-hidden="true" />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted">No premium support requests yet.</p>
-              )}
+              <CompactSupportHistory requests={supportRequests} />
             </article>
           </section>
         </>
       )}
     </main>
+  );
+}
+
+function CompactAmlHistory({ requests }: { requests: AmlCheckRequest[] }) {
+  const recentRequests = requests.slice(0, 3);
+  const olderRequests = requests.slice(3);
+
+  return (
+    <div className="compact-history-panel">
+      <div className="compact-history-heading">
+        <div>
+          <p className="eyebrow">Recent checks</p>
+          <h3>AML history</h3>
+        </div>
+        <span>{requests.length} total</span>
+      </div>
+
+      {requests.length ? (
+        <>
+          <CompactAmlHistoryList requests={recentRequests} />
+          {olderRequests.length > 0 && (
+            <details className="compact-history-details">
+              <summary>View all {requests.length} AML checks</summary>
+              <CompactAmlHistoryList requests={olderRequests} />
+            </details>
+          )}
+        </>
+      ) : (
+        <p className="compact-history-empty">No AML check history yet.</p>
+      )}
+    </div>
+  );
+}
+
+function CompactAmlHistoryList({ requests }: { requests: AmlCheckRequest[] }) {
+  return (
+    <ul className="compact-history-list">
+      {requests.map((request) => (
+        <li className="compact-history-row" key={request.id}>
+          <div>
+            <strong>{request.network} - {shortenAddress(request.address)}</strong>
+            <span>
+              {formatDateTime(request.created_at)} - {formatUsd(request.amount_charged_cents)}
+            </span>
+            {(request.admin_result || request.admin_notes) && (
+              <small>{request.admin_result ?? request.admin_notes}</small>
+            )}
+          </div>
+          <span className="status-pill free">{request.status.replace("_", " ")}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CompactSupportHistory({ requests }: { requests: PremiumSupportRequest[] }) {
+  const recentRequests = requests.slice(0, 3);
+  const olderRequests = requests.slice(3);
+
+  return (
+    <div className="compact-history-panel">
+      <div className="compact-history-heading">
+        <div>
+          <p className="eyebrow">Recent support</p>
+          <h3>Support history</h3>
+        </div>
+        <span>{requests.length} total</span>
+      </div>
+
+      {requests.length ? (
+        <>
+          <CompactSupportHistoryList requests={recentRequests} />
+          {olderRequests.length > 0 && (
+            <details className="compact-history-details">
+              <summary>View all {requests.length} support requests</summary>
+              <CompactSupportHistoryList requests={olderRequests} />
+            </details>
+          )}
+        </>
+      ) : (
+        <p className="compact-history-empty">No premium support requests yet.</p>
+      )}
+    </div>
+  );
+}
+
+function CompactSupportHistoryList({ requests }: { requests: PremiumSupportRequest[] }) {
+  return (
+    <ul className="compact-history-list">
+      {requests.map((request) => (
+        <li className="compact-history-row" key={request.id}>
+          <div>
+            <strong>{request.subject}</strong>
+            <span>
+              {request.status.replace("_", " ")} - {request.priority} - {formatDateTime(request.created_at)}
+            </span>
+            {request.admin_response && <small>{request.admin_response}</small>}
+          </div>
+          <span className="status-pill premium">{request.priority}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LeaderboardAvatar({ row }: { row: TradingAcademyLeaderboardRow }) {
+  const [hasImageError, setHasImageError] = useState(false);
+  const avatarUrl = resolvePublicAvatarUrl(row.avatar_url);
+  const fallbackInitial = row.display_name.trim().charAt(0).toUpperCase() || "A";
+
+  return (
+    <span className="leaderboard-avatar">
+      {avatarUrl && !hasImageError ? (
+        <img src={avatarUrl} alt={`${row.display_name} avatar`} onError={() => setHasImageError(true)} />
+      ) : (
+        <>
+          <UserRound size={16} aria-hidden="true" />
+          <span aria-hidden="true">{fallbackInitial}</span>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -544,7 +620,6 @@ function SignalCard({ signal, showPastSummary = false }: { signal: TradingSignal
             <SignalLevel label="Leverage" value={`${leverage}X`} />
             <SignalLevel label="Entry" value={original?.entryPrice ?? signal.entry_price} />
             <SignalLevel label="SL" value={original?.stopLoss ?? signal.stop_loss} />
-            <SignalLevel label="Creation price" value={original?.priceAtCreation ?? signal.price_at_creation} />
             <SignalLevel label="Opened" value={formatDateTime(original?.createdAt ?? signal.created_at)} />
           </dl>
 
