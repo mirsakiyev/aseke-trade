@@ -5,6 +5,7 @@ import { test } from "node:test";
 const dashboardSource = await readFile(new URL("../src/pages/Dashboard.tsx", import.meta.url), "utf8");
 const adminSource = await readFile(new URL("../src/pages/Admin.tsx", import.meta.url), "utf8");
 const notificationsApiSource = await readFile(new URL("../src/lib/notificationsApi.ts", import.meta.url), "utf8");
+const validationSource = await readFile(new URL("../src/lib/validation.ts", import.meta.url), "utf8");
 const typesSource = await readFile(new URL("../src/types/content.ts", import.meta.url), "utf8");
 const migration = await readFile(
   new URL("../supabase/migrations/202606120006_inbox_notifications.sql", import.meta.url),
@@ -35,9 +36,12 @@ test("dashboard renders inbox, read handling, display name editing, and compact 
     "fetchInboxMessages",
     "markInboxMessageRead",
     "display-name-form",
+    "display-name-static",
+    "isEditingDisplayName",
     "avatar-level-badge",
     "compact-level-panel",
-    "inbox-panel"
+    "inbox-panel",
+    "inbox-message-body"
   ]) {
     assert.match(dashboardSource, new RegExp(expected.replace(/[.]/g, "\\.")));
   }
@@ -61,6 +65,9 @@ test("notification client types and helper validate premium-only delivery", () =
   assert.match(typesSource, /export type InboxMessageType/);
   assert.match(typesSource, /export interface InboxMessage/);
   assert.match(notificationsApiSource, /premiumOnlyTypes/);
+  assert.match(notificationsApiSource, /sanitizeMultilineText\(input\.message, 2400\)/);
+  assert.match(validationSource, /export function sanitizeMultilineText/);
+  assert.match(validationSource, /replace\(\/\\r\\n\?\/g, "\\n"\)/);
   assert.match(notificationsApiSource, /Trading signal notifications are sent automatically when signals are created or updated/);
   assert.match(notificationsApiSource, /Market outlook and trading signal notifications must be sent to premium users/);
   assert.match(notificationsApiSource, /Community messages must be sent to all users/);

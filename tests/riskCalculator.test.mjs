@@ -79,6 +79,24 @@ test("risk calculator warns when manual size exceeds selected risk", () => {
   assert.ok(calculation.result.warnings.includes("Manual size risks more than the selected account risk."));
 });
 
+test("risk calculator warns for crypto volatility risk", () => {
+  const calculation = calculateRisk({
+    symbol: "BTC/USDT",
+    direction: "long",
+    accountBalance: 1000,
+    riskPercent: 3,
+    entryPrice: 100,
+    stopLossPrice: 99.8,
+    takeProfitPrices: [102],
+    leverage: 10,
+    positionSizeMode: "auto"
+  });
+
+  assert.equal(calculation.ok, true);
+  assert.ok(calculation.result.warnings.includes("Crypto risk is above 2% of account balance."));
+  assert.ok(calculation.result.warnings.includes("Stop distance is very tight for volatile crypto markets."));
+});
+
 test("risk calculator rejects an invalid long stop", () => {
   const calculation = calculateRisk({
     symbol: "BTC/USDT",

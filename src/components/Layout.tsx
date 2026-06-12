@@ -15,6 +15,7 @@ import {
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { BtcTicker } from "./BtcTicker";
+import { ScrollMemory } from "./ScrollMemory";
 import { useAuth } from "../contexts/AuthContext";
 import { useAccountStatus } from "../hooks/useAccountStatus";
 import { tradingAcademyNavPath } from "../lib/tradingAcademyAccess";
@@ -53,6 +54,8 @@ export function Layout() {
 
   return (
     <div className="app-shell">
+      <ScrollMemory />
+
       <header className="site-header">
         <Link to="/" className="brand" onClick={closeMenu} aria-label="ASEKE TRADE home">
           <span className="brand-mark" aria-hidden="true">

@@ -129,6 +129,7 @@ export function TradingAcademyDashboard() {
   const [riskForm, setRiskForm] = useState<RiskCalculatorFormState>(() => createBlankRiskForm());
   const [riskResult, setRiskResult] = useState<RiskCalculatorResult | null>(null);
   const [riskErrors, setRiskErrors] = useState<string[]>([]);
+  const [hasRiskCalculated, setHasRiskCalculated] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     if (!user) return;
@@ -254,9 +255,7 @@ export function TradingAcademyDashboard() {
     }
   };
 
-  const submitRiskCalculation = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const calculateCurrentRisk = useCallback(() => {
     const calculation = calculateRisk({
       symbol: "Position",
       direction: riskForm.direction,
@@ -273,11 +272,24 @@ export function TradingAcademyDashboard() {
     if (!calculation.ok) {
       setRiskResult(null);
       setRiskErrors(calculation.errors);
-      return;
+      return false;
     }
 
     setRiskErrors([]);
     setRiskResult(calculation.result);
+    return true;
+  }, [riskForm]);
+
+  useEffect(() => {
+    if (!hasRiskCalculated) return;
+
+    calculateCurrentRisk();
+  }, [calculateCurrentRisk, hasRiskCalculated]);
+
+  const submitRiskCalculation = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setHasRiskCalculated(true);
+    calculateCurrentRisk();
   };
 
   const updateRiskForm = (field: RiskCalculatorEditableField, value: string) => {
@@ -311,6 +323,7 @@ export function TradingAcademyDashboard() {
     setRiskForm(createBlankRiskForm());
     setRiskResult(null);
     setRiskErrors([]);
+    setHasRiskCalculated(false);
   };
 
   return (
@@ -799,9 +812,8 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
       <p className="risk-start-line">{result ? `${result.direction.toUpperCase()} position plan` : "Enter Account Balance to start"}</p>
 
       <div className="risk-position-card">
-        <span>Position Size</span>
-        <strong>{result ? formatRiskNumber(result.positionSizeUnits) : "--"} coins</strong>
-        <small>{result ? formatUsdAmount(result.notionalPositionValue) : "$--"} total value</small>
+        <span>Position Value</span>
+        <strong>{result ? formatUsdAmount(result.notionalPositionValue) : "$--"}</strong>
       </div>
 
       <dl className="risk-summary-list">
@@ -810,7 +822,7 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
           label="Risk Distance"
           value={result ? `${formatUsdAmount(result.stopDistance)} (${formatPercentValue(result.stopDistancePercent)})` : "$-- (--)"}
         />
-        <RiskMetricRow label="Position Value" value={result ? formatUsdAmount(result.notionalPositionValue) : "$--"} />
+        <RiskMetricRow label="Margin Required" value={result ? formatUsdAmount(result.marginRequired) : "$--"} />
       </dl>
 
       <section className="risk-breakdown-card">
@@ -836,9 +848,9 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
         </div>
         <div className="risk-assessment-scale">
           <span>0%</span>
+          <span>1%</span>
           <span>2%</span>
-          <span>5%</span>
-          <span>10%+</span>
+          <span>5%+</span>
         </div>
         <strong>{assessment.valueLabel}</strong>
         <span>{assessment.label}</span>
@@ -1137,13 +1149,13 @@ function getRiskAssessment(accountRiskPercent: number | null): {
     return { label: "CONSERVATIVE", positionPercent: 0, valueLabel: "--%" };
   }
 
-  const positionPercent = Math.min(100, Math.max(0, (accountRiskPercent / 10) * 100));
+  const positionPercent = Math.min(100, Math.max(0, (accountRiskPercent / 5) * 100));
   const label =
-    accountRiskPercent <= 2
+    accountRiskPercent <= 1
       ? "CONSERVATIVE"
-      : accountRiskPercent <= 5
-        ? "BALANCED"
-        : accountRiskPercent <= 10
+      : accountRiskPercent <= 2
+        ? "MODERATE"
+        : accountRiskPercent <= 5
           ? "AGGRESSIVE"
           : "HIGH RISK";
 

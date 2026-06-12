@@ -82,8 +82,14 @@ export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
   const marginUsedPercent = (marginRequired / input.accountBalance) * 100;
   const validTakeProfitPrices = input.takeProfitPrices.filter(isPositive);
 
-  if (input.riskPercent > 3) {
-    warnings.push("Risk is above 3% of account balance.");
+  if (input.riskPercent > 5) {
+    warnings.push("Crypto risk is above 5% of account balance.");
+  } else if (input.riskPercent > 2) {
+    warnings.push("Crypto risk is above 2% of account balance.");
+  }
+
+  if (stopDistancePercent < 0.5) {
+    warnings.push("Stop distance is very tight for volatile crypto markets.");
   }
 
   if (input.positionSizeMode === "manual" && estimatedLoss > riskAmount) {
@@ -92,6 +98,8 @@ export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
 
   if (marginRequired > input.accountBalance) {
     warnings.push("Required margin is higher than account balance.");
+  } else if (marginUsedPercent > 50) {
+    warnings.push("Margin used is high for volatile crypto markets.");
   }
 
   const takeProfits = validTakeProfitPrices.map((price, index) => {

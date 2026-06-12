@@ -29,6 +29,14 @@ export function sanitizePlainText(value: string, maxLength = 8000): string {
     .slice(0, maxLength);
 }
 
+export function sanitizeMultilineText(value: string, maxLength = 8000): string {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim()
+    .slice(0, maxLength);
+}
+
 export function slugify(value: string): string {
   return sanitizePlainText(value, 120)
     .toLowerCase()

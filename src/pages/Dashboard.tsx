@@ -5,6 +5,7 @@ import {
   BookMarked,
   Camera,
   Crown,
+  Edit3,
   GraduationCap,
   Mail,
   MailOpen,
@@ -86,10 +87,12 @@ export function Dashboard() {
   const [displayNameInput, setDisplayNameInput] = useState("");
   const [nameMessage, setNameMessage] = useState<string | null>(null);
   const [isNameSaving, setIsNameSaving] = useState(false);
+  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [error, setError] = useState<string | null>(null);
   const totalXP = profile?.total_xp ?? 0;
   const levelProgress = getProgressToNextLevel(totalXP);
+  const displayName = profile?.full_name ?? profile?.username ?? user?.email ?? "Account";
   const unreadInboxCount = inboxMessages.filter((message) => !message.is_read).length;
   const filteredInboxMessages = useMemo(
     () => inboxMessages.filter((message) => matchesInboxFilter(message, inboxFilter)),
@@ -101,8 +104,10 @@ export function Dashboard() {
   );
 
   useEffect(() => {
-    setDisplayNameInput(profile?.full_name ?? profile?.username ?? user?.email?.split("@")[0] ?? "");
-  }, [profile?.full_name, profile?.username, user?.email]);
+    if (!isEditingDisplayName) {
+      setDisplayNameInput(profile?.full_name ?? profile?.username ?? user?.email?.split("@")[0] ?? "");
+    }
+  }, [isEditingDisplayName, profile?.full_name, profile?.username, user?.email]);
 
   useEffect(() => {
     let mounted = true;
@@ -233,9 +238,22 @@ export function Dashboard() {
     } else {
       setNameMessage("Display name updated.");
       await refreshProfile();
+      setIsEditingDisplayName(false);
     }
 
     setIsNameSaving(false);
+  };
+
+  const startEditingDisplayName = () => {
+    setDisplayNameInput(profile?.full_name ?? profile?.username ?? user?.email?.split("@")[0] ?? "");
+    setNameMessage(null);
+    setIsEditingDisplayName(true);
+  };
+
+  const cancelEditingDisplayName = () => {
+    setDisplayNameInput(profile?.full_name ?? profile?.username ?? user?.email?.split("@")[0] ?? "");
+    setNameMessage(null);
+    setIsEditingDisplayName(false);
   };
 
   const openInboxMessage = async (message: InboxMessage) => {
@@ -297,25 +315,43 @@ export function Dashboard() {
             </div>
           </div>
           {avatarMessage && <p className="soft-notice">{avatarMessage}</p>}
-          <form className="display-name-form" onSubmit={saveDisplayName}>
-            <label>
-              Display name
-              <input
-                value={displayNameInput}
-                onChange={(event) => setDisplayNameInput(event.target.value)}
-                maxLength={40}
-              />
-            </label>
-            <button className="ghost-button compact" type="submit" disabled={isNameSaving}>
-              <Save size={16} />
-              {isNameSaving ? "Saving" : "Save"}
-            </button>
-          </form>
+          {isEditingDisplayName ? (
+            <form className="display-name-form" onSubmit={saveDisplayName}>
+              <label>
+                Display name
+                <input
+                  value={displayNameInput}
+                  onChange={(event) => setDisplayNameInput(event.target.value)}
+                  maxLength={40}
+                />
+              </label>
+              <div className="display-name-actions">
+                <button className="ghost-button compact" type="submit" disabled={isNameSaving}>
+                  <Save size={16} />
+                  {isNameSaving ? "Saving" : "Save"}
+                </button>
+                <button className="ghost-button compact" type="button" onClick={cancelEditingDisplayName}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="display-name-static">
+              <div>
+                <span>Display name</span>
+                <strong>{displayName}</strong>
+              </div>
+              <button className="ghost-button compact" type="button" onClick={startEditingDisplayName}>
+                <Edit3 size={16} />
+                Change name
+              </button>
+            </div>
+          )}
           {nameMessage && <p className="soft-notice">{nameMessage}</p>}
           <dl className="detail-list">
             <div>
               <dt>Name</dt>
-              <dd>{profile?.full_name ?? profile?.username ?? user?.email ?? "Account"}</dd>
+              <dd>{displayName}</dd>
             </div>
             <div>
               <dt>Email</dt>
@@ -399,7 +435,7 @@ export function Dashboard() {
                   </div>
                   <h3>{selectedInboxMessage.title}</h3>
                   {selectedInboxMessage.summary && <p className="muted">{selectedInboxMessage.summary}</p>}
-                  <p>{selectedInboxMessage.message}</p>
+                  <p className="inbox-message-body">{selectedInboxMessage.message}</p>
                   {selectedInboxMessage.related_signal_id && (
                     <p className="muted">Signal ID: {selectedInboxMessage.related_signal_id}</p>
                   )}

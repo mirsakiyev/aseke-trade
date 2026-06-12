@@ -964,6 +964,43 @@ p {
   margin-bottom: 0.75rem;
 }
 
+.display-name-actions {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.display-name-static {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0.72rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.035);
+}
+
+.display-name-static span,
+.display-name-static strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.display-name-static span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.display-name-static strong {
+  color: var(--platinum);
+  font-size: 0.92rem;
+}
+
 .display-name-form label {
   gap: 0.35rem;
 }
@@ -1054,11 +1091,29 @@ p {
 }
 
 .dashboard-inbox-card .inbox-list {
-  max-height: 258px;
+  max-height: 348px;
 }
 
 .dashboard-inbox-card .inbox-detail-panel {
-  min-height: 196px;
+  min-height: 292px;
+}
+
+.dashboard-access-card,
+.dashboard-level-card {
+  align-content: start;
+  gap: 0.55rem;
+  padding-block: 0.9rem;
+}
+
+.dashboard-access-card .feature-icon {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 0.45rem;
+}
+
+.dashboard-access-card p {
+  margin: 0;
+  line-height: 1.42;
 }
 
 .inbox-filter-row {
@@ -1173,6 +1228,10 @@ p {
 .inbox-detail-panel h3,
 .inbox-detail-panel p {
   margin: 0;
+}
+
+.inbox-message-body {
+  white-space: pre-wrap;
 }
 
 .inbox-detail-empty {
@@ -3457,7 +3516,7 @@ select:focus {
   overflow: hidden;
   height: 5px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #12a373 0 20%, #f5a524 20% 50%, #d04348 50% 100%);
+  background: linear-gradient(90deg, #12a373 0 20%, #f5a524 20% 40%, #d04348 40% 100%);
 }
 
 .risk-assessment-fill {
@@ -3490,11 +3549,11 @@ select:focus {
   color: #31d294;
 }
 
-.risk-assessment-scale span:nth-child(2) {
+.risk-assessment-scale span:nth-child(2),
+.risk-assessment-scale span:nth-child(3) {
   color: #f5a524;
 }
 
-.risk-assessment-scale span:nth-child(3),
 .risk-assessment-scale span:nth-child(4) {
   color: #ff4d55;
 }

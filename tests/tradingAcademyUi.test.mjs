@@ -37,10 +37,15 @@ test("academy dashboard includes a subscriber risk calculator", () => {
   assert.match(dashboardSource, /addRiskTakeProfit/);
   assert.match(dashboardSource, /removeRiskTakeProfit/);
   assert.match(dashboardSource, /riskLeverageOptions/);
+  assert.match(dashboardSource, /hasRiskCalculated/);
+  assert.match(dashboardSource, /calculateCurrentRisk/);
+  assert.match(dashboardSource, /Position Value/);
   assert.doesNotMatch(dashboardSource, /riskForm\.symbol|<label>\s*Pair/);
+  assert.doesNotMatch(dashboardSource, /coins/);
   assert.doesNotMatch(dashboardSource, /placeholder="(?:63404|62555|64444|65555|66666)"/);
   assert.match(dashboardSource, /Risk Breakdown/);
   assert.match(dashboardSource, /Risk Assessment/);
+  assert.match(dashboardSource, /5%\+/);
 });
 
 test("charts market picker is a compact toolbar above the TradingView chart", () => {

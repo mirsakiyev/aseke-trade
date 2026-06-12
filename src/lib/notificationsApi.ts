@@ -1,6 +1,6 @@
 import type { InboxMessage, InboxMessageType, InboxTargetAudience } from "../types/content";
 import { supabase } from "./supabase";
-import { sanitizePlainText } from "./validation";
+import { sanitizeMultilineText, sanitizePlainText } from "./validation";
 
 const premiumOnlyTypes = new Set<InboxMessageType>(["market_outlook", "trading_signal"]);
 
@@ -71,7 +71,7 @@ export function buildNotificationPayload(input: {
 
   const title = sanitizePlainText(input.title, 180);
   const summary = sanitizePlainText(input.summary ?? "", 260);
-  const message = sanitizePlainText(input.message, 2400);
+  const message = sanitizeMultilineText(input.message, 2400);
   const relatedSignalId = sanitizePlainText(input.relatedSignalId ?? "", 80);
 
   if (!title) throw new Error("Notification title is required.");
