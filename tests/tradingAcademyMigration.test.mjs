@@ -6,6 +6,10 @@ const migration = await readFile(
   new URL("../supabase/migrations/202606120001_trading_academy_dashboard.sql", import.meta.url),
   "utf8"
 );
+const signalReworkMigration = await readFile(
+  new URL("../supabase/migrations/202606120003_rework_trading_signals.sql", import.meta.url),
+  "utf8"
+);
 
 test("migration defines Trading Academy access, leaderboard, signals, AML, and support models", () => {
   for (const expected of [
@@ -42,4 +46,23 @@ test("Academy dashboard tables have row level security policies", () => {
   assert.match(migration, /alter table public\.premium_support_requests enable row level security/i);
   assert.match(migration, /public\.has_premium_access\(\)/i);
   assert.match(migration, /public\.is_admin\(\)/i);
+});
+
+test("trading signal rework adds leverage, timeline, TP allocation, and subscriber-only signal access", () => {
+  for (const expected of [
+    "leverage integer",
+    "generated_title text",
+    "take_profits jsonb",
+    "original_signal jsonb",
+    "updates jsonb",
+    "final_roi numeric"
+  ]) {
+    assert.match(signalReworkMigration, new RegExp(expected.replace(/[.]/g, "\\."), "i"));
+  }
+
+  assert.match(signalReworkMigration, /public\.validate_trading_signal_take_profits/i);
+  assert.match(signalReworkMigration, /new\.created_at := old\.created_at/i);
+  assert.match(signalReworkMigration, /new\.original_signal := old\.original_signal/i);
+  assert.match(signalReworkMigration, /public\.has_premium_access\(\)/i);
+  assert.doesNotMatch(signalReworkMigration, /and is_active = true/i);
 });

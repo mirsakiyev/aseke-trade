@@ -33,7 +33,7 @@ export async function fetchTradingSignals(options: { includeInactive?: boolean }
 
   let query = supabase.from("trading_signals").select("*").order("created_at", { ascending: false });
   if (!options.includeInactive) {
-    query = query.eq("is_active", true).neq("status", "draft");
+    query = query.in("status", ["active", "hit_tp", "hit_sl", "manually_closed"]);
   }
 
   const { data, error } = await query;

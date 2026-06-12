@@ -23,13 +23,23 @@ import {
   submitPremiumSupportRequest
 } from "../lib/tradingAcademyApi";
 import { leaderboardRankTone } from "../lib/tradingAcademyAccess";
+import {
+  TRADING_SIGNAL_FINAL_STATUSES,
+  calculateSignalFinalRoi,
+  formatPercent,
+  formatSignalStatus,
+  generateSignalTitle,
+  getSignalTakeProfits,
+  getSignalUpdates
+} from "../lib/tradingSignals";
 import { sanitizePlainText } from "../lib/validation";
 import type {
   AmlCheckRequest,
   PremiumSupportPriority,
   PremiumSupportRequest,
   TradingAcademyLeaderboardRow,
-  TradingSignal
+  TradingSignal,
+  TradingSignalTakeProfit
 } from "../types/content";
 
 const blankAmlForm = {
@@ -94,6 +104,11 @@ export function TradingAcademyDashboard() {
   const displayName = useMemo(
     () => profile?.full_name ?? profile?.username ?? user?.email ?? "Academy learner",
     [profile, user]
+  );
+  const activeSignals = useMemo(() => signals.filter((signal) => signal.status === "active"), [signals]);
+  const pastTrades = useMemo(
+    () => signals.filter((signal) => TRADING_SIGNAL_FINAL_STATUSES.includes(signal.status)),
+    [signals]
   );
 
   const submitAml = async (event: FormEvent<HTMLFormElement>) => {
@@ -239,39 +254,33 @@ export function TradingAcademyDashboard() {
               </div>
               <LineChart size={28} aria-hidden="true" />
             </div>
-            {signals.length ? (
+            {activeSignals.length ? (
               <div className="signal-grid">
-                {signals.map((signal) => (
-                  <article className="signal-card" key={signal.id}>
-                    {signal.chart_image_url ? (
-                      <img className="signal-chart-image" src={signal.chart_image_url} alt="" />
-                    ) : (
-                      <div className="signal-chart-empty">Chart pending</div>
-                    )}
-                    <div className="signal-card-body">
-                      <div className="lesson-title-line">
-                        <div>
-                          <p className="eyebrow">{signal.direction.toUpperCase()}</p>
-                          <h3>{signal.title || signal.symbol}</h3>
-                        </div>
-                        <span className="status-pill premium">{signal.status.replace("_", " ")}</span>
-                      </div>
-                      <dl className="signal-level-grid">
-                        <SignalLevel label="Entry" value={signal.entry_price} />
-                        <SignalLevel label="SL" value={signal.stop_loss} />
-                        <SignalLevel label="TP1" value={signal.take_profit_1} />
-                        <SignalLevel label="TP2" value={signal.take_profit_2} />
-                        <SignalLevel label="TP3" value={signal.take_profit_3} />
-                        <SignalLevel label="Creation price" value={signal.price_at_creation} />
-                      </dl>
-                      {signal.notes && <p className="muted">{signal.notes}</p>}
-                      <small className="muted">Posted {formatDateTime(signal.created_at)}</small>
-                    </div>
-                  </article>
+                {activeSignals.map((signal) => (
+                  <SignalCard signal={signal} key={signal.id} />
                 ))}
               </div>
             ) : (
-              <p className="muted">No trading signals have been posted yet.</p>
+              <p className="muted">No active trading signals have been posted yet.</p>
+            )}
+          </section>
+
+          <section className="section-panel page-stack">
+            <div className="lesson-title-line">
+              <div>
+                <p className="eyebrow">Past Trades</p>
+                <h2>Completed signal history</h2>
+              </div>
+              <Trophy size={28} aria-hidden="true" />
+            </div>
+            {pastTrades.length ? (
+              <div className="signal-grid">
+                {pastTrades.map((signal) => (
+                  <SignalCard signal={signal} showPastSummary key={signal.id} />
+                ))}
+              </div>
+            ) : (
+              <p className="muted">Completed Trading Academy signals will appear here.</p>
             )}
           </section>
 
@@ -443,6 +452,101 @@ function SignalLevel({ label, value }: { label: string; value: string | number }
   );
 }
 
+function SignalCard({ signal, showPastSummary = false }: { signal: TradingSignal; showPastSummary?: boolean }) {
+  const original = signal.original_signal;
+  const currentTakeProfits = getSignalTakeProfits(signal);
+  const displayTakeProfits = original?.takeProfits?.length
+    ? original.takeProfits.map((takeProfit, index) => mergeTakeProfitHitState(takeProfit, currentTakeProfits[index]))
+    : currentTakeProfits;
+  const updates = getSignalUpdates(signal);
+  const title =
+    original?.generatedTitle ||
+    signal.generated_title ||
+    signal.title ||
+    generateSignalTitle(signal.direction, signal.leverage ?? 1);
+  const direction = original?.direction ?? signal.direction;
+  const leverage = original?.leverage ?? signal.leverage ?? 1;
+  const finalRoi = signal.final_roi ?? calculateSignalFinalRoi(signal);
+
+  return (
+    <article className="signal-card">
+      {signal.chart_image_url ? (
+        <img className="signal-chart-image" src={signal.chart_image_url} alt="" />
+      ) : (
+        <div className="signal-chart-empty">Chart pending</div>
+      )}
+      <div className="signal-card-body">
+        <div className="lesson-title-line">
+          <div>
+            <p className="eyebrow">{signal.symbol}</p>
+            <h3>{title}</h3>
+          </div>
+          <span className={`status-pill ${signal.status === "hit_sl" ? "danger" : "premium"}`}>
+            {formatSignalStatus(signal.status)}
+          </span>
+        </div>
+
+        <dl className="signal-level-grid">
+          <SignalLevel label="Direction" value={direction.toUpperCase()} />
+          <SignalLevel label="Leverage" value={`${leverage}X`} />
+          <SignalLevel label="Entry" value={original?.entryPrice ?? signal.entry_price} />
+          <SignalLevel label="SL" value={original?.stopLoss ?? signal.stop_loss} />
+          <SignalLevel label="Creation price" value={original?.priceAtCreation ?? signal.price_at_creation} />
+          <SignalLevel label="Opened" value={formatDateTime(original?.createdAt ?? signal.created_at)} />
+        </dl>
+
+        <div className="signal-detail-block">
+          <h4>Take Profits</h4>
+          <ul className="signal-tp-list">
+            {displayTakeProfits.map((takeProfit, index) => (
+              <li className={takeProfit.isHit ? "hit" : ""} key={takeProfit.id}>
+                <strong>TP{index + 1}: {formatSignalPrice(takeProfit.price)}</strong>
+                <span>
+                  {formatPercent(takeProfit.positionSizePercent)}% - {takeProfit.isHit ? "Hit" : "Pending"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {showPastSummary && (
+          <dl className="signal-level-grid">
+            <SignalLevel label="Final status" value={formatSignalStatus(signal.status)} />
+            <SignalLevel label="Final price" value={signal.final_price ?? signal.manual_close_price ?? signal.stop_loss} />
+            <SignalLevel label="Closed" value={signal.closed_at ? formatDateTime(signal.closed_at) : "Pending"} />
+            <SignalLevel label="Final ROI" value={finalRoi === null ? "N/A" : formatRoi(finalRoi)} />
+          </dl>
+        )}
+
+        {(original?.notes || signal.notes) && <p className="muted">{original?.notes ?? signal.notes}</p>}
+
+        <div className="signal-detail-block">
+          <h4>Updates</h4>
+          <ol className="signal-timeline">
+            {updates.map((update) => (
+              <li key={update.id}>
+                <time>{formatDateTime(update.createdAt)}</time>
+                <span>{update.message}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function mergeTakeProfitHitState(
+  originalTakeProfit: TradingSignalTakeProfit,
+  currentTakeProfit: TradingSignalTakeProfit | undefined
+): TradingSignalTakeProfit {
+  return {
+    ...originalTakeProfit,
+    isHit: currentTakeProfit?.isHit ?? originalTakeProfit.isHit,
+    hitAt: currentTakeProfit?.hitAt ?? originalTakeProfit.hitAt
+  };
+}
+
 function formatSignalPrice(value: string | number): string {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) return String(value);
@@ -450,6 +554,15 @@ function formatSignalPrice(value: string | number): string {
   return numericValue.toLocaleString("en-US", {
     maximumFractionDigits: 10
   });
+}
+
+function formatRoi(value: string | number): string {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return String(value);
+
+  return `${numericValue >= 0 ? "+" : ""}${numericValue.toLocaleString("en-US", {
+    maximumFractionDigits: 2
+  })}%`;
 }
 
 function formatDateTime(value: string): string {

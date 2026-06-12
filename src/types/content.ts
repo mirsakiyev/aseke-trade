@@ -239,25 +239,67 @@ export interface AccountBalanceTransaction {
   created_at: string;
 }
 
-export type TradingSignalDirection = "long" | "short" | "spot" | "update";
-export type TradingSignalStatus = "draft" | "active" | "closed" | "cancelled" | "hit_tp" | "hit_sl";
+export type TradingSignalDirection = "long" | "short";
+export type TradingSignalStatus = "active" | "hit_tp" | "hit_sl" | "manually_closed";
+export type TradingSignalUpdateType = "signal_created" | "signal_edited" | "note" | "tp_hit" | "sl_hit" | "manual_close";
+
+export interface TradingSignalTakeProfit {
+  id: string;
+  price: string | number;
+  positionSizePercent: string | number;
+  position_size_percent?: string | number;
+  isHit: boolean;
+  is_hit?: boolean;
+  hitAt: string | null;
+  hit_at?: string | null;
+}
+
+export interface TradingSignalUpdate {
+  id: string;
+  type: TradingSignalUpdateType;
+  message: string;
+  createdAt: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface TradingSignalOriginalSnapshot {
+  generatedTitle: string;
+  symbol: string;
+  direction: TradingSignalDirection;
+  leverage: number;
+  entryPrice: string | number;
+  stopLoss: string | number;
+  takeProfits: TradingSignalTakeProfit[];
+  priceAtCreation: string | number;
+  notes: string | null;
+  createdAt: string;
+}
 
 export interface TradingSignal {
   id: string;
   title: string | null;
+  generated_title: string | null;
   symbol: string;
   direction: TradingSignalDirection;
+  leverage: number;
   entry_price: string | number;
   stop_loss: string | number;
-  take_profit_1: string | number;
-  take_profit_2: string | number;
-  take_profit_3: string | number;
-  additional_take_profits: Array<string | number>;
+  take_profits: TradingSignalTakeProfit[] | null;
+  take_profit_1?: string | number | null;
+  take_profit_2?: string | number | null;
+  take_profit_3?: string | number | null;
+  additional_take_profits?: Array<string | number> | null;
   price_at_creation: string | number;
   chart_image_url: string | null;
   notes: string | null;
   status: TradingSignalStatus;
-  is_active: boolean;
+  updates: TradingSignalUpdate[] | null;
+  original_signal: TradingSignalOriginalSnapshot | null;
+  closed_at: string | null;
+  manual_close_price: string | number | null;
+  final_price: string | number | null;
+  final_roi: string | number | null;
+  is_active?: boolean;
   created_by_admin_id: string | null;
   created_at: string;
   updated_at: string;
