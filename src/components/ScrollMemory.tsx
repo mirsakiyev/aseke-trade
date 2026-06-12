@@ -7,7 +7,7 @@ type ScrollPosition = {
 };
 
 const scrollPositions = new Map<string, ScrollPosition>();
-const restoreDurationMs = 2200;
+const restoreDurationMs = 7000;
 
 function createScrollKey(pathname: string, search: string, hash: string): string {
   return `${pathname}${search}${hash}`;
@@ -31,13 +31,14 @@ function scrollToPosition(position: ScrollPosition) {
   document.documentElement.style.scrollBehavior = previousBehavior;
 }
 
-function restoreScrollPosition(scrollKey: string): () => void {
+function restoreScrollPosition(scrollKey: string, onRestoringChange: (isRestoring: boolean) => void): () => void {
   const savedPosition = scrollPositions.get(scrollKey);
   if (!savedPosition) return () => undefined;
 
   let animationFrame = 0;
   let isCancelled = false;
   const startedAt = Date.now();
+  onRestoringChange(true);
 
   const restore = () => {
     if (isCancelled) return;
@@ -56,7 +57,10 @@ function restoreScrollPosition(scrollKey: string): () => void {
 
     scrollToPosition(targetPosition);
 
-    if ((isAtTarget && isPageTallEnough && isPageWideEnough) || isExpired) return;
+    if ((isAtTarget && isPageTallEnough && isPageWideEnough) || isExpired) {
+      onRestoringChange(false);
+      return;
+    }
     animationFrame = window.requestAnimationFrame(restore);
   };
 
@@ -64,6 +68,7 @@ function restoreScrollPosition(scrollKey: string): () => void {
 
   return () => {
     isCancelled = true;
+    onRestoringChange(false);
     window.cancelAnimationFrame(animationFrame);
   };
 }
@@ -76,6 +81,7 @@ export function ScrollMemory() {
   );
   const scrollKeyRef = useRef(scrollKey);
   const cancelRestoreRef = useRef<() => void>(() => undefined);
+  const isRestoringRef = useRef(false);
 
   useEffect(() => {
     if ("scrollRestoration" in window.history) {
@@ -89,13 +95,17 @@ export function ScrollMemory() {
     saveScrollPosition(scrollKeyRef.current);
     scrollKeyRef.current = scrollKey;
     cancelRestoreRef.current();
-    cancelRestoreRef.current = restoreScrollPosition(scrollKey);
+    cancelRestoreRef.current = restoreScrollPosition(scrollKey, (isRestoring) => {
+      isRestoringRef.current = isRestoring;
+    });
   }, [scrollKey]);
 
   useEffect(() => {
     let pendingFrame = 0;
 
-    const saveCurrentScroll = () => {
+    const saveCurrentScroll = (force = false) => {
+      if (!force && (document.visibilityState !== "visible" || isRestoringRef.current)) return;
+
       saveScrollPosition(scrollKeyRef.current);
     };
 
@@ -110,12 +120,14 @@ export function ScrollMemory() {
 
     const restoreCurrentScroll = () => {
       cancelRestoreRef.current();
-      cancelRestoreRef.current = restoreScrollPosition(scrollKeyRef.current);
+      cancelRestoreRef.current = restoreScrollPosition(scrollKeyRef.current, (isRestoring) => {
+        isRestoringRef.current = isRestoring;
+      });
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        saveCurrentScroll();
+        saveCurrentScroll(true);
         return;
       }
 
@@ -123,11 +135,12 @@ export function ScrollMemory() {
         restoreCurrentScroll();
       }
     };
+    const handlePageHide = () => saveCurrentScroll(true);
 
     window.addEventListener("scroll", queueSaveCurrentScroll, { passive: true });
     window.addEventListener("resize", queueSaveCurrentScroll);
     window.addEventListener("focus", restoreCurrentScroll);
-    window.addEventListener("pagehide", saveCurrentScroll);
+    window.addEventListener("pagehide", handlePageHide);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
@@ -137,7 +150,7 @@ export function ScrollMemory() {
       window.removeEventListener("scroll", queueSaveCurrentScroll);
       window.removeEventListener("resize", queueSaveCurrentScroll);
       window.removeEventListener("focus", restoreCurrentScroll);
-      window.removeEventListener("pagehide", saveCurrentScroll);
+      window.removeEventListener("pagehide", handlePageHide);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);

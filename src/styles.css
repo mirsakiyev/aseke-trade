@@ -885,6 +885,7 @@ p {
 
 .dashboard-inbox-card {
   grid-area: inbox;
+  min-height: 500px;
 }
 
 .dashboard-access-card {
@@ -1088,20 +1089,21 @@ p {
 
 .dashboard-inbox-card .inbox-layout {
   grid-template-columns: minmax(230px, 0.66fr) minmax(0, 1fr);
+  min-height: 360px;
 }
 
 .dashboard-inbox-card .inbox-list {
-  max-height: 348px;
+  max-height: 430px;
 }
 
 .dashboard-inbox-card .inbox-detail-panel {
-  min-height: 292px;
+  min-height: 360px;
 }
 
 .dashboard-access-card,
 .dashboard-level-card {
   align-content: start;
-  gap: 0.55rem;
+  gap: 0.65rem;
   padding-block: 0.9rem;
 }
 
@@ -1111,9 +1113,9 @@ p {
   margin-bottom: 0.45rem;
 }
 
-.dashboard-access-card p {
-  margin: 0;
-  line-height: 1.42;
+.dashboard-access-card .inline-actions {
+  align-items: stretch;
+  flex-direction: column;
 }
 
 .inbox-filter-row {
@@ -3255,6 +3257,11 @@ select:focus {
   color: #f8fbfc;
 }
 
+.risk-mode-toggle button {
+  min-height: 38px;
+  font-size: 0.82rem;
+}
+
 .risk-prefixed-input {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
@@ -3297,6 +3304,26 @@ select:focus {
 .risk-form-grid select {
   min-height: 38px;
   padding: 0.55rem 0.62rem;
+}
+
+.risk-derived-line,
+.risk-education-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.risk-derived-line {
+  display: block;
+}
+
+.risk-education-note {
+  margin: 0;
+  padding: 0.72rem;
+  border: 1px solid rgba(229, 228, 226, 0.1);
+  border-radius: 8px;
+  background: rgba(5, 6, 7, 0.24);
 }
 
 .risk-tp-editor,

@@ -1,4 +1,5 @@
 export type RiskDirection = "long" | "short";
+export type RiskValueMode = "percentage" | "price";
 export type PositionSizeMode = "auto" | "manual";
 
 export interface RiskCalculatorInput {
@@ -7,16 +8,19 @@ export interface RiskCalculatorInput {
   accountBalance: number;
   riskPercent: number;
   entryPrice: number;
-  stopLossPrice: number;
-  takeProfitPrices: number[];
+  stopLossMode: RiskValueMode;
+  stopLossValue: number;
+  takeProfitMode: RiskValueMode;
+  takeProfitValues: number[];
   leverage: number;
   positionSizeMode: PositionSizeMode;
-  manualPositionSize?: number;
+  manualNotionalValue?: number;
 }
 
 export interface RiskTakeProfitResult {
   label: string;
   price: number;
+  percent: number;
   profitAmount: number;
   riskReward: number;
 }
@@ -24,15 +28,29 @@ export interface RiskTakeProfitResult {
 export interface RiskCalculatorResult {
   symbol: string;
   direction: RiskDirection;
+  accountBalance: number;
   riskAmount: number;
+  selectedRiskAmount: number;
+  selectedRiskPercent: number;
+  actualRiskAmount: number;
+  actualRiskPercent: number;
   accountRiskPercent: number;
+  stopLossPrice: number;
+  stopLossPercent: number;
   stopDistance: number;
   stopDistancePercent: number;
   positionRiskPercent: number;
   positionSizeUnits: number;
   notionalPositionValue: number;
+  leverage: number;
   marginRequired: number;
   marginUsedPercent: number;
+  marginShortfall: number;
+  requiredLeverage: number;
+  maxPositionValueAtSelectedLeverage: number;
+  maxAffordablePositionValue: number;
+  maxAffordableCoinQuantity: number;
+  isExecutable: boolean;
   estimatedLoss: number;
   takeProfits: RiskTakeProfitResult[];
   warnings: string[];
@@ -45,71 +63,102 @@ export type RiskCalculation =
 export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const symbol = input.symbol.trim();
 
-  if (!input.symbol.trim()) errors.push("Symbol is required.");
+  if (!symbol) errors.push("Symbol is required.");
   if (!isPositive(input.accountBalance)) errors.push("Account balance must be greater than zero.");
   if (!isPositive(input.riskPercent)) errors.push("Risk percent must be greater than zero.");
   if (!isPositive(input.entryPrice)) errors.push("Entry price must be greater than zero.");
-  if (!isPositive(input.stopLossPrice)) errors.push("Stop loss must be greater than zero.");
+  if (!isPositive(input.stopLossValue)) {
+    errors.push(
+      input.stopLossMode === "percentage"
+        ? "Stop loss percentage must be greater than zero."
+        : "Stop loss price must be greater than zero."
+    );
+  }
   if (!isPositive(input.leverage)) errors.push("Leverage must be greater than zero.");
-  if (input.positionSizeMode === "manual" && !isPositive(input.manualPositionSize)) {
-    errors.push("Manual position size must be greater than zero.");
+  if (input.positionSizeMode === "manual" && !isPositive(input.manualNotionalValue)) {
+    errors.push("Manual notional value must be greater than zero.");
   }
 
+  if (errors.length) return { ok: false, errors };
+
+  const stopLoss = deriveStopLoss(input.direction, input.entryPrice, input.stopLossMode, input.stopLossValue);
+
+  if (!isPositive(stopLoss.price)) errors.push("Stop loss price must be greater than zero.");
+
   if (!errors.length) {
-    if (input.direction === "long" && input.stopLossPrice >= input.entryPrice) {
+    if (input.direction === "long" && stopLoss.price >= input.entryPrice) {
       errors.push("For a long setup, stop loss must be below entry.");
     }
 
-    if (input.direction === "short" && input.stopLossPrice <= input.entryPrice) {
+    if (input.direction === "short" && stopLoss.price <= input.entryPrice) {
       errors.push("For a short setup, stop loss must be above entry.");
     }
   }
 
   if (errors.length) return { ok: false, errors };
 
-  const stopDistance = Math.abs(input.entryPrice - input.stopLossPrice);
-  const riskAmount = input.accountBalance * (input.riskPercent / 100);
-  const positionSizeUnits =
-    input.positionSizeMode === "manual" && input.manualPositionSize
-      ? input.manualPositionSize
-      : riskAmount / stopDistance;
-  const notionalPositionValue = positionSizeUnits * input.entryPrice;
+  const selectedRiskAmount = input.accountBalance * (input.riskPercent / 100);
+  const stopLossDecimal = stopLoss.percent / 100;
+  const notionalPositionValue =
+    input.positionSizeMode === "manual" && input.manualNotionalValue
+      ? input.manualNotionalValue
+      : selectedRiskAmount / stopLossDecimal;
+  const positionSizeUnits = notionalPositionValue / input.entryPrice;
+  const actualRiskAmount = notionalPositionValue * stopLossDecimal;
+  const actualRiskPercent = (actualRiskAmount / input.accountBalance) * 100;
   const marginRequired = notionalPositionValue / input.leverage;
-  const estimatedLoss = positionSizeUnits * stopDistance;
-  const stopDistancePercent = (stopDistance / input.entryPrice) * 100;
-  const positionRiskPercent = notionalPositionValue > 0 ? (estimatedLoss / notionalPositionValue) * 100 : 0;
   const marginUsedPercent = (marginRequired / input.accountBalance) * 100;
-  const validTakeProfitPrices = input.takeProfitPrices.filter(isPositive);
+  const marginShortfall = Math.max(0, marginRequired - input.accountBalance);
+  const requiredLeverage = notionalPositionValue / input.accountBalance;
+  const maxPositionValueAtSelectedLeverage = input.accountBalance * input.leverage;
+  const maxAffordablePositionValue = maxPositionValueAtSelectedLeverage;
+  const maxAffordableCoinQuantity = maxAffordablePositionValue / input.entryPrice;
+  const isExecutable = marginRequired <= input.accountBalance;
+  const validTakeProfitValues = input.takeProfitValues.filter(isPositive);
 
-  if (input.riskPercent > 5) {
-    warnings.push("Crypto risk is above 5% of account balance.");
-  } else if (input.riskPercent > 2) {
-    warnings.push("Crypto risk is above 2% of account balance.");
+  if (actualRiskPercent > 5) {
+    warnings.push("High risk: risking more than 5% of account balance on one trade.");
   }
 
-  if (stopDistancePercent < 0.5) {
-    warnings.push("Stop distance is very tight for volatile crypto markets.");
+  if (actualRiskPercent > 25) {
+    warnings.push("Extreme risk: this trade could lose a large part of the account if stop loss is hit.");
   }
 
-  if (input.positionSizeMode === "manual" && estimatedLoss > riskAmount) {
-    warnings.push("Manual size risks more than the selected account risk.");
+  if (actualRiskPercent >= 100) {
+    warnings.push("Extreme risk: this trade risks the full account balance.");
   }
 
-  if (marginRequired > input.accountBalance) {
-    warnings.push("Required margin is higher than account balance.");
-  } else if (marginUsedPercent > 50) {
-    warnings.push("Margin used is high for volatile crypto markets.");
+  if (input.positionSizeMode === "manual" && actualRiskAmount > selectedRiskAmount) {
+    warnings.push("Manual notional value risks more than the selected account risk.");
   }
 
-  const takeProfits = validTakeProfitPrices.map((price, index) => {
-    const profitPerUnit = input.direction === "long" ? price - input.entryPrice : input.entryPrice - price;
+  if (!isExecutable) {
+    warnings.push("Invalid plan: required margin is higher than account balance.");
+    warnings.push(
+      `This position requires ${formatDollarForWarning(marginRequired)} margin at ${formatCompactNumber(
+        input.leverage
+      )}x leverage, but your account balance is only ${formatDollarForWarning(input.accountBalance)}.`
+    );
+  }
+
+  if (input.leverage >= 20) {
+    warnings.push("High leverage increases liquidation risk.");
+  }
+
+  const takeProfits = validTakeProfitValues.map((value, index) => {
+    const takeProfit = deriveTakeProfit(input.direction, input.entryPrice, input.takeProfitMode, value);
+    const profitPerUnit =
+      input.direction === "long" ? takeProfit.price - input.entryPrice : input.entryPrice - takeProfit.price;
     const profitAmount = profitPerUnit * positionSizeUnits;
+
     return {
       label: `TP${index + 1}`,
-      price,
+      price: takeProfit.price,
+      percent: takeProfit.percent,
       profitAmount,
-      riskReward: profitAmount / estimatedLoss
+      riskReward: actualRiskAmount > 0 ? profitAmount / actualRiskAmount : 0
     };
   });
 
@@ -120,24 +169,93 @@ export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
   return {
     ok: true,
     result: {
-      symbol: input.symbol.trim().toUpperCase(),
+      symbol: symbol.toUpperCase(),
       direction: input.direction,
-      riskAmount,
-      accountRiskPercent: input.riskPercent,
-      stopDistance,
-      stopDistancePercent,
-      positionRiskPercent,
+      accountBalance: input.accountBalance,
+      riskAmount: actualRiskAmount,
+      selectedRiskAmount,
+      selectedRiskPercent: input.riskPercent,
+      actualRiskAmount,
+      actualRiskPercent,
+      accountRiskPercent: actualRiskPercent,
+      stopLossPrice: stopLoss.price,
+      stopLossPercent: stopLoss.percent,
+      stopDistance: stopLoss.distance,
+      stopDistancePercent: stopLoss.percent,
+      positionRiskPercent: stopLoss.percent,
       positionSizeUnits,
       notionalPositionValue,
+      leverage: input.leverage,
       marginRequired,
       marginUsedPercent,
-      estimatedLoss,
+      marginShortfall,
+      requiredLeverage,
+      maxPositionValueAtSelectedLeverage,
+      maxAffordablePositionValue,
+      maxAffordableCoinQuantity,
+      isExecutable,
+      estimatedLoss: actualRiskAmount,
       takeProfits,
       warnings
     }
   };
 }
 
+function deriveStopLoss(
+  direction: RiskDirection,
+  entryPrice: number,
+  mode: RiskValueMode,
+  value: number
+): { price: number; percent: number; distance: number } {
+  if (mode === "percentage") {
+    const price = direction === "long" ? entryPrice * (1 - value / 100) : entryPrice * (1 + value / 100);
+    return {
+      price,
+      percent: value,
+      distance: Math.abs(entryPrice - price)
+    };
+  }
+
+  return {
+    price: value,
+    percent: (Math.abs(entryPrice - value) / entryPrice) * 100,
+    distance: Math.abs(entryPrice - value)
+  };
+}
+
+function deriveTakeProfit(
+  direction: RiskDirection,
+  entryPrice: number,
+  mode: RiskValueMode,
+  value: number
+): { price: number; percent: number } {
+  if (mode === "percentage") {
+    return {
+      price: direction === "long" ? entryPrice * (1 + value / 100) : entryPrice * (1 - value / 100),
+      percent: value
+    };
+  }
+
+  return {
+    price: value,
+    percent: (Math.abs(value - entryPrice) / entryPrice) * 100
+  };
+}
+
 function isPositive(value: number | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function formatDollarForWarning(value: number): string {
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2
+  });
+}
+
+function formatCompactNumber(value: number): string {
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: 2
+  });
 }

@@ -41,10 +41,13 @@ test("dashboard renders inbox, read handling, display name editing, and compact 
     "avatar-level-badge",
     "compact-level-panel",
     "inbox-panel",
-    "inbox-message-body"
+    "inbox-message-body",
+    "Extend Trading Academy Access"
   ]) {
     assert.match(dashboardSource, new RegExp(expected.replace(/[.]/g, "\\.")));
   }
+  assert.doesNotMatch(dashboardSource, /Your Trading Academy access is active/);
+  assert.doesNotMatch(dashboardSource, /Join Trading Academy/);
 });
 
 test("admin has a notification tab with constrained notification audiences", () => {

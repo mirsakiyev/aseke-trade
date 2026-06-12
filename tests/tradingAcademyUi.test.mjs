@@ -39,8 +39,16 @@ test("academy dashboard includes a subscriber risk calculator", () => {
   assert.match(dashboardSource, /riskLeverageOptions/);
   assert.match(dashboardSource, /hasRiskCalculated/);
   assert.match(dashboardSource, /calculateCurrentRisk/);
-  assert.match(dashboardSource, /Position Value/);
+  assert.match(dashboardSource, /stopLossMode/);
+  assert.match(dashboardSource, /takeProfitMode/);
+  assert.match(dashboardSource, /manualNotionalValue/);
+  assert.match(dashboardSource, /Stop Loss Mode/);
+  assert.match(dashboardSource, /Take Profits/);
+  assert.match(dashboardSource, /Notional Position Value/);
+  assert.match(dashboardSource, /Stop Loss Distance/);
+  assert.match(dashboardSource, /Risk is based on position value and stop-loss distance/);
   assert.doesNotMatch(dashboardSource, /riskForm\.symbol|<label>\s*Pair/);
+  assert.doesNotMatch(dashboardSource, /Position Risk/);
   assert.doesNotMatch(dashboardSource, /coins/);
   assert.doesNotMatch(dashboardSource, /placeholder="(?:63404|62555|64444|65555|66666)"/);
   assert.match(dashboardSource, /Risk Breakdown/);

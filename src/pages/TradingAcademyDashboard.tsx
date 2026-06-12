@@ -23,7 +23,8 @@ import {
   calculateRisk,
   type PositionSizeMode,
   type RiskCalculatorResult,
-  type RiskDirection
+  type RiskDirection,
+  type RiskValueMode
 } from "../lib/riskCalculator";
 import {
   AML_CHECK_PRICE_CENTS,
@@ -72,16 +73,18 @@ type RiskCalculatorFormState = {
   accountBalance: string;
   riskPercent: string;
   entryPrice: string;
-  stopLossPrice: string;
+  stopLossMode: RiskValueMode;
+  stopLossValue: string;
+  takeProfitMode: RiskValueMode;
   takeProfits: RiskTakeProfitInput[];
   leverage: string;
   positionSizeMode: PositionSizeMode;
-  manualPositionSize: string;
+  manualNotionalValue: string;
 };
 
 type RiskTakeProfitInput = {
   id: string;
-  price: string;
+  value: string;
 };
 
 type RiskCalculatorEditableField = Exclude<keyof RiskCalculatorFormState, "takeProfits">;
@@ -94,18 +97,20 @@ function createBlankRiskForm(): RiskCalculatorFormState {
     accountBalance: "",
     riskPercent: "1",
     entryPrice: "",
-    stopLossPrice: "",
+    stopLossMode: "percentage",
+    stopLossValue: "",
+    takeProfitMode: "percentage",
     takeProfits: [createRiskTakeProfitInput()],
     leverage: "1",
     positionSizeMode: "auto",
-    manualPositionSize: ""
+    manualNotionalValue: ""
   };
 }
 
 function createRiskTakeProfitInput(): RiskTakeProfitInput {
   return {
     id: crypto.randomUUID(),
-    price: ""
+    value: ""
   };
 }
 
@@ -262,11 +267,13 @@ export function TradingAcademyDashboard() {
       accountBalance: numberFromInput(riskForm.accountBalance),
       riskPercent: numberFromInput(riskForm.riskPercent),
       entryPrice: numberFromInput(riskForm.entryPrice),
-      stopLossPrice: numberFromInput(riskForm.stopLossPrice),
-      takeProfitPrices: riskForm.takeProfits.map((takeProfit) => numberFromInput(takeProfit.price)),
+      stopLossMode: riskForm.stopLossMode,
+      stopLossValue: numberFromInput(riskForm.stopLossValue),
+      takeProfitMode: riskForm.takeProfitMode,
+      takeProfitValues: riskForm.takeProfits.map((takeProfit) => numberFromInput(takeProfit.value)),
       leverage: numberFromInput(riskForm.leverage),
       positionSizeMode: riskForm.positionSizeMode,
-      manualPositionSize: numberFromInput(riskForm.manualPositionSize)
+      manualNotionalValue: numberFromInput(riskForm.manualNotionalValue)
     });
 
     if (!calculation.ok) {
@@ -300,7 +307,7 @@ export function TradingAcademyDashboard() {
     setRiskForm((form) => ({
       ...form,
       takeProfits: form.takeProfits.map((takeProfit) =>
-        takeProfit.id === takeProfitId ? { ...takeProfit, price } : takeProfit
+        takeProfit.id === takeProfitId ? { ...takeProfit, value: price } : takeProfit
       )
     }));
   };
@@ -700,14 +707,6 @@ function RiskCalculatorPanel({
                 />
               </label>
               <label>
-                Stop Loss
-                <input
-                  inputMode="decimal"
-                  value={form.stopLossPrice}
-                  onChange={(event) => onChange("stopLossPrice", event.target.value)}
-                />
-              </label>
-              <label>
                 Leverage
                 <select value={form.leverage} onChange={(event) => onChange("leverage", event.target.value)}>
                   {riskLeverageOptions.map((leverage) => (
@@ -717,7 +716,69 @@ function RiskCalculatorPanel({
                   ))}
                 </select>
               </label>
+              <label>
+                Size Mode
+                <select
+                  value={form.positionSizeMode}
+                  onChange={(event) => onChange("positionSizeMode", event.target.value)}
+                >
+                  <option value="auto">Auto risk-based size</option>
+                  <option value="manual">Manual notional value</option>
+                </select>
+              </label>
             </div>
+
+            {form.positionSizeMode === "manual" && (
+              <label className="risk-field-group">
+                <span className="risk-field-label">Manual Notional Value</span>
+                <span className="risk-prefixed-input">
+                  <span>$</span>
+                  <input
+                    inputMode="decimal"
+                    value={form.manualNotionalValue}
+                    onChange={(event) => onChange("manualNotionalValue", event.target.value)}
+                  />
+                </span>
+              </label>
+            )}
+
+            <div className="risk-field-group">
+              <span className="risk-field-label">Stop Loss Mode</span>
+              <div className="risk-direction-toggle risk-mode-toggle" role="group" aria-label="Stop loss input mode">
+                <button
+                  className={form.stopLossMode === "percentage" ? "active" : ""}
+                  type="button"
+                  onClick={() => onChange("stopLossMode", "percentage")}
+                >
+                  Percentage
+                </button>
+                <button
+                  className={form.stopLossMode === "price" ? "active" : ""}
+                  type="button"
+                  onClick={() => onChange("stopLossMode", "price")}
+                >
+                  Price
+                </button>
+              </div>
+            </div>
+
+            <label className="risk-field-group">
+              <span className="risk-field-label">
+                {form.stopLossMode === "percentage" ? "Stop Loss %" : "Stop Loss Price"}
+              </span>
+              <span className={form.stopLossMode === "percentage" ? "risk-prefixed-input suffix" : "risk-prefixed-input"}>
+                <span>{form.stopLossMode === "percentage" ? "%" : "$"}</span>
+                <input
+                  inputMode="decimal"
+                  placeholder={form.stopLossMode === "percentage" ? "5" : "60,800"}
+                  value={form.stopLossValue}
+                  onChange={(event) => onChange("stopLossValue", event.target.value)}
+                />
+              </span>
+              {formatDerivedStopLossLine(form) && (
+                <small className="risk-derived-line">{formatDerivedStopLossLine(form)}</small>
+              )}
+            </label>
 
             <div className="risk-tp-editor">
               <div className="compact-panel-header">
@@ -727,16 +788,36 @@ function RiskCalculatorPanel({
                   Add TP
                 </button>
               </div>
+              <div className="risk-direction-toggle risk-mode-toggle" role="group" aria-label="Take profit input mode">
+                <button
+                  className={form.takeProfitMode === "percentage" ? "active" : ""}
+                  type="button"
+                  onClick={() => onChange("takeProfitMode", "percentage")}
+                >
+                  Percentage
+                </button>
+                <button
+                  className={form.takeProfitMode === "price" ? "active" : ""}
+                  type="button"
+                  onClick={() => onChange("takeProfitMode", "price")}
+                >
+                  Price
+                </button>
+              </div>
               <div className="risk-tp-input-list">
                 {form.takeProfits.map((takeProfit, index) => (
                   <div className="risk-tp-input-row" key={takeProfit.id}>
                     <label>
-                      TP{index + 1}
+                      {form.takeProfitMode === "percentage" ? `TP${index + 1} %` : `TP${index + 1} Price`}
                       <input
                         inputMode="decimal"
-                        value={takeProfit.price}
+                        placeholder={form.takeProfitMode === "percentage" ? "10" : "70,000"}
+                        value={takeProfit.value}
                         onChange={(event) => onTakeProfitChange(takeProfit.id, event.target.value)}
                       />
+                      {formatDerivedTakeProfitLine(form, takeProfit.value) && (
+                        <small className="risk-derived-line">{formatDerivedTakeProfitLine(form, takeProfit.value)}</small>
+                      )}
                     </label>
                     <button
                       className="icon-button danger"
@@ -752,31 +833,11 @@ function RiskCalculatorPanel({
               </div>
             </div>
 
-            <details className="risk-advanced-options">
-              <summary>Advanced Options</summary>
-              <div className="risk-form-grid">
-                <label>
-                  Size mode
-                  <select
-                    value={form.positionSizeMode}
-                    onChange={(event) => onChange("positionSizeMode", event.target.value)}
-                  >
-                    <option value="auto">Auto size</option>
-                    <option value="manual">Manual size</option>
-                  </select>
-                </label>
-                {form.positionSizeMode === "manual" && (
-                  <label>
-                    Position size
-                    <input
-                      inputMode="decimal"
-                      value={form.manualPositionSize}
-                      onChange={(event) => onChange("manualPositionSize", event.target.value)}
-                    />
-                  </label>
-                )}
-              </div>
-            </details>
+            <p className="risk-education-note">
+              Risk is based on position value and stop-loss distance. If two assets have the same stop-loss percentage,
+              the account risk is the same. The asset price only changes the coin quantity. This calculator is for
+              educational purposes only and does not guarantee profit or prevent loss.
+            </p>
 
             {errors.length > 0 && (
               <ul className="risk-message-list warning">
@@ -812,17 +873,22 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
       <p className="risk-start-line">{result ? `${result.direction.toUpperCase()} position plan` : "Enter Account Balance to start"}</p>
 
       <div className="risk-position-card">
-        <span>Position Value</span>
+        <span>Notional Position Value</span>
         <strong>{result ? formatUsdAmount(result.notionalPositionValue) : "$--"}</strong>
+        <small>{result ? `Position Size: ${formatCoinQuantity(result.positionSizeUnits)} units` : "Position Size: -- units"}</small>
       </div>
 
       <dl className="risk-summary-list">
-        <RiskMetricRow label="Risk Amount" value={result ? formatUsdAmount(result.riskAmount) : "$--"} />
         <RiskMetricRow
-          label="Risk Distance"
-          value={result ? `${formatUsdAmount(result.stopDistance)} (${formatPercentValue(result.stopDistancePercent)})` : "$-- (--)"}
+          label="Account Risk"
+          value={result ? `${formatUsdAmount(result.actualRiskAmount)} (${formatPercentValue(result.actualRiskPercent)})` : "$-- (--)"}
         />
-        <RiskMetricRow label="Margin Required" value={result ? formatUsdAmount(result.marginRequired) : "$--"} />
+        <RiskMetricRow label="Stop Loss Distance" value={result ? formatPercentValue(result.stopLossPercent) : "--%"} />
+        <RiskMetricRow label="Stop Loss Price" value={result ? formatUsdAmount(result.stopLossPrice) : "$--"} />
+        <RiskMetricRow
+          label="Margin Required"
+          value={result ? `${formatUsdAmount(result.marginRequired)} at ${formatRiskDecimal(result.leverage)}x` : "$--"}
+        />
       </dl>
 
       <section className="risk-breakdown-card">
@@ -831,11 +897,27 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
           Risk Breakdown
         </h3>
         <dl className="risk-result-grid">
-          <RiskMetricBox label="Account Risk" value={result ? formatPercentValue(result.accountRiskPercent) : "--%"} />
-          <RiskMetricBox label="Position Risk" value={result ? formatPercentValue(result.positionRiskPercent) : "--%"} />
+          <RiskMetricBox label="Account Risk %" value={result ? formatPercentValue(result.actualRiskPercent) : "--%"} />
+          <RiskMetricBox label="Stop Loss Distance" value={result ? formatPercentValue(result.stopLossPercent) : "--%"} />
           <RiskMetricBox label="Margin Used" value={result ? formatPercentValue(result.marginUsedPercent) : "--%"} />
+          <RiskMetricBox label="Required Leverage" value={result ? `${formatRiskDecimal(result.requiredLeverage)}x` : "--x"} />
         </dl>
       </section>
+
+      <dl className="risk-summary-list">
+        <RiskMetricRow label="Available Balance" value={result ? formatUsdAmount(result.accountBalance) : "$--"} />
+        <RiskMetricRow
+          label="Max Position at Selected Leverage"
+          value={result ? formatUsdAmount(result.maxPositionValueAtSelectedLeverage) : "$--"}
+        />
+        <RiskMetricRow
+          label="Max Affordable Coin Quantity"
+          value={result ? `${formatCoinQuantity(result.maxAffordableCoinQuantity)} units` : "-- units"}
+        />
+        {result && result.marginShortfall > 0 && (
+          <RiskMetricRow label="Margin Shortfall" value={formatUsdAmount(result.marginShortfall)} />
+        )}
+      </dl>
 
       <section className="risk-assessment-card">
         <h3>
@@ -861,10 +943,10 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
           {result.takeProfits.map((takeProfit) => (
             <li className={takeProfit.profitAmount > 0 ? "positive" : "warning"} key={takeProfit.label}>
               <strong>
-                {takeProfit.label}: {formatRiskNumber(takeProfit.price)}
+                {takeProfit.label}: {formatUsdAmount(takeProfit.price)} ({formatPercentValue(takeProfit.percent)})
               </strong>
               <span>
-                {formatUsdAmount(takeProfit.profitAmount)} - {formatRiskNumber(takeProfit.riskReward)}R
+                {formatUsdAmount(takeProfit.profitAmount)} - {formatRiskMultiple(takeProfit.riskReward)}
               </span>
             </li>
           ))}
@@ -1140,6 +1222,46 @@ function numberFromInput(value: string): number {
   return Number(value.replace(/,/g, "").trim());
 }
 
+function formatDerivedStopLossLine(form: RiskCalculatorFormState): string | null {
+  const entryPrice = numberFromInput(form.entryPrice);
+  const stopLossValue = numberFromInput(form.stopLossValue);
+  if (!isPositiveNumber(entryPrice) || !isPositiveNumber(stopLossValue)) return null;
+
+  if (form.stopLossMode === "percentage") {
+    const stopLossPrice =
+      form.direction === "long"
+        ? entryPrice * (1 - stopLossValue / 100)
+        : entryPrice * (1 + stopLossValue / 100);
+    if (!isPositiveNumber(stopLossPrice)) return null;
+    return `Stop Price: ${formatUsdAmount(stopLossPrice)}`;
+  }
+
+  const stopDistancePercent = (Math.abs(entryPrice - stopLossValue) / entryPrice) * 100;
+  return `Stop Distance: ${formatPercentValue(stopDistancePercent)}`;
+}
+
+function formatDerivedTakeProfitLine(form: RiskCalculatorFormState, takeProfitValue: string): string | null {
+  const entryPrice = numberFromInput(form.entryPrice);
+  const takeProfit = numberFromInput(takeProfitValue);
+  if (!isPositiveNumber(entryPrice) || !isPositiveNumber(takeProfit)) return null;
+
+  if (form.takeProfitMode === "percentage") {
+    const takeProfitPrice =
+      form.direction === "long"
+        ? entryPrice * (1 + takeProfit / 100)
+        : entryPrice * (1 - takeProfit / 100);
+    if (!isPositiveNumber(takeProfitPrice)) return null;
+    return `TP Price: ${formatUsdAmount(takeProfitPrice)}`;
+  }
+
+  const takeProfitPercent = (Math.abs(takeProfit - entryPrice) / entryPrice) * 100;
+  return `TP Distance: ${formatPercentValue(takeProfitPercent)}`;
+}
+
+function isPositiveNumber(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
+}
+
 function getRiskAssessment(accountRiskPercent: number | null): {
   label: string;
   positionPercent: number;
@@ -1175,14 +1297,26 @@ function formatUsdAmount(value: number): string {
 }
 
 function formatPercentValue(value: number): string {
-  return `${formatRiskNumber(value)}%`;
+  return `${formatRiskDecimal(value)}%`;
 }
 
-function formatRiskNumber(value: number): string {
+function formatRiskMultiple(value: number): string {
+  return `${formatRiskDecimal(value)}R`;
+}
+
+function formatRiskDecimal(value: number): string {
   if (!Number.isFinite(value)) return "N/A";
 
   return value.toLocaleString("en-US", {
-    maximumFractionDigits: 6
+    maximumFractionDigits: 2
+  });
+}
+
+function formatCoinQuantity(value: number): string {
+  if (!Number.isFinite(value)) return "N/A";
+
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: 8
   });
 }
 

@@ -460,11 +460,6 @@ export function Dashboard() {
             <WalletCards size={21} />
           </span>
           <h2>Account access</h2>
-          <p className="muted">
-            {accountStatus.isPremiumActive
-              ? "Your Trading Academy access is active. Continue advanced lessons, review Trading Academy materials, study trading strategies, or extend your access."
-              : "You are on the Basic plan. Join Trading Academy to unlock advanced trading education, strategy lessons, signals, and 1-on-1 learning."}
-          </p>
           <div className="inline-actions">
             <Link className="primary-button compact" to="/account/payments">
               <ArrowUpRight size={16} />
@@ -472,7 +467,7 @@ export function Dashboard() {
             </Link>
             <Link className="ghost-button compact" to="/trading-academy">
               <ShieldCheck size={16} />
-              {accountStatus.isPremiumActive ? "Extend Trading Academy Access" : "Join Trading Academy"}
+              Extend Trading Academy Access
             </Link>
           </div>
         </article>

@@ -16,4 +16,7 @@ test("scroll memory restores positions when users return to a tab", () => {
   assert.match(scrollMemorySource, /window\.addEventListener\("focus", restoreCurrentScroll\)/);
   assert.match(scrollMemorySource, /window\.history\.scrollRestoration = "manual"/);
   assert.match(scrollMemorySource, /restoreDurationMs/);
+  assert.match(scrollMemorySource, /isRestoringRef/);
+  assert.match(scrollMemorySource, /saveCurrentScroll\(true\)/);
+  assert.match(scrollMemorySource, /document\.visibilityState !== "visible"/);
 });
