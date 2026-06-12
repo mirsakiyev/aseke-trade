@@ -246,7 +246,7 @@ export function TradingAcademyDashboard() {
             )}
           </section>
 
-          <section className="section-panel page-stack">
+          <section className="section-panel academy-signal-section">
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Trading Signals</p>
@@ -255,17 +255,20 @@ export function TradingAcademyDashboard() {
               <LineChart size={28} aria-hidden="true" />
             </div>
             {activeSignals.length ? (
-              <div className="signal-grid">
+              <div className="signal-grid academy-signal-grid">
                 {activeSignals.map((signal) => (
                   <SignalCard signal={signal} key={signal.id} />
                 ))}
               </div>
             ) : (
-              <p className="muted">No active trading signals have been posted yet.</p>
+              <div className="compact-empty-state">
+                <LineChart size={20} aria-hidden="true" />
+                <p className="muted">No active trading signals have been posted yet.</p>
+              </div>
             )}
           </section>
 
-          <section className="section-panel page-stack">
+          <section className="section-panel academy-signal-section">
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Past Trades</p>
@@ -274,23 +277,35 @@ export function TradingAcademyDashboard() {
               <Trophy size={28} aria-hidden="true" />
             </div>
             {pastTrades.length ? (
-              <div className="signal-grid">
+              <div className="signal-grid academy-signal-grid">
                 {pastTrades.map((signal) => (
                   <SignalCard signal={signal} showPastSummary key={signal.id} />
                 ))}
               </div>
             ) : (
-              <p className="muted">Completed Trading Academy signals will appear here.</p>
+              <div className="compact-empty-state">
+                <Trophy size={20} aria-hidden="true" />
+                <p className="muted">Completed Trading Academy signals will appear here.</p>
+              </div>
             )}
           </section>
 
           <section className="dashboard-grid">
-            <article className="section-panel stack-form">
-              <span className="feature-icon">
-                <SearchCheck size={21} />
-              </span>
-              <h2>Paid AML Check</h2>
-              <p className="muted">Each request costs {formatUsd(AML_CHECK_PRICE_CENTS)} and is manually reviewed by admin.</p>
+            <article className="section-panel stack-form academy-tool-panel">
+              <div className="compact-tool-heading">
+                <span className="feature-icon">
+                  <SearchCheck size={20} />
+                </span>
+                <div>
+                  <h2>Paid AML Check</h2>
+                  <p className="muted">Each request costs {formatUsd(AML_CHECK_PRICE_CENTS)} and is manually reviewed by admin.</p>
+                </div>
+              </div>
+              <p className="muted helper-copy">
+                AML checks help assess whether a crypto wallet or transaction may be connected to suspicious activity,
+                helping protect you from receiving dirty or high-risk crypto that may create exchange, withdrawal, or
+                compliance review problems.
+              </p>
               {amlMessage && <p className="soft-notice">{amlMessage}</p>}
               <form className="stack-form" onSubmit={submitAml}>
                 <label>
@@ -354,11 +369,48 @@ export function TradingAcademyDashboard() {
           </section>
 
           <section className="dashboard-grid">
-            <article className="section-panel stack-form">
-              <span className="feature-icon">
-                <Headphones size={21} />
-              </span>
-              <h2>Premium Support</h2>
+            <article className="section-panel stack-form academy-tool-panel premium-support-panel">
+              <div className="compact-tool-heading">
+                <span className="feature-icon">
+                  <Headphones size={20} />
+                </span>
+                <div>
+                  <h2>Premium Support</h2>
+                  <p className="muted">Need help? Premium members can reach support directly on Telegram.</p>
+                </div>
+              </div>
+              <div className="telegram-contact-grid" aria-label="Telegram support links">
+                <a
+                  className="telegram-contact-link"
+                  href="https://t.me/don_chrome"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Message ASEKE TRADE support on Telegram at @don_chrome"
+                >
+                  <span className="telegram-icon-frame">
+                    <TelegramIcon />
+                  </span>
+                  <span>
+                    <strong>Message Support</strong>
+                    <small>@don_chrome</small>
+                  </span>
+                </a>
+                <a
+                  className="telegram-contact-link"
+                  href="https://t.me/aseketrade"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Join the ASEKE TRADE Telegram group"
+                >
+                  <span className="telegram-icon-frame">
+                    <TelegramIcon />
+                  </span>
+                  <span>
+                    <strong>Join Community</strong>
+                    <small>t.me/aseketrade</small>
+                  </span>
+                </a>
+              </div>
               {supportMessage && <p className="soft-notice">{supportMessage}</p>}
               <form className="stack-form" onSubmit={submitSupport}>
                 <label>
@@ -469,7 +521,7 @@ function SignalCard({ signal, showPastSummary = false }: { signal: TradingSignal
   const finalRoi = signal.final_roi ?? calculateSignalFinalRoi(signal);
 
   return (
-    <article className="signal-card">
+    <article className="signal-card academy-signal-card">
       {signal.chart_image_url ? (
         <img className="signal-chart-image" src={signal.chart_image_url} alt="" />
       ) : (
@@ -533,6 +585,17 @@ function SignalCard({ signal, showPastSummary = false }: { signal: TradingSignal
         </div>
       </div>
     </article>
+  );
+}
+
+function TelegramIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="0 0 24 24">
+      <path
+        fill="currentColor"
+        d="M21.64 4.08c.31-.13.66.11.59.48l-2.79 15.73c-.06.34-.44.5-.72.31l-4.82-3.38-2.46 2.38c-.27.26-.72.11-.79-.26l-.82-4.32-4.72-1.62c-.39-.13-.41-.68-.03-.84L21.64 4.08Zm-3.59 3.3-10.4 5.63 3.01.97 6.85-4.31c.15-.09.3.1.18.22l-5.53 5.26.58 2.74 1.24-1.19c.16-.15.4-.17.58-.04l3.32 2.33 2.2-12.37-2.03.76Z"
+      />
+    </svg>
   );
 }
 

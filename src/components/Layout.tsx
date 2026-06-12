@@ -173,8 +173,20 @@ function AccountSummary({ accountStatus }: { accountStatus: ReturnType<typeof us
       <span className="account-summary-text">
         <span className="account-email">{accountStatus.email}</span>
         <span className="account-summary-meta">Balance: {accountStatus.balanceLabel}</span>
-        <span className={accountStatus.isPremiumActive ? "account-plan-tag premium" : "account-plan-tag"}>
-          {accountStatus.planLabel}
+        <span
+          className={
+            accountStatus.isPremiumActive ? "account-plan-tag premium icon-only" : "account-plan-tag"
+          }
+          title={accountStatus.planLabel}
+        >
+          {accountStatus.isPremiumActive ? (
+            <>
+              <Crown size={13} aria-hidden="true" />
+              <span className="sr-only">{accountStatus.planLabel}</span>
+            </>
+          ) : (
+            accountStatus.planLabel
+          )}
         </span>
       </span>
     </>
