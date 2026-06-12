@@ -3,10 +3,13 @@ import {
   Crown,
   Headphones,
   LineChart,
+  Plus,
   RefreshCw,
   RotateCcw,
   SearchCheck,
   Send,
+  ShieldCheck,
+  Trash2,
   Trophy,
   UserRound
 } from "lucide-react";
@@ -65,34 +68,46 @@ const blankSupportForm = {
 };
 
 type RiskCalculatorFormState = {
-  symbol: string;
   direction: RiskDirection;
   accountBalance: string;
   riskPercent: string;
   entryPrice: string;
   stopLossPrice: string;
-  takeProfit1: string;
-  takeProfit2: string;
-  takeProfit3: string;
+  takeProfits: RiskTakeProfitInput[];
   leverage: string;
   positionSizeMode: PositionSizeMode;
   manualPositionSize: string;
 };
 
-const blankRiskForm: RiskCalculatorFormState = {
-  symbol: "BTC/USDT",
-  direction: "long",
-  accountBalance: "",
-  riskPercent: "1",
-  entryPrice: "",
-  stopLossPrice: "",
-  takeProfit1: "",
-  takeProfit2: "",
-  takeProfit3: "",
-  leverage: "1",
-  positionSizeMode: "auto",
-  manualPositionSize: ""
+type RiskTakeProfitInput = {
+  id: string;
+  price: string;
 };
+
+type RiskCalculatorEditableField = Exclude<keyof RiskCalculatorFormState, "takeProfits">;
+
+const riskLeverageOptions = Array.from({ length: 100 }, (_, index) => String(index + 1));
+
+function createBlankRiskForm(): RiskCalculatorFormState {
+  return {
+    direction: "long",
+    accountBalance: "",
+    riskPercent: "1",
+    entryPrice: "",
+    stopLossPrice: "",
+    takeProfits: [createRiskTakeProfitInput()],
+    leverage: "1",
+    positionSizeMode: "auto",
+    manualPositionSize: ""
+  };
+}
+
+function createRiskTakeProfitInput(): RiskTakeProfitInput {
+  return {
+    id: crypto.randomUUID(),
+    price: ""
+  };
+}
 
 export function TradingAcademyDashboard() {
   const { user, profile } = useAuth();
@@ -111,7 +126,7 @@ export function TradingAcademyDashboard() {
   const [supportMessage, setSupportMessage] = useState<string | null>(null);
   const [isSupportSubmitting, setIsSupportSubmitting] = useState(false);
   const [isLeaderboardExpanded, setIsLeaderboardExpanded] = useState(false);
-  const [riskForm, setRiskForm] = useState<RiskCalculatorFormState>(blankRiskForm);
+  const [riskForm, setRiskForm] = useState<RiskCalculatorFormState>(() => createBlankRiskForm());
   const [riskResult, setRiskResult] = useState<RiskCalculatorResult | null>(null);
   const [riskErrors, setRiskErrors] = useState<string[]>([]);
 
@@ -243,13 +258,13 @@ export function TradingAcademyDashboard() {
     event.preventDefault();
 
     const calculation = calculateRisk({
-      symbol: sanitizePlainText(riskForm.symbol, 24),
+      symbol: "Position",
       direction: riskForm.direction,
       accountBalance: numberFromInput(riskForm.accountBalance),
       riskPercent: numberFromInput(riskForm.riskPercent),
       entryPrice: numberFromInput(riskForm.entryPrice),
       stopLossPrice: numberFromInput(riskForm.stopLossPrice),
-      takeProfitPrices: [riskForm.takeProfit1, riskForm.takeProfit2, riskForm.takeProfit3].map(numberFromInput),
+      takeProfitPrices: riskForm.takeProfits.map((takeProfit) => numberFromInput(takeProfit.price)),
       leverage: numberFromInput(riskForm.leverage),
       positionSizeMode: riskForm.positionSizeMode,
       manualPositionSize: numberFromInput(riskForm.manualPositionSize)
@@ -265,12 +280,35 @@ export function TradingAcademyDashboard() {
     setRiskResult(calculation.result);
   };
 
-  const updateRiskForm = (field: keyof RiskCalculatorFormState, value: string) => {
+  const updateRiskForm = (field: RiskCalculatorEditableField, value: string) => {
     setRiskForm((form) => ({ ...form, [field]: value }));
   };
 
+  const updateRiskTakeProfit = (takeProfitId: string, price: string) => {
+    setRiskForm((form) => ({
+      ...form,
+      takeProfits: form.takeProfits.map((takeProfit) =>
+        takeProfit.id === takeProfitId ? { ...takeProfit, price } : takeProfit
+      )
+    }));
+  };
+
+  const addRiskTakeProfit = () => {
+    setRiskForm((form) => ({ ...form, takeProfits: [...form.takeProfits, createRiskTakeProfitInput()] }));
+  };
+
+  const removeRiskTakeProfit = (takeProfitId: string) => {
+    setRiskForm((form) => ({
+      ...form,
+      takeProfits:
+        form.takeProfits.length > 1
+          ? form.takeProfits.filter((takeProfit) => takeProfit.id !== takeProfitId)
+          : form.takeProfits
+    }));
+  };
+
   const resetRiskCalculator = () => {
-    setRiskForm(blankRiskForm);
+    setRiskForm(createBlankRiskForm());
     setRiskResult(null);
     setRiskErrors([]);
   };
@@ -384,12 +422,15 @@ export function TradingAcademyDashboard() {
           </section>
 
           <RiskCalculatorPanel
+            addTakeProfit={addRiskTakeProfit}
             errors={riskErrors}
             form={riskForm}
             isLocked={!accountStatus.isPremiumActive}
             onChange={updateRiskForm}
+            onRemoveTakeProfit={removeRiskTakeProfit}
             onReset={resetRiskCalculator}
             onSubmit={submitRiskCalculation}
+            onTakeProfitChange={updateRiskTakeProfit}
             result={riskResult}
           />
 
@@ -552,20 +593,26 @@ export function TradingAcademyDashboard() {
 }
 
 function RiskCalculatorPanel({
+  addTakeProfit,
   errors,
   form,
   isLocked,
   onChange,
+  onRemoveTakeProfit,
   onReset,
   onSubmit,
+  onTakeProfitChange,
   result
 }: {
+  addTakeProfit: () => void;
   errors: string[];
   form: RiskCalculatorFormState;
   isLocked: boolean;
-  onChange: (field: keyof RiskCalculatorFormState, value: string) => void;
+  onChange: (field: RiskCalculatorEditableField, value: string) => void;
+  onRemoveTakeProfit: (takeProfitId: string) => void;
   onReset: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onTakeProfitChange: (takeProfitId: string, price: string) => void;
   result: RiskCalculatorResult | null;
 }) {
   return (
@@ -585,113 +632,139 @@ function RiskCalculatorPanel({
         </div>
       ) : (
         <div className="risk-calculator-layout">
-          <form className="risk-calculator-form stack-form" onSubmit={onSubmit}>
-            <div className="risk-form-grid">
-              <label>
-                Pair
-                <input value={form.symbol} onChange={(event) => onChange("symbol", event.target.value)} maxLength={24} />
-              </label>
-              <label>
-                Direction
-                <select value={form.direction} onChange={(event) => onChange("direction", event.target.value)}>
-                  <option value="long">Long</option>
-                  <option value="short">Short</option>
-                </select>
-              </label>
-              <label>
-                Account balance
+          <form className="risk-calculator-form risk-input-panel stack-form" onSubmit={onSubmit}>
+            <div className="risk-field-group">
+              <span className="risk-field-label">Direction</span>
+              <div className="risk-direction-toggle" role="group" aria-label="Trade direction">
+                <button
+                  className={form.direction === "long" ? "active" : ""}
+                  type="button"
+                  onClick={() => onChange("direction", "long")}
+                >
+                  Long
+                </button>
+                <button
+                  className={form.direction === "short" ? "active" : ""}
+                  type="button"
+                  onClick={() => onChange("direction", "short")}
+                >
+                  Short
+                </button>
+              </div>
+            </div>
+
+            <label className="risk-field-group">
+              <span className="risk-field-label">Account Balance</span>
+              <span className="risk-prefixed-input">
+                <span>$</span>
                 <input
                   inputMode="decimal"
                   value={form.accountBalance}
                   onChange={(event) => onChange("accountBalance", event.target.value)}
-                  placeholder="1000"
                 />
-              </label>
-              <label>
-                Risk %
+              </span>
+            </label>
+
+            <label className="risk-field-group">
+              <span className="risk-field-label">Risk Per Trade</span>
+              <span className="risk-prefixed-input">
+                <span>%</span>
                 <input
                   inputMode="decimal"
                   value={form.riskPercent}
                   onChange={(event) => onChange("riskPercent", event.target.value)}
-                  placeholder="1"
                 />
-              </label>
+              </span>
+            </label>
+
+            <div className="risk-form-grid">
               <label>
-                Entry
+                Entry Price
                 <input
                   inputMode="decimal"
                   value={form.entryPrice}
                   onChange={(event) => onChange("entryPrice", event.target.value)}
-                  placeholder="63404"
                 />
               </label>
               <label>
-                Stop loss
+                Stop Loss
                 <input
                   inputMode="decimal"
                   value={form.stopLossPrice}
                   onChange={(event) => onChange("stopLossPrice", event.target.value)}
-                  placeholder="62555"
-                />
-              </label>
-              <label>
-                TP1
-                <input
-                  inputMode="decimal"
-                  value={form.takeProfit1}
-                  onChange={(event) => onChange("takeProfit1", event.target.value)}
-                  placeholder="64444"
-                />
-              </label>
-              <label>
-                TP2
-                <input
-                  inputMode="decimal"
-                  value={form.takeProfit2}
-                  onChange={(event) => onChange("takeProfit2", event.target.value)}
-                  placeholder="65555"
-                />
-              </label>
-              <label>
-                TP3
-                <input
-                  inputMode="decimal"
-                  value={form.takeProfit3}
-                  onChange={(event) => onChange("takeProfit3", event.target.value)}
-                  placeholder="66666"
                 />
               </label>
               <label>
                 Leverage
-                <input
-                  inputMode="decimal"
-                  value={form.leverage}
-                  onChange={(event) => onChange("leverage", event.target.value)}
-                  placeholder="5"
-                />
-              </label>
-              <label>
-                Size mode
-                <select
-                  value={form.positionSizeMode}
-                  onChange={(event) => onChange("positionSizeMode", event.target.value)}
-                >
-                  <option value="auto">Auto size</option>
-                  <option value="manual">Manual size</option>
+                <select value={form.leverage} onChange={(event) => onChange("leverage", event.target.value)}>
+                  {riskLeverageOptions.map((leverage) => (
+                    <option value={leverage} key={leverage}>
+                      {leverage}X
+                    </option>
+                  ))}
                 </select>
               </label>
-              {form.positionSizeMode === "manual" && (
-                <label>
-                  Position size
-                  <input
-                    inputMode="decimal"
-                    value={form.manualPositionSize}
-                    onChange={(event) => onChange("manualPositionSize", event.target.value)}
-                    placeholder="0.05"
-                  />
-                </label>
-              )}
             </div>
+
+            <div className="risk-tp-editor">
+              <div className="compact-panel-header">
+                <h3>Take Profits</h3>
+                <button className="ghost-button compact" type="button" onClick={addTakeProfit}>
+                  <Plus size={16} />
+                  Add TP
+                </button>
+              </div>
+              <div className="risk-tp-input-list">
+                {form.takeProfits.map((takeProfit, index) => (
+                  <div className="risk-tp-input-row" key={takeProfit.id}>
+                    <label>
+                      TP{index + 1}
+                      <input
+                        inputMode="decimal"
+                        value={takeProfit.price}
+                        onChange={(event) => onTakeProfitChange(takeProfit.id, event.target.value)}
+                      />
+                    </label>
+                    <button
+                      className="icon-button danger"
+                      type="button"
+                      onClick={() => onRemoveTakeProfit(takeProfit.id)}
+                      disabled={form.takeProfits.length === 1}
+                    >
+                      <Trash2 size={16} />
+                      <span className="sr-only">Remove TP{index + 1}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <details className="risk-advanced-options">
+              <summary>Advanced Options</summary>
+              <div className="risk-form-grid">
+                <label>
+                  Size mode
+                  <select
+                    value={form.positionSizeMode}
+                    onChange={(event) => onChange("positionSizeMode", event.target.value)}
+                  >
+                    <option value="auto">Auto size</option>
+                    <option value="manual">Manual size</option>
+                  </select>
+                </label>
+                {form.positionSizeMode === "manual" && (
+                  <label>
+                    Position size
+                    <input
+                      inputMode="decimal"
+                      value={form.manualPositionSize}
+                      onChange={(event) => onChange("manualPositionSize", event.target.value)}
+                    />
+                  </label>
+                )}
+              </div>
+            </details>
+
             {errors.length > 0 && (
               <ul className="risk-message-list warning">
                 {errors.map((riskError) => (
@@ -711,60 +784,67 @@ function RiskCalculatorPanel({
             </div>
           </form>
 
-          {result ? (
-            <RiskCalculatorResults result={result} />
-          ) : (
-            <div className="risk-result-empty">
-              <span className="feature-icon">
-                <Calculator size={21} />
-              </span>
-              <strong>Plan before entry</strong>
-              <span>Risk amount, position size, margin, and TP reward will appear here.</span>
-            </div>
-          )}
+          <RiskCalculatorResults result={result} />
         </div>
       )}
     </section>
   );
 }
 
-function RiskCalculatorResults({ result }: { result: RiskCalculatorResult }) {
+function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null }) {
+  const assessment = getRiskAssessment(result?.accountRiskPercent ?? null);
+
   return (
     <article className="risk-result-panel">
-      <div className="risk-result-heading">
-        <div>
-          <p className="eyebrow">{result.symbol}</p>
-          <h3>{result.direction.toUpperCase()} setup</h3>
-        </div>
-        <span className="level-badge">{formatPercentValue(result.stopDistancePercent)} SL</span>
+      <p className="risk-start-line">{result ? `${result.direction.toUpperCase()} position plan` : "Enter Account Balance to start"}</p>
+
+      <div className="risk-position-card">
+        <span>Position Size</span>
+        <strong>{result ? formatRiskNumber(result.positionSizeUnits) : "--"} coins</strong>
+        <small>{result ? formatUsdAmount(result.notionalPositionValue) : "$--"} total value</small>
       </div>
-      <dl className="risk-result-grid">
-        <div>
-          <dt>Risk amount</dt>
-          <dd>{formatUsdAmount(result.riskAmount)}</dd>
-        </div>
-        <div>
-          <dt>Position size</dt>
-          <dd>{formatRiskNumber(result.positionSizeUnits)}</dd>
-        </div>
-        <div>
-          <dt>Notional value</dt>
-          <dd>{formatUsdAmount(result.notionalPositionValue)}</dd>
-        </div>
-        <div>
-          <dt>Margin required</dt>
-          <dd>{formatUsdAmount(result.marginRequired)}</dd>
-        </div>
-        <div>
-          <dt>Stop distance</dt>
-          <dd>{formatRiskNumber(result.stopDistance)}</dd>
-        </div>
-        <div>
-          <dt>Estimated loss</dt>
-          <dd>{formatUsdAmount(result.estimatedLoss)}</dd>
-        </div>
+
+      <dl className="risk-summary-list">
+        <RiskMetricRow label="Risk Amount" value={result ? formatUsdAmount(result.riskAmount) : "$--"} />
+        <RiskMetricRow
+          label="Risk Distance"
+          value={result ? `${formatUsdAmount(result.stopDistance)} (${formatPercentValue(result.stopDistancePercent)})` : "$-- (--)"}
+        />
+        <RiskMetricRow label="Position Value" value={result ? formatUsdAmount(result.notionalPositionValue) : "$--"} />
       </dl>
-      {result.takeProfits.length > 0 && (
+
+      <section className="risk-breakdown-card">
+        <h3>
+          <ShieldCheck size={17} />
+          Risk Breakdown
+        </h3>
+        <dl className="risk-result-grid">
+          <RiskMetricBox label="Account Risk" value={result ? formatPercentValue(result.accountRiskPercent) : "--%"} />
+          <RiskMetricBox label="Position Risk" value={result ? formatPercentValue(result.positionRiskPercent) : "--%"} />
+          <RiskMetricBox label="Margin Used" value={result ? formatPercentValue(result.marginUsedPercent) : "--%"} />
+        </dl>
+      </section>
+
+      <section className="risk-assessment-card">
+        <h3>
+          <ShieldCheck size={17} />
+          Risk Assessment
+        </h3>
+        <div className="risk-assessment-bar" aria-label="Risk assessment scale">
+          <span className="risk-assessment-fill" style={{ width: `${assessment.positionPercent}%` }} />
+          <span className="risk-assessment-marker" style={{ left: `${assessment.positionPercent}%` }} />
+        </div>
+        <div className="risk-assessment-scale">
+          <span>0%</span>
+          <span>2%</span>
+          <span>5%</span>
+          <span>10%+</span>
+        </div>
+        <strong>{assessment.valueLabel}</strong>
+        <span>{assessment.label}</span>
+      </section>
+
+      {result && result.takeProfits.length > 0 && (
         <ul className="risk-tp-list">
           {result.takeProfits.map((takeProfit) => (
             <li className={takeProfit.profitAmount > 0 ? "positive" : "warning"} key={takeProfit.label}>
@@ -778,7 +858,7 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult }) {
           ))}
         </ul>
       )}
-      {result.warnings.length > 0 && (
+      {result && result.warnings.length > 0 && (
         <ul className="risk-message-list">
           {result.warnings.map((warning) => (
             <li key={warning}>{warning}</li>
@@ -786,6 +866,24 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult }) {
         </ul>
       )}
     </article>
+  );
+}
+
+function RiskMetricRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function RiskMetricBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
   );
 }
 
@@ -1028,6 +1126,32 @@ function mergeTakeProfitHitState(
 
 function numberFromInput(value: string): number {
   return Number(value.replace(/,/g, "").trim());
+}
+
+function getRiskAssessment(accountRiskPercent: number | null): {
+  label: string;
+  positionPercent: number;
+  valueLabel: string;
+} {
+  if (accountRiskPercent === null || !Number.isFinite(accountRiskPercent)) {
+    return { label: "CONSERVATIVE", positionPercent: 0, valueLabel: "--%" };
+  }
+
+  const positionPercent = Math.min(100, Math.max(0, (accountRiskPercent / 10) * 100));
+  const label =
+    accountRiskPercent <= 2
+      ? "CONSERVATIVE"
+      : accountRiskPercent <= 5
+        ? "BALANCED"
+        : accountRiskPercent <= 10
+          ? "AGGRESSIVE"
+          : "HIGH RISK";
+
+  return {
+    label,
+    positionPercent,
+    valueLabel: formatPercentValue(accountRiskPercent)
+  };
 }
 
 function formatUsdAmount(value: number): string {

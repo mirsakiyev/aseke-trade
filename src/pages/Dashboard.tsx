@@ -274,7 +274,7 @@ export function Dashboard() {
       {error && <p className="warning-box">{error}</p>}
 
       <section className="dashboard-grid three profile-overview-grid">
-        <article className="section-panel">
+        <article className="section-panel dashboard-profile-card">
           <div className="avatar-profile-row">
             <div className="dashboard-avatar" aria-label="Profile avatar">
               {profile?.avatar_url ? (
@@ -338,26 +338,88 @@ export function Dashboard() {
           </dl>
         </article>
 
-        <article className="section-panel level-panel compact-level-panel">
-          <div className="level-compact-header">
-            <span className="feature-icon compact-icon">
-              <Award size={21} />
-            </span>
+        <article className="section-panel inbox-panel dashboard-inbox-card">
+          <div className="lesson-title-line">
             <div>
-              <h2>Learning Level</h2>
-              <span>{totalXP} total XP</span>
+              <p className="eyebrow">Inbox</p>
+              <h2>Account notifications</h2>
             </div>
-            <span className="level-badge">LVL {levelProgress.level}</span>
+            <span className={unreadInboxCount ? "status-pill premium" : "status-pill free"}>
+              <Bell size={15} />
+              {unreadInboxCount} unread
+            </span>
           </div>
-          <div className="xp-progress-track" aria-label={`${levelProgress.progressPercent}% to next level`}>
-            <span style={{ width: `${levelProgress.progressPercent}%` }} />
+
+          <div className="inbox-filter-row" aria-label="Inbox filters">
+            {inboxFilters.map((filter) => (
+              <button
+                className={inboxFilter === filter.value ? "filter-pill active" : "filter-pill"}
+                type="button"
+                onClick={() => setInboxFilter(filter.value)}
+                key={filter.value}
+              >
+                {filter.label}
+              </button>
+            ))}
           </div>
-          <p className="level-next-line">
-            {levelProgress.xpIntoLevel}/{levelProgress.xpRequiredForNextLevel} XP - {levelProgress.xpRemainingForNextLevel} XP to LVL {levelProgress.level + 1}
-          </p>
+
+          {inboxError && <p className="warning-box">{inboxError}</p>}
+
+          {isLoading ? (
+            <LoadingState label="Loading inbox" />
+          ) : filteredInboxMessages.length ? (
+            <div className="inbox-layout">
+              <div className="inbox-list" role="list">
+                {filteredInboxMessages.map((message) => (
+                  <button
+                    className={`inbox-row ${selectedInboxMessage?.id === message.id ? "active" : ""} ${message.is_read ? "read" : "unread"}`}
+                    type="button"
+                    onClick={() => void openInboxMessage(message)}
+                    role="listitem"
+                    key={message.id}
+                  >
+                    <span className="inbox-row-top">
+                      <span className="inbox-icon-frame">
+                        {message.is_read ? <MailOpen size={16} /> : <Mail size={16} />}
+                      </span>
+                      <strong>{message.title}</strong>
+                      <span>{inboxTypeLabels[message.type]}</span>
+                    </span>
+                    <span>{message.summary ?? formatInboxPreview(message.message)}</span>
+                    <time>{formatDashboardDate(message.created_at)}</time>
+                  </button>
+                ))}
+              </div>
+
+              {selectedInboxMessage ? (
+                <article className="inbox-detail-panel">
+                  <div className="inbox-detail-heading">
+                    <span className="status-pill premium">{inboxTypeLabels[selectedInboxMessage.type]}</span>
+                    <time>{formatDashboardDate(selectedInboxMessage.created_at)}</time>
+                  </div>
+                  <h3>{selectedInboxMessage.title}</h3>
+                  {selectedInboxMessage.summary && <p className="muted">{selectedInboxMessage.summary}</p>}
+                  <p>{selectedInboxMessage.message}</p>
+                  {selectedInboxMessage.related_signal_id && (
+                    <p className="muted">Signal ID: {selectedInboxMessage.related_signal_id}</p>
+                  )}
+                </article>
+              ) : (
+                <div className="inbox-detail-panel inbox-detail-empty">
+                  <MailOpen size={22} aria-hidden="true" />
+                  <p className="muted">Select a notification to read it.</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="compact-empty-state">
+              <MailOpen size={20} aria-hidden="true" />
+              <p className="muted">No notifications in this view.</p>
+            </div>
+          )}
         </article>
 
-        <article className="section-panel">
+        <article className="section-panel dashboard-access-card">
           <span className="feature-icon">
             <WalletCards size={21} />
           </span>
@@ -378,87 +440,25 @@ export function Dashboard() {
             </Link>
           </div>
         </article>
-      </section>
 
-      <section className="section-panel inbox-panel">
-        <div className="lesson-title-line">
-          <div>
-            <p className="eyebrow">Inbox</p>
-            <h2>Account notifications</h2>
-          </div>
-          <span className={unreadInboxCount ? "status-pill premium" : "status-pill free"}>
-            <Bell size={15} />
-            {unreadInboxCount} unread
-          </span>
-        </div>
-
-        <div className="inbox-filter-row" aria-label="Inbox filters">
-          {inboxFilters.map((filter) => (
-            <button
-              className={inboxFilter === filter.value ? "filter-pill active" : "filter-pill"}
-              type="button"
-              onClick={() => setInboxFilter(filter.value)}
-              key={filter.value}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-
-        {inboxError && <p className="warning-box">{inboxError}</p>}
-
-        {isLoading ? (
-          <LoadingState label="Loading inbox" />
-        ) : filteredInboxMessages.length ? (
-          <div className="inbox-layout">
-            <div className="inbox-list" role="list">
-              {filteredInboxMessages.map((message) => (
-                <button
-                  className={`inbox-row ${selectedInboxMessage?.id === message.id ? "active" : ""} ${message.is_read ? "read" : "unread"}`}
-                  type="button"
-                  onClick={() => void openInboxMessage(message)}
-                  role="listitem"
-                  key={message.id}
-                >
-                  <span className="inbox-row-top">
-                    <span className="inbox-icon-frame">
-                      {message.is_read ? <MailOpen size={16} /> : <Mail size={16} />}
-                    </span>
-                    <strong>{message.title}</strong>
-                    <span>{inboxTypeLabels[message.type]}</span>
-                  </span>
-                  <span>{message.summary ?? formatInboxPreview(message.message)}</span>
-                  <time>{formatDashboardDate(message.created_at)}</time>
-                </button>
-              ))}
+        <article className="section-panel level-panel compact-level-panel dashboard-level-card">
+          <div className="level-compact-header">
+            <span className="feature-icon compact-icon">
+              <Award size={21} />
+            </span>
+            <div>
+              <h2>Learning Level</h2>
+              <span>{totalXP} total XP</span>
             </div>
-
-            {selectedInboxMessage ? (
-              <article className="inbox-detail-panel">
-                <div className="inbox-detail-heading">
-                  <span className="status-pill premium">{inboxTypeLabels[selectedInboxMessage.type]}</span>
-                  <time>{formatDashboardDate(selectedInboxMessage.created_at)}</time>
-                </div>
-                <h3>{selectedInboxMessage.title}</h3>
-                {selectedInboxMessage.summary && <p className="muted">{selectedInboxMessage.summary}</p>}
-                <p>{selectedInboxMessage.message}</p>
-                {selectedInboxMessage.related_signal_id && (
-                  <p className="muted">Signal ID: {selectedInboxMessage.related_signal_id}</p>
-                )}
-              </article>
-            ) : (
-              <div className="inbox-detail-panel inbox-detail-empty">
-                <MailOpen size={22} aria-hidden="true" />
-                <p className="muted">Select a notification to read it.</p>
-              </div>
-            )}
+            <span className="level-badge">LVL {levelProgress.level}</span>
           </div>
-        ) : (
-          <div className="compact-empty-state">
-            <MailOpen size={20} aria-hidden="true" />
-            <p className="muted">No notifications in this view.</p>
+          <div className="xp-progress-track" aria-label={`${levelProgress.progressPercent}% to next level`}>
+            <span style={{ width: `${levelProgress.progressPercent}%` }} />
           </div>
-        )}
+          <p className="level-next-line">
+            {levelProgress.xpIntoLevel}/{levelProgress.xpRequiredForNextLevel} XP - {levelProgress.xpRemainingForNextLevel} XP to LVL {levelProgress.level + 1}
+          </p>
+        </article>
       </section>
 
       {isLoading ? (

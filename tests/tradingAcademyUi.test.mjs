@@ -33,6 +33,14 @@ test("academy dashboard includes a subscriber risk calculator", () => {
   assert.match(dashboardSource, /RiskCalculatorPanel/);
   assert.match(dashboardSource, /calculateRisk/);
   assert.match(dashboardSource, /risk-calculator-panel/);
+  assert.match(dashboardSource, /takeProfits:\s*\[createRiskTakeProfitInput\(\)\]/);
+  assert.match(dashboardSource, /addRiskTakeProfit/);
+  assert.match(dashboardSource, /removeRiskTakeProfit/);
+  assert.match(dashboardSource, /riskLeverageOptions/);
+  assert.doesNotMatch(dashboardSource, /riskForm\.symbol|<label>\s*Pair/);
+  assert.doesNotMatch(dashboardSource, /placeholder="(?:63404|62555|64444|65555|66666)"/);
+  assert.match(dashboardSource, /Risk Breakdown/);
+  assert.match(dashboardSource, /Risk Assessment/);
 });
 
 test("charts market picker is a compact toolbar above the TradingView chart", () => {

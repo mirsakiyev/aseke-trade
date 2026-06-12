@@ -31,9 +31,12 @@ test("risk calculator sizes a long setup from account risk", () => {
   assert.equal(calculation.ok, true);
   assert.equal(calculation.result.symbol, "BTC/USDT");
   assert.equal(calculation.result.riskAmount, 10);
+  assert.equal(calculation.result.accountRiskPercent, 1);
   assert.equal(calculation.result.positionSizeUnits, 1);
   assert.equal(calculation.result.notionalPositionValue, 100);
   assert.equal(calculation.result.marginRequired, 20);
+  assert.equal(calculation.result.positionRiskPercent, 10);
+  assert.equal(calculation.result.marginUsedPercent, 2);
   assert.equal(calculation.result.takeProfits[0].profitAmount, 20);
   assert.equal(calculation.result.takeProfits[0].riskReward, 2);
 });

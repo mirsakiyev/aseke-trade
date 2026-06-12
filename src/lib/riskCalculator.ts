@@ -25,11 +25,14 @@ export interface RiskCalculatorResult {
   symbol: string;
   direction: RiskDirection;
   riskAmount: number;
+  accountRiskPercent: number;
   stopDistance: number;
   stopDistancePercent: number;
+  positionRiskPercent: number;
   positionSizeUnits: number;
   notionalPositionValue: number;
   marginRequired: number;
+  marginUsedPercent: number;
   estimatedLoss: number;
   takeProfits: RiskTakeProfitResult[];
   warnings: string[];
@@ -75,6 +78,8 @@ export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
   const marginRequired = notionalPositionValue / input.leverage;
   const estimatedLoss = positionSizeUnits * stopDistance;
   const stopDistancePercent = (stopDistance / input.entryPrice) * 100;
+  const positionRiskPercent = notionalPositionValue > 0 ? (estimatedLoss / notionalPositionValue) * 100 : 0;
+  const marginUsedPercent = (marginRequired / input.accountBalance) * 100;
   const validTakeProfitPrices = input.takeProfitPrices.filter(isPositive);
 
   if (input.riskPercent > 3) {
@@ -110,11 +115,14 @@ export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
       symbol: input.symbol.trim().toUpperCase(),
       direction: input.direction,
       riskAmount,
+      accountRiskPercent: input.riskPercent,
       stopDistance,
       stopDistancePercent,
+      positionRiskPercent,
       positionSizeUnits,
       notionalPositionValue,
       marginRequired,
+      marginUsedPercent,
       estimatedLoss,
       takeProfits,
       warnings
