@@ -4,30 +4,32 @@ import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import {
-  loadDailyPuzzle,
-  submitDailyPuzzle,
-  type DailyPuzzleSubmissionResult
+  loadPuzzle,
+  submitPuzzle as submitPuzzleAnswer,
+  type PuzzleSubmissionResult
 } from "../lib/gamificationApi";
 import { getProgressToNextLevel } from "../lib/levels";
-import type { DailyPuzzle } from "../types/content";
+import { getNextPuzzleRefreshTime } from "../lib/puzzleWindows";
+import type { Puzzle } from "../types/content";
 
 export function PuzzleOfTheDay() {
   const { user, refreshProfile } = useAuth();
-  const [puzzle, setPuzzle] = useState<DailyPuzzle | null>(null);
+  const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
   const [answer, setAnswer] = useState("");
-  const [result, setResult] = useState<DailyPuzzleSubmissionResult | null>(null);
+  const [result, setResult] = useState<PuzzleSubmissionResult | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     let mounted = true;
 
-    loadDailyPuzzle()
+    loadPuzzle()
       .then((nextPuzzle) => {
         if (!mounted) return;
         setPuzzle(nextPuzzle);
-        setNotice(nextPuzzle ? null : "Connect Supabase and run migrations to load today's puzzle.");
+        setNotice(nextPuzzle ? null : "Connect Supabase and run migrations to load the current puzzle.");
       })
       .finally(() => {
         if (mounted) setIsLoading(false);
@@ -36,6 +38,11 @@ export function PuzzleOfTheDay() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const submitPuzzle = async () => {
@@ -50,9 +57,17 @@ export function PuzzleOfTheDay() {
     setNotice(null);
 
     try {
-      const nextResult = await submitDailyPuzzle(puzzle.id, answer);
+      const nextResult = await submitPuzzleAnswer(puzzle.id, answer);
       setResult(nextResult);
-      setPuzzle((current) => (current ? { ...current, reward_claimed: current.reward_claimed || nextResult.is_correct } : current));
+      setPuzzle((current) =>
+        current
+          ? {
+              ...current,
+              reward_claimed: current.reward_claimed || nextResult.is_correct,
+              user_completed: current.user_completed || nextResult.is_correct
+            }
+          : current
+      );
       await refreshProfile();
     } catch {
       setNotice("Puzzle answer could not be submitted. Please try again.");
@@ -61,15 +76,18 @@ export function PuzzleOfTheDay() {
     }
   };
 
+  const nextRefresh = puzzle?.next_refresh_at ? new Date(puzzle.next_refresh_at) : getNextPuzzleRefreshTime(now);
+  const refreshCountdown = formatRefreshCountdown(nextRefresh, now);
+
   return (
     <main className="page page-stack">
       <section className="page-title-row puzzle-title-row">
         <div>
-          <p className="eyebrow">Puzzle of the Day</p>
-          <h1>Daily crypto challenge</h1>
+          <p className="eyebrow">Puzzle</p>
+          <h1>Crypto challenge</h1>
           <p className="muted">
-            Solve the daily puzzle. The first correct solver receives 100 XP; everyone else can still
-            submit and check their answer.
+            Solve the current puzzle window. A new challenge refreshes every 4 hours at 00:00, 04:00,
+            08:00, 12:00, 16:00, and 20:00 UTC.
           </p>
         </div>
         <span className="quiz-title-mark" aria-hidden="true">
@@ -86,7 +104,7 @@ export function PuzzleOfTheDay() {
           <article className="section-panel puzzle-panel">
             <div className="lesson-title-line">
               <div>
-                <p className="eyebrow">{formatPuzzleDate(puzzle.puzzle_date)}</p>
+                <p className="eyebrow">{formatPuzzleWindow(puzzle.window_start_at)}</p>
                 <h2>{puzzle.title}</h2>
               </div>
               <span className={puzzle.reward_claimed ? "status-pill free" : "status-pill premium"}>
@@ -106,7 +124,7 @@ export function PuzzleOfTheDay() {
                 value={answer}
                 onChange={(event) => setAnswer(event.target.value)}
                 placeholder="Type your answer"
-                disabled={isSubmitting}
+                disabled={isSubmitting || puzzle.user_completed}
               />
             </label>
 
@@ -114,10 +132,10 @@ export function PuzzleOfTheDay() {
               <button
                 className="primary-button"
                 type="button"
-                disabled={!answer.trim() || isSubmitting}
+                disabled={!answer.trim() || isSubmitting || puzzle.user_completed}
                 onClick={() => void submitPuzzle()}
               >
-                Submit answer
+                {puzzle.user_completed ? "Puzzle completed" : "Submit answer"}
                 <CheckCircle2 size={18} />
               </button>
               {!user && (
@@ -139,7 +157,7 @@ export function PuzzleOfTheDay() {
             <ul className="check-list">
               <li>
                 <CheckCircle2 size={17} />
-                <span>One puzzle is shown each day.</span>
+                <span>A new puzzle appears every 4 hours on a UTC schedule.</span>
               </li>
               <li>
                 <CheckCircle2 size={17} />
@@ -149,20 +167,25 @@ export function PuzzleOfTheDay() {
                 <CheckCircle2 size={17} />
                 <span>Later correct solvers can see their result, but the XP reward stays claimed.</span>
               </li>
+              <li>
+                <CheckCircle2 size={17} />
+                <span>Next refresh: {refreshCountdown}.</span>
+              </li>
             </ul>
           </aside>
         </section>
       ) : (
         <section className="section-panel">
           <h2>Puzzle unavailable</h2>
-          <p className="muted">Today's puzzle could not be loaded.</p>
+          <p className="muted">The current puzzle could not be loaded.</p>
+          <p className="muted">Next refresh: {refreshCountdown}.</p>
         </section>
       )}
     </main>
   );
 }
 
-function PuzzleResultPanel({ result }: { result: DailyPuzzleSubmissionResult }) {
+function PuzzleResultPanel({ result }: { result: PuzzleSubmissionResult }) {
   if (!result.is_correct) {
     return (
       <div className="quiz-explanation incorrect" aria-live="polite">
@@ -185,8 +208,8 @@ function PuzzleResultPanel({ result }: { result: DailyPuzzleSubmissionResult }) 
       </strong>
       <p>
         {result.is_first_solver
-          ? "You claimed today's first-solver reward."
-          : "Today's XP reward was already claimed by an earlier solver."}
+          ? "You claimed this window's first-solver reward."
+          : "This window's XP reward was already claimed by an earlier solver."}
       </p>
       <div className="xp-mini-summary">
         <span className="level-badge">LVL {result.level}</span>
@@ -200,16 +223,31 @@ function PuzzleResultPanel({ result }: { result: DailyPuzzleSubmissionResult }) 
   );
 }
 
-function formatPuzzleDate(value: string): string {
-  const date = new Date(`${value}T00:00:00`);
+function formatPuzzleWindow(value: string): string {
+  const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Today";
+    return "Current window";
   }
 
   return new Intl.DateTimeFormat(undefined, {
     month: "long",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
   }).format(date);
+}
+
+function formatRefreshCountdown(refreshAt: Date, now: Date): string {
+  const remainingMs = Math.max(0, refreshAt.getTime() - now.getTime());
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }

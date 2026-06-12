@@ -522,67 +522,69 @@ function SignalCard({ signal, showPastSummary = false }: { signal: TradingSignal
 
   return (
     <article className="signal-card academy-signal-card">
-      {signal.chart_image_url ? (
-        <img className="signal-chart-image" src={signal.chart_image_url} alt="" />
-      ) : (
-        <div className="signal-chart-empty">Chart pending</div>
-      )}
-      <div className="signal-card-body">
-        <div className="lesson-title-line">
-          <div>
-            <p className="eyebrow">{signal.symbol}</p>
-            <h3>{title}</h3>
-          </div>
-          <span className={`status-pill ${signal.status === "hit_sl" ? "danger" : "premium"}`}>
-            {formatSignalStatus(signal.status)}
-          </span>
-        </div>
-
-        <dl className="signal-level-grid">
-          <SignalLevel label="Direction" value={direction.toUpperCase()} />
-          <SignalLevel label="Leverage" value={`${leverage}X`} />
-          <SignalLevel label="Entry" value={original?.entryPrice ?? signal.entry_price} />
-          <SignalLevel label="SL" value={original?.stopLoss ?? signal.stop_loss} />
-          <SignalLevel label="Creation price" value={original?.priceAtCreation ?? signal.price_at_creation} />
-          <SignalLevel label="Opened" value={formatDateTime(original?.createdAt ?? signal.created_at)} />
-        </dl>
-
-        <div className="signal-detail-block">
-          <h4>Take Profits</h4>
-          <ul className="signal-tp-list">
-            {displayTakeProfits.map((takeProfit, index) => (
-              <li className={takeProfit.isHit ? "hit" : ""} key={takeProfit.id}>
-                <strong>TP{index + 1}: {formatSignalPrice(takeProfit.price)}</strong>
-                <span>
-                  {formatPercent(takeProfit.positionSizePercent)}% - {takeProfit.isHit ? "Hit" : "Pending"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {showPastSummary && (
-          <dl className="signal-level-grid">
-            <SignalLevel label="Final status" value={formatSignalStatus(signal.status)} />
-            <SignalLevel label="Final price" value={signal.final_price ?? signal.manual_close_price ?? signal.stop_loss} />
-            <SignalLevel label="Closed" value={signal.closed_at ? formatDateTime(signal.closed_at) : "Pending"} />
-            <SignalLevel label="Final ROI" value={finalRoi === null ? "N/A" : formatRoi(finalRoi)} />
-          </dl>
+      <div className="signal-card-setup">
+        {signal.chart_image_url ? (
+          <img className="signal-chart-image" src={signal.chart_image_url} alt="" />
+        ) : (
+          <div className="signal-chart-empty">Chart pending</div>
         )}
+        <div className="signal-card-body">
+          <div className="lesson-title-line">
+            <div>
+              <p className="eyebrow">{signal.symbol}</p>
+              <h3>{title}</h3>
+            </div>
+            <span className={`status-pill ${signal.status === "hit_sl" ? "danger" : "premium"}`}>
+              {formatSignalStatus(signal.status)}
+            </span>
+          </div>
 
-        {(original?.notes || signal.notes) && <p className="muted">{original?.notes ?? signal.notes}</p>}
+          <dl className="signal-level-grid">
+            <SignalLevel label="Direction" value={direction.toUpperCase()} />
+            <SignalLevel label="Leverage" value={`${leverage}X`} />
+            <SignalLevel label="Entry" value={original?.entryPrice ?? signal.entry_price} />
+            <SignalLevel label="SL" value={original?.stopLoss ?? signal.stop_loss} />
+            <SignalLevel label="Creation price" value={original?.priceAtCreation ?? signal.price_at_creation} />
+            <SignalLevel label="Opened" value={formatDateTime(original?.createdAt ?? signal.created_at)} />
+          </dl>
 
-        <div className="signal-detail-block">
-          <h4>Updates</h4>
-          <ol className="signal-timeline">
-            {updates.map((update) => (
-              <li key={update.id}>
-                <time>{formatDateTime(update.createdAt)}</time>
-                <span>{update.message}</span>
-              </li>
-            ))}
-          </ol>
+          <div className="signal-detail-block">
+            <h4>Take Profits</h4>
+            <ul className="signal-tp-list">
+              {displayTakeProfits.map((takeProfit, index) => (
+                <li className={takeProfit.isHit ? "hit" : ""} key={takeProfit.id}>
+                  <strong>TP{index + 1}: {formatSignalPrice(takeProfit.price)}</strong>
+                  <span>
+                    {formatPercent(takeProfit.positionSizePercent)}% - {takeProfit.isHit ? "Hit" : "Pending"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {showPastSummary && (
+            <dl className="signal-level-grid">
+              <SignalLevel label="Final status" value={formatSignalStatus(signal.status)} />
+              <SignalLevel label="Final price" value={signal.final_price ?? signal.manual_close_price ?? signal.stop_loss} />
+              <SignalLevel label="Closed" value={signal.closed_at ? formatDateTime(signal.closed_at) : "Pending"} />
+              <SignalLevel label="Final ROI" value={finalRoi === null ? "N/A" : formatRoi(finalRoi)} />
+            </dl>
+          )}
+
+          {(original?.notes || signal.notes) && <p className="muted">{original?.notes ?? signal.notes}</p>}
         </div>
+      </div>
+
+      <div className="signal-detail-block signal-card-updates">
+        <h4>Updates</h4>
+        <ol className="signal-timeline">
+          {updates.map((update) => (
+            <li key={update.id}>
+              <time>{formatDateTime(update.createdAt)}</time>
+              <span>{update.message}</span>
+            </li>
+          ))}
+        </ol>
       </div>
     </article>
   );

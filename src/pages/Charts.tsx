@@ -1,19 +1,50 @@
-import { ArrowRight, BarChart3 } from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, ArrowRight, BarChart3, RefreshCw, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { TradingViewChart } from "../components/TradingViewChart";
-
-const chartAssets = [
-  { title: "Bitcoin", ticker: "BTC/USDT", symbol: "BINANCE:BTCUSDT" },
-  { title: "Ethereum", ticker: "ETH/USDT", symbol: "BINANCE:ETHUSDT" },
-  { title: "BNB", ticker: "BNB/USDT", symbol: "BINANCE:BNBUSDT" },
-  { title: "Solana", ticker: "SOL/USDT", symbol: "BINANCE:SOLUSDT" },
-  { title: "XRP", ticker: "XRP/USDT", symbol: "BINANCE:XRPUSDT" },
-  { title: "Cardano", ticker: "ADA/USDT", symbol: "BINANCE:ADAUSDT" }
-];
+import {
+  chartAssetFromCoin,
+  coreChartAssets,
+  fetchTopCryptoCoins,
+  filterCryptoCoins,
+  type ChartAsset,
+  type CryptoMarketCoin
+} from "../lib/cryptoMarkets";
 
 export function Charts() {
-  const [selectedAsset, setSelectedAsset] = useState(chartAssets[0]);
+  const [selectedAsset, setSelectedAsset] = useState<ChartAsset>(coreChartAssets[0]);
+  const [coins, setCoins] = useState<CryptoMarketCoin[]>([]);
+  const [coinSearch, setCoinSearch] = useState("");
+  const [isLoadingCoins, setIsLoadingCoins] = useState(true);
+  const [coinError, setCoinError] = useState<string | null>(null);
+
+  const loadCoinList = async () => {
+    setIsLoadingCoins(true);
+    setCoinError(null);
+
+    try {
+      const nextCoins = await fetchTopCryptoCoins();
+      setCoins(nextCoins);
+    } catch {
+      setCoinError("Market list could not be loaded.");
+    } finally {
+      setIsLoadingCoins(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadCoinList();
+  }, []);
+
+  const filteredCoins = useMemo(
+    () => filterCryptoCoins(coins, coinSearch).slice(0, coinSearch.trim() ? 16 : 12),
+    [coinSearch, coins]
+  );
+
+  const selectCoin = (coin: CryptoMarketCoin) => {
+    setSelectedAsset(chartAssetFromCoin(coin));
+    setCoinSearch(`${coin.name} (${coin.symbol})`);
+  };
 
   return (
     <main className="page page-stack charts-page">
@@ -32,23 +63,83 @@ export function Charts() {
       </section>
 
       <section className="chart-selector-panel" aria-label="Choose chart asset">
-        <div>
+        <div className="chart-selector-summary">
           <p className="eyebrow">Select Market</p>
           <h2>{selectedAsset.title} chart</h2>
+          <span>{selectedAsset.ticker}</span>
         </div>
-        <div className="chart-selector" role="tablist" aria-label="Cryptocurrency chart selector">
-          {chartAssets.map((asset) => (
-            <button
-              className={asset.symbol === selectedAsset.symbol ? "filter-pill active" : "filter-pill"}
-              type="button"
-              onClick={() => setSelectedAsset(asset)}
-              aria-selected={asset.symbol === selectedAsset.symbol}
-              role="tab"
-              key={asset.symbol}
-            >
-              {asset.ticker}
-            </button>
-          ))}
+        <div className="chart-selector-stack">
+          <div className="chart-selector" role="tablist" aria-label="Core cryptocurrency chart selector">
+            {coreChartAssets.map((asset) => (
+              <button
+                className={asset.id === selectedAsset.id ? "filter-pill active" : "filter-pill"}
+                type="button"
+                onClick={() => setSelectedAsset(asset)}
+                aria-selected={asset.id === selectedAsset.id}
+                role="tab"
+                key={asset.id}
+              >
+                {asset.ticker}
+              </button>
+            ))}
+          </div>
+
+          <div className="coin-search-panel">
+            <label className="coin-search-label">
+              <Search size={17} aria-hidden="true" />
+              <span className="sr-only">Search top crypto markets</span>
+              <input
+                value={coinSearch}
+                onChange={(event) => setCoinSearch(event.target.value)}
+                placeholder="Search top 200 coins"
+                aria-controls="coin-search-results"
+              />
+            </label>
+
+            <div className="coin-search-meta">
+              <span>Top 200 by market cap</span>
+              <button className="icon-button compact-icon-button" type="button" onClick={() => void loadCoinList()}>
+                <RefreshCw size={15} />
+                <span className="sr-only">Refresh market list</span>
+              </button>
+            </div>
+
+            <div className="coin-search-results" id="coin-search-results" role="listbox">
+              {isLoadingCoins ? (
+                <span className="coin-search-state">Loading markets...</span>
+              ) : coinError ? (
+                <span className="coin-search-state error">
+                  <AlertCircle size={15} />
+                  {coinError}
+                </span>
+              ) : filteredCoins.length ? (
+                filteredCoins.map((coin) => {
+                  const asset = chartAssetFromCoin(coin);
+
+                  return (
+                    <button
+                      className={asset.id === selectedAsset.id ? "coin-option active" : "coin-option"}
+                      type="button"
+                      onClick={() => selectCoin(coin)}
+                      role="option"
+                      aria-selected={asset.id === selectedAsset.id}
+                      key={coin.id}
+                    >
+                      {coin.image && <img src={coin.image} alt="" aria-hidden="true" />}
+                      <span>
+                        <strong>{coin.name}</strong>
+                        <small>
+                          #{coin.rank} {coin.symbol}
+                        </small>
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <span className="coin-search-state">No matching markets.</span>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -58,7 +149,7 @@ export function Charts() {
           title={selectedAsset.title}
           ticker={selectedAsset.ticker}
           height={620}
-          key={selectedAsset.symbol}
+          key={`${selectedAsset.id}-${selectedAsset.symbol}`}
         />
       </section>
 

@@ -90,14 +90,20 @@ export interface XPTransaction {
   created_at: string;
 }
 
-export interface DailyPuzzle {
+export interface Puzzle {
   id: string;
-  puzzle_date: string;
+  puzzle_date?: string;
+  puzzle_window_id: string;
+  window_start_at: string;
+  next_refresh_at: string;
   title: string;
   prompt: string;
   category: string;
   reward_claimed: boolean;
+  user_completed: boolean;
 }
+
+export type DailyPuzzle = Puzzle;
 
 export interface DailyPuzzleSolve {
   id: string;

@@ -329,7 +329,7 @@ export function Dashboard() {
               </ul>
             ) : (
               <p className="muted">
-                Pass guide quizzes and solve the daily puzzle to build your XP history.
+                Pass guide quizzes and solve the current puzzle to build your XP history.
               </p>
             )}
           </article>

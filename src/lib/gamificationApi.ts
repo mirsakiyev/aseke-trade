@@ -1,4 +1,5 @@
-import type { DailyPuzzle, GuideQuiz } from "../types/content";
+import { getCurrentPuzzleWindow } from "./puzzleWindows";
+import type { DailyPuzzle, GuideQuiz, Puzzle } from "../types/content";
 import { supabase } from "./supabase";
 
 export interface GuideQuizSubmissionResult {
@@ -19,6 +20,8 @@ export interface DailyPuzzleSubmissionResult {
   total_xp: number;
   level: number;
 }
+
+export type PuzzleSubmissionResult = DailyPuzzleSubmissionResult;
 
 type GuideQuizRow = Omit<GuideQuiz, "answer_options"> & {
   answer_options: unknown;
@@ -66,29 +69,29 @@ export async function submitGuideQuiz(
   return row as GuideQuizSubmissionResult;
 }
 
-export async function loadDailyPuzzle(): Promise<DailyPuzzle | null> {
+export async function loadPuzzle(): Promise<Puzzle | null> {
   if (!supabase) return null;
 
-  const { data, error } = await supabase.rpc("get_daily_puzzle");
+  const { data, error } = await supabase.rpc("get_puzzle");
 
   if (error) {
-    console.warn("Daily puzzle could not be loaded", error);
+    console.warn("Puzzle could not be loaded", error);
     return null;
   }
 
   const row = Array.isArray(data) ? data[0] : data;
-  return (row as DailyPuzzle | null) ?? null;
+  return normalizePuzzleRow(row);
 }
 
-export async function submitDailyPuzzle(
+export async function submitPuzzle(
   puzzleId: string,
   submittedAnswer: string
-): Promise<DailyPuzzleSubmissionResult> {
+): Promise<PuzzleSubmissionResult> {
   if (!supabase) {
     throw new Error("Supabase is not connected.");
   }
 
-  const { data, error } = await supabase.rpc("submit_daily_puzzle", {
+  const { data, error } = await supabase.rpc("submit_puzzle", {
     target_puzzle_id: puzzleId,
     submitted_answer: submittedAnswer
   });
@@ -99,6 +102,37 @@ export async function submitDailyPuzzle(
   if (!row) throw new Error("Puzzle response was empty.");
 
   return row as DailyPuzzleSubmissionResult;
+}
+
+export async function loadDailyPuzzle(): Promise<DailyPuzzle | null> {
+  return loadPuzzle();
+}
+
+export async function submitDailyPuzzle(
+  puzzleId: string,
+  submittedAnswer: string
+): Promise<DailyPuzzleSubmissionResult> {
+  return submitPuzzle(puzzleId, submittedAnswer);
+}
+
+function normalizePuzzleRow(value: unknown): Puzzle | null {
+  if (!value || typeof value !== "object") return null;
+
+  const row = value as Partial<Puzzle>;
+  const fallbackWindow = getCurrentPuzzleWindow();
+
+  return {
+    id: String(row.id ?? ""),
+    puzzle_date: row.puzzle_date,
+    puzzle_window_id: row.puzzle_window_id ?? fallbackWindow.id,
+    window_start_at: row.window_start_at ?? fallbackWindow.start.toISOString(),
+    next_refresh_at: row.next_refresh_at ?? fallbackWindow.nextRefresh.toISOString(),
+    title: String(row.title ?? ""),
+    prompt: String(row.prompt ?? ""),
+    category: String(row.category ?? "crypto puzzle"),
+    reward_claimed: Boolean(row.reward_claimed),
+    user_completed: Boolean(row.user_completed)
+  };
 }
 
 function normalizeAnswerOptions(value: unknown): string[] {

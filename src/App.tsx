@@ -25,6 +25,7 @@ import { Terms } from "./pages/Terms";
 import { TradingAcademyDashboard } from "./pages/TradingAcademyDashboard";
 
 const Charts = lazy(() => import("./pages/Charts").then((module) => ({ default: module.Charts })));
+const CryptoGlossary = lazy(() => import("./pages/CryptoGlossary").then((module) => ({ default: module.CryptoGlossary })));
 const CryptoQuiz = lazy(() => import("./pages/CryptoQuiz").then((module) => ({ default: module.CryptoQuiz })));
 
 export default function App() {
@@ -66,6 +67,14 @@ export default function App() {
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
         <Route path="terms" element={<Terms />} />
+        <Route
+          path="crypto-glossary"
+          element={
+            <Suspense fallback={<LoadingState label="Loading glossary" />}>
+              <CryptoGlossary />
+            </Suspense>
+          }
+        />
         <Route path="reset-password" element={<ResetPassword />} />
         <Route
           path="dashboard"
