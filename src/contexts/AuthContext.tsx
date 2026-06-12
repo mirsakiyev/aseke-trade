@@ -1,6 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
+import { hasTradingAcademyAccess } from "../lib/tradingAcademyAccess";
 import { safeErrorMessage, sanitizePlainText, validateEmail, validatePassword } from "../lib/validation";
 import type { Profile } from "../types/content";
 
@@ -17,6 +18,7 @@ interface AuthContextValue {
   isConfigured: boolean;
   isAdmin: boolean;
   isPremium: boolean;
+  isTradingAcademyMember: boolean;
   signIn: (email: string, password: string) => Promise<AuthActionResult>;
   signUp: (fullName: string, email: string, password: string, termsAccepted: boolean) => Promise<AuthActionResult>;
   signOut: () => Promise<void>;
@@ -27,11 +29,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 function profileHasPremium(profile: Profile | null): boolean {
-  if (!profile) return false;
-  if (profile.role === "admin") return true;
-  if (profile.premium_starts_at && new Date(profile.premium_starts_at).getTime() > Date.now()) return false;
-  if (!profile.premium_until) return false;
-  return new Date(profile.premium_until).getTime() > Date.now();
+  return hasTradingAcademyAccess(profile);
 }
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
@@ -194,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isConfigured: isSupabaseConfigured,
       isAdmin: profile?.role === "admin",
       isPremium: profileHasPremium(profile),
+      isTradingAcademyMember: profileHasPremium(profile),
       signIn,
       signUp,
       signOut,

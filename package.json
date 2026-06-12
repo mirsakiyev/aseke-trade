@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "test:levels": "node --test tests/levels.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:levels": "node --test tests/levels.test.mjs",
+    "test:academy": "node --test tests/tradingAcademyAccess.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

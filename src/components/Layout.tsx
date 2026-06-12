@@ -17,6 +17,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { BtcTicker } from "./BtcTicker";
 import { useAuth } from "../contexts/AuthContext";
 import { useAccountStatus } from "../hooks/useAccountStatus";
+import { tradingAcademyNavPath } from "../lib/tradingAcademyAccess";
 import { applyRandomHoverCharts } from "../utils/hoverCharts";
 
 const navItems = [
@@ -30,10 +31,15 @@ const navItems = [
 ];
 
 export function Layout() {
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, profile, isAdmin, signOut } = useAuth();
   const accountStatus = useAccountStatus();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const resolvedNavItems = navItems.map((item) =>
+    item.to === "/trading-academy"
+      ? { ...item, to: tradingAcademyNavPath(Boolean(user), profile) }
+      : item
+  );
 
   const closeMenu = () => setMenuOpen(false);
   const handleSignOut = () => {
@@ -76,7 +82,7 @@ export function Layout() {
           id="primary-navigation"
           aria-label="Primary navigation"
         >
-          {navItems.map((item) => (
+          {resolvedNavItems.map((item) => (
             <NavItem item={item} closeMenu={closeMenu} key={item.to} />
           ))}
 

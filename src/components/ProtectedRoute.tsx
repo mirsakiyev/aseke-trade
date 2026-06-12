@@ -5,12 +5,14 @@ import { LoadingState } from "./LoadingState";
 
 export function ProtectedRoute({
   children,
-  requireAdmin = false
+  requireAdmin = false,
+  requireTradingAcademy = false
 }: {
   children: ReactNode;
   requireAdmin?: boolean;
+  requireTradingAcademy?: boolean;
 }) {
-  const { isLoading, user, isAdmin } = useAuth();
+  const { isLoading, user, isAdmin, isTradingAcademyMember } = useAuth();
   const location = useLocation();
 
   if (isLoading) return <LoadingState label="Checking account" />;
@@ -32,6 +34,10 @@ export function ProtectedRoute({
         </section>
       </main>
     );
+  }
+
+  if (requireTradingAcademy && !isTradingAcademyMember) {
+    return <Navigate to="/trading-academy" replace />;
   }
 
   return <>{children}</>;

@@ -1,4 +1,4 @@
-import { CalendarClock, Edit3, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from "lucide-react";
+import { CalendarClock, Crown, Edit3, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
@@ -432,6 +432,10 @@ export function Admin() {
           </p>
         </div>
         <div className="inline-actions">
+          <Link className="ghost-button" to="/admin/trading-academy">
+            <Crown size={17} />
+            Academy Tools
+          </Link>
           <Link className="ghost-button" to="/admin/crypto-payments">
             <WalletCards size={17} />
             Crypto Payments

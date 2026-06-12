@@ -233,10 +233,81 @@ export interface AccountBalanceTransaction {
   plan_id: PremiumPlanId | null;
   plan_duration_months: number | null;
   premium_subscription_id: string | null;
-  transaction_type: "deposit" | "purchase" | "refund" | "adjustment";
+  transaction_type: "deposit" | "purchase" | "refund" | "adjustment" | "fee";
   amount_cents: number;
   description: string | null;
   created_at: string;
+}
+
+export type TradingSignalDirection = "long" | "short" | "spot" | "update";
+export type TradingSignalStatus = "draft" | "active" | "closed" | "cancelled" | "hit_tp" | "hit_sl";
+
+export interface TradingSignal {
+  id: string;
+  title: string | null;
+  symbol: string;
+  direction: TradingSignalDirection;
+  entry_price: string | number;
+  stop_loss: string | number;
+  take_profit_1: string | number;
+  take_profit_2: string | number;
+  take_profit_3: string | number;
+  additional_take_profits: Array<string | number>;
+  price_at_creation: string | number;
+  chart_image_url: string | null;
+  notes: string | null;
+  status: TradingSignalStatus;
+  is_active: boolean;
+  created_by_admin_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AmlCheckStatus = "pending" | "in_review" | "completed" | "rejected" | "refunded";
+
+export interface AmlCheckRequest {
+  id: string;
+  user_id: string;
+  address: string;
+  network: string;
+  notes: string | null;
+  status: AmlCheckStatus;
+  admin_result: string | null;
+  admin_notes: string | null;
+  amount_charged_cents: number;
+  transaction_id: string | null;
+  idempotency_key: string | null;
+  reviewed_by_admin_id: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export type PremiumSupportPriority = "low" | "normal" | "high" | "urgent";
+export type PremiumSupportStatus = "open" | "in_review" | "answered" | "closed";
+
+export interface PremiumSupportRequest {
+  id: string;
+  user_id: string;
+  subject: string;
+  message: string;
+  category: string | null;
+  priority: PremiumSupportPriority;
+  status: PremiumSupportStatus;
+  admin_response: string | null;
+  admin_notes: string | null;
+  reviewed_by_admin_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TradingAcademyLeaderboardRow {
+  rank: number;
+  member_key: string;
+  display_name: string;
+  level: number;
+  total_xp: number;
+  joined_at: string;
 }
 
 export interface PremiumSubscription {

@@ -6,6 +6,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AccountPayments } from "./pages/AccountPayments";
 import { Admin } from "./pages/Admin";
 import { AdminCryptoPayments } from "./pages/AdminCryptoPayments";
+import { AdminTradingAcademy } from "./pages/AdminTradingAcademy";
 import { CourseDetail } from "./pages/CourseDetail";
 import { Courses } from "./pages/Courses";
 import { CryptoCheckout } from "./pages/CryptoCheckout";
@@ -21,6 +22,7 @@ import { PuzzleOfTheDay } from "./pages/PuzzleOfTheDay";
 import { Register } from "./pages/Register";
 import { ResetPassword } from "./pages/ResetPassword";
 import { Terms } from "./pages/Terms";
+import { TradingAcademyDashboard } from "./pages/TradingAcademyDashboard";
 
 const Charts = lazy(() => import("./pages/Charts").then((module) => ({ default: module.Charts })));
 const CryptoQuiz = lazy(() => import("./pages/CryptoQuiz").then((module) => ({ default: module.CryptoQuiz })));
@@ -51,6 +53,14 @@ export default function App() {
           }
         />
         <Route path="trading-academy" element={<Premium />} />
+        <Route
+          path="trading-academy/dashboard"
+          element={
+            <ProtectedRoute requireTradingAcademy>
+              <TradingAcademyDashboard />
+            </ProtectedRoute>
+          }
+        />
         <Route path="puzzle-of-the-day" element={<PuzzleOfTheDay />} />
         <Route path="premium" element={<Navigate to="/trading-academy" replace />} />
         <Route path="login" element={<Login />} />
@@ -102,6 +112,14 @@ export default function App() {
           element={
             <ProtectedRoute requireAdmin>
               <AdminCryptoPayments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/trading-academy"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminTradingAcademy />
             </ProtectedRoute>
           }
         />

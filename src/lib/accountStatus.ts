@@ -1,5 +1,6 @@
 import type { Profile } from "../types/content";
 import { TRADING_ACADEMY_PRODUCT_LABEL } from "./premiumPlans";
+import { hasTradingAcademyAccess } from "./tradingAcademyAccess";
 
 export type AccountPlanLabel = "Basic" | typeof TRADING_ACADEMY_PRODUCT_LABEL;
 
@@ -15,12 +16,7 @@ export function formatUsd(cents: number): string {
 }
 
 export function hasActivePremiumAccess(profile: Profile | null, now = Date.now()): boolean {
-  if (!profile) return false;
-  if (profile.role === "admin") return true;
-  if (profile.premium_starts_at && new Date(profile.premium_starts_at).getTime() > now) return false;
-  if (!profile.premium_until) return false;
-
-  return new Date(profile.premium_until).getTime() > now;
+  return hasTradingAcademyAccess(profile, now);
 }
 
 export function accountPlanLabel(profile: Profile | null): AccountPlanLabel {
