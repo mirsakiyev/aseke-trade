@@ -19,6 +19,14 @@ test("migration defines Trading Academy access, leaderboard, signals, AML, and s
   }
 });
 
+test("leaderboard ranks active Trading Academy subscribers and excludes admins", () => {
+  assert.match(migration, /from public\.premium_subscriptions as ps/i);
+  assert.match(migration, /ps\.product_type = 'premium'/i);
+  assert.match(migration, /ps\.status in \('pending', 'active'\)/i);
+  assert.match(migration, /join public\.profiles as p on p\.id = active_members\.user_id/i);
+  assert.match(migration, /where p\.role <> 'admin'/i);
+});
+
 test("AML RPC locks balance, checks funds, writes fee ledger, and creates the request", () => {
   assert.match(migration, /for update/i);
   assert.match(migration, /available_balance < fee_cents/i);

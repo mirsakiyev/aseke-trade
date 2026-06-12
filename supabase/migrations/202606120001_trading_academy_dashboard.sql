@@ -147,19 +147,30 @@ begin
   end if;
 
   return query
+  with active_members as (
+    select
+      ps.user_id,
+      min(ps.starts_at) as joined_at
+    from public.premium_subscriptions as ps
+    where ps.product_type = 'premium'
+      and ps.status in ('pending', 'active')
+      and ps.starts_at <= now()
+      and ps.expires_at > now()
+    group by ps.user_id
+  )
   select
     row_number() over (
-      order by p.level desc, p.total_xp desc, p.created_at asc, p.id asc
+      order by p.level desc, p.total_xp desc, active_members.joined_at asc, p.id asc
     )::integer as rank,
-    substr(encode(digest(p.id::text, 'sha256'), 'hex'), 1, 16) as member_key,
+    substr(md5(p.id::text), 1, 16) as member_key,
     coalesce(nullif(p.username, ''), nullif(p.full_name, ''), 'Academy learner') as display_name,
     p.level,
     p.total_xp,
-    p.created_at as joined_at
-  from public.profiles as p
+    active_members.joined_at
+  from active_members
+  join public.profiles as p on p.id = active_members.user_id
   where p.role <> 'admin'
-    and public.user_has_trading_academy_access(p.id)
-  order by p.level desc, p.total_xp desc, p.created_at asc, p.id asc;
+  order by p.level desc, p.total_xp desc, active_members.joined_at asc, p.id asc;
 end;
 $$;
 

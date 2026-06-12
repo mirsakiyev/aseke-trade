@@ -6,11 +6,9 @@ import {
   RefreshCw,
   SearchCheck,
   Send,
-  ShieldCheck,
   Trophy
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { useAccountStatus } from "../hooks/useAccountStatus";
@@ -207,48 +205,30 @@ export function TradingAcademyDashboard() {
         <LoadingState label="Loading Trading Academy" />
       ) : (
         <>
-          <section className="dashboard-grid">
-            <article className="section-panel leaderboard-panel">
-              <div className="lesson-title-line">
-                <div>
-                  <p className="eyebrow">Leaderboard</p>
-                  <h2>Top Academy learners</h2>
-                </div>
-                <Trophy size={28} aria-hidden="true" />
+          <section className="section-panel leaderboard-panel">
+            <div className="lesson-title-line">
+              <div>
+                <p className="eyebrow">Leaderboard</p>
+                <h2>Top Academy learners</h2>
               </div>
-              {leaderboard.length ? (
-                <ol className="leaderboard-list">
-                  {leaderboard.map((row) => (
-                    <li className={`leaderboard-row ${leaderboardRankTone(row.rank)}`} key={row.member_key}>
-                      <span className="leaderboard-rank">#{row.rank}</span>
-                      <span>
-                        <strong>{row.display_name}</strong>
-                        <small>{row.total_xp} XP</small>
-                      </span>
-                      <span className="level-badge">LVL {row.level}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="muted">No Trading Academy users are ranked yet.</p>
-              )}
-            </article>
-
-            <article className="section-panel">
-              <span className="feature-icon">
-                <ShieldCheck size={21} />
-              </span>
-              <h2>Account balance</h2>
-              <dl className="detail-list">
-                <div>
-                  <dt>Available</dt>
-                  <dd>{accountStatus.balanceLabel}</dd>
-                </div>
-              </dl>
-              <Link className="ghost-button compact" to="/account/payments">
-                Top up balance
-              </Link>
-            </article>
+              <Trophy size={28} aria-hidden="true" />
+            </div>
+            {leaderboard.length ? (
+              <ol className="leaderboard-list">
+                {leaderboard.map((row) => (
+                  <li className={`leaderboard-row ${leaderboardRankTone(row.rank)}`} key={row.member_key}>
+                    <span className="leaderboard-rank">#{row.rank}</span>
+                    <span>
+                      <strong>{row.display_name}</strong>
+                      <small>{row.total_xp} XP</small>
+                    </span>
+                    <span className="level-badge">LVL {row.level}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="muted">No Trading Academy users are ranked yet.</p>
+            )}
           </section>
 
           <section className="section-panel page-stack">
