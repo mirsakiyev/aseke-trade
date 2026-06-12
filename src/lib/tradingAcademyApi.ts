@@ -23,7 +23,7 @@ export async function fetchTradingAcademyLeaderboard(): Promise<TradingAcademyLe
   if (!supabase) return [];
 
   const { data, error } = await supabase.rpc("get_trading_academy_leaderboard");
-  if (error) throw new Error("Leaderboard could not be loaded.");
+  if (error) return [];
 
   return (data ?? []) as TradingAcademyLeaderboardRow[];
 }

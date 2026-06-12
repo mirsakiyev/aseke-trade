@@ -244,10 +244,6 @@ export function TradingAcademyDashboard() {
                   <dt>Available</dt>
                   <dd>{accountStatus.balanceLabel}</dd>
                 </div>
-                <div>
-                  <dt>AML check price</dt>
-                  <dd>{formatUsd(AML_CHECK_PRICE_CENTS)}</dd>
-                </div>
               </dl>
               <Link className="ghost-button compact" to="/account/payments">
                 Top up balance
