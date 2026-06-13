@@ -43,6 +43,7 @@ test("dashboard renders inbox, read handling, display name editing, and compact 
     "avatar-level-badge",
     "compact-level-panel",
     "inbox-panel",
+    "inbox-list-empty",
     "inbox-message-body",
     "Extend Trading Academy Access"
   ]) {

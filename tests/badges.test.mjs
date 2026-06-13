@@ -67,9 +67,9 @@ test("leaderboard exposes compact public badge data without private subscription
   assert.doesNotMatch(badgeMigration, /payment_reference|receive_address|email|wallet/i);
   assert.doesNotMatch(badgeMigration, /badge_position <= 3/i);
   assert.match(academyDashboardSource, /LeaderboardBadgeStrip/);
-  assert.match(academyDashboardSource, /expandedLeaderboardBadges/);
-  assert.match(academyDashboardSource, /row\.badges\.slice\(0,\s*3\)/);
-  assert.match(academyDashboardSource, /aria-expanded=\{isExpanded\}/);
+  assert.match(academyDashboardSource, /row\.badges\.map/);
+  assert.doesNotMatch(academyDashboardSource, /expandedLeaderboardBadges/);
+  assert.doesNotMatch(academyDashboardSource, /row\.badges\.slice\(0,\s*3\)/);
   assert.match(academyDashboardSource, /<UserBadgePill badge=\{badge\} size="small" showLabel=\{false\}/);
   assert.match(tradingAcademyApiSource, /normalizePublicBadges/);
 });

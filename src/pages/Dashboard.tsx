@@ -428,28 +428,32 @@ export function Dashboard() {
 
           {isLoading ? (
             <LoadingState label="Loading inbox" />
-          ) : filteredInboxMessages.length ? (
+          ) : (
             <div className="inbox-layout">
               <div className="inbox-list" role="list">
-                {filteredInboxMessages.map((message) => (
-                  <button
-                    className={`inbox-row ${selectedInboxMessage?.id === message.id ? "active" : ""} ${message.is_read ? "read" : "unread"}`}
-                    type="button"
-                    onClick={() => void openInboxMessage(message)}
-                    role="listitem"
-                    key={message.id}
-                  >
-                    <span className="inbox-row-top">
-                      <span className="inbox-icon-frame">
-                        {message.is_read ? <MailOpen size={16} /> : <Mail size={16} />}
+                {filteredInboxMessages.length ? (
+                  filteredInboxMessages.map((message) => (
+                    <button
+                      className={`inbox-row ${selectedInboxMessage?.id === message.id ? "active" : ""} ${message.is_read ? "read" : "unread"}`}
+                      type="button"
+                      onClick={() => void openInboxMessage(message)}
+                      role="listitem"
+                      key={message.id}
+                    >
+                      <span className="inbox-row-top">
+                        <span className="inbox-icon-frame">
+                          {message.is_read ? <MailOpen size={16} /> : <Mail size={16} />}
+                        </span>
+                        <strong>{message.title}</strong>
+                        <span>{inboxTypeLabels[message.type]}</span>
                       </span>
-                      <strong>{message.title}</strong>
-                      <span>{inboxTypeLabels[message.type]}</span>
-                    </span>
-                    <span>{message.summary ?? formatInboxPreview(message.message)}</span>
-                    <time>{formatDashboardDate(message.created_at)}</time>
-                  </button>
-                ))}
+                      <span>{message.summary ?? formatInboxPreview(message.message)}</span>
+                      <time>{formatDashboardDate(message.created_at)}</time>
+                    </button>
+                  ))
+                ) : (
+                  <div className="inbox-list-empty" aria-hidden="true" />
+                )}
               </div>
 
               {selectedInboxMessage ? (
@@ -468,14 +472,13 @@ export function Dashboard() {
               ) : (
                 <div className="inbox-detail-panel inbox-detail-empty">
                   <MailOpen size={22} aria-hidden="true" />
-                  <p className="muted">Select a notification to read it.</p>
+                  <p className="muted">
+                    {filteredInboxMessages.length
+                      ? "Select a notification to read it."
+                      : "No notifications in this view."}
+                  </p>
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="compact-empty-state">
-              <MailOpen size={20} aria-hidden="true" />
-              <p className="muted">No notifications in this view.</p>
             </div>
           )}
         </article>

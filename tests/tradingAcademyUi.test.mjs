@@ -28,11 +28,16 @@ test("leaderboard renders public avatars with fallback support", () => {
   assert.match(dashboardSource, /leaderboard\.slice\(0,\s*3\)/);
   assert.match(dashboardSource, /setIsLeaderboardExpanded/);
   assert.match(dashboardSource, /leaderboard-member-info/);
-  assert.match(dashboardSource, /toggleLeaderboardBadges/);
+  assert.match(dashboardSource, /<LeaderboardBadgeStrip row=\{row\}/);
+  assert.doesNotMatch(dashboardSource, /toggleLeaderboardBadges/);
 });
 
 test("academy dashboard includes a subscriber risk calculator", () => {
   assert.match(dashboardSource, /RiskCalculatorPanel/);
+  assert.match(dashboardSource, /<h2>Risk Calculator<\/h2>/);
+  assert.doesNotMatch(dashboardSource, /Position plan/);
+  assert.match(dashboardSource, /form\.direction === "long" \? "long active" : "long"/);
+  assert.match(dashboardSource, /form\.direction === "short" \? "short active" : "short"/);
   assert.match(dashboardSource, /calculateRisk/);
   assert.match(dashboardSource, /risk-calculator-panel/);
   assert.match(dashboardSource, /takeProfits:\s*\[createRiskTakeProfitInput\(\)\]/);
@@ -62,6 +67,8 @@ test("academy dashboard includes a subscriber risk calculator", () => {
   assert.doesNotMatch(dashboardSource, /placeholder="(?:63404|62555|64444|65555|66666)"/);
   assert.match(dashboardSource, /Risk Breakdown/);
   assert.match(dashboardSource, /Risk Assessment/);
+  assert.match(dashboardSource, /role="meter"/);
+  assert.match(dashboardSource, /aria-valuetext=\{assessment\.ariaLabel\}/);
   assert.match(dashboardSource, /5%\+/);
 });
 

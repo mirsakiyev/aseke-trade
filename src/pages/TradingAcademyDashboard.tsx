@@ -132,7 +132,6 @@ export function TradingAcademyDashboard() {
   const [supportMessage, setSupportMessage] = useState<string | null>(null);
   const [isSupportSubmitting, setIsSupportSubmitting] = useState(false);
   const [isLeaderboardExpanded, setIsLeaderboardExpanded] = useState(false);
-  const [expandedLeaderboardBadges, setExpandedLeaderboardBadges] = useState<Set<string>>(() => new Set());
   const [riskForm, setRiskForm] = useState<RiskCalculatorFormState>(() => createBlankRiskForm());
   const [riskResult, setRiskResult] = useState<RiskCalculatorResult | null>(null);
   const [riskErrors, setRiskErrors] = useState<string[]>([]);
@@ -180,17 +179,6 @@ export function TradingAcademyDashboard() {
     () => (isLeaderboardExpanded ? leaderboard : leaderboard.slice(0, 3)),
     [isLeaderboardExpanded, leaderboard]
   );
-  const toggleLeaderboardBadges = useCallback((memberKey: string) => {
-    setExpandedLeaderboardBadges((currentKeys) => {
-      const nextKeys = new Set(currentKeys);
-      if (nextKeys.has(memberKey)) {
-        nextKeys.delete(memberKey);
-      } else {
-        nextKeys.add(memberKey);
-      }
-      return nextKeys;
-    });
-  }, []);
 
   const submitAml = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -401,11 +389,7 @@ export function TradingAcademyDashboard() {
                     <div className="leaderboard-member-info">
                       <strong>{row.display_name}</strong>
                       <small>{row.total_xp} XP</small>
-                      <LeaderboardBadgeStrip
-                        row={row}
-                        isExpanded={expandedLeaderboardBadges.has(row.member_key)}
-                        onToggle={() => toggleLeaderboardBadges(row.member_key)}
-                      />
+                      <LeaderboardBadgeStrip row={row} />
                     </div>
                     <span className="level-badge">LVL {row.level}</span>
                   </li>
@@ -667,8 +651,7 @@ function RiskCalculatorPanel({
     <section className="section-panel risk-calculator-panel">
       <div className="lesson-title-line">
         <div>
-          <p className="eyebrow">Risk Calculator</p>
-          <h2>Position plan</h2>
+          <h2>Risk Calculator</h2>
         </div>
         <Calculator size={28} aria-hidden="true" />
       </div>
@@ -685,14 +668,14 @@ function RiskCalculatorPanel({
               <span className="risk-field-label">Direction</span>
               <div className="risk-direction-toggle" role="group" aria-label="Trade direction">
                 <button
-                  className={form.direction === "long" ? "active" : ""}
+                  className={form.direction === "long" ? "long active" : "long"}
                   type="button"
                   onClick={() => onChange("direction", "long")}
                 >
                   Long
                 </button>
                 <button
-                  className={form.direction === "short" ? "active" : ""}
+                  className={form.direction === "short" ? "short active" : "short"}
                   type="button"
                   onClick={() => onChange("direction", "short")}
                 >
@@ -906,7 +889,9 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
 
   return (
     <article className="risk-result-panel">
-      <p className="risk-start-line">{result ? `${result.direction.toUpperCase()} position plan` : "Enter Account Balance to start"}</p>
+      <p className="risk-start-line">
+        {result ? `${result.direction.toUpperCase()} risk profile` : "Enter Account Balance to start"}
+      </p>
 
       <div className="risk-position-card">
         <span>Notional Position Value</span>
@@ -966,12 +951,20 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
         )}
       </dl>
 
-      <section className="risk-assessment-card">
+      <section className={`risk-assessment-card ${assessment.tone}`}>
         <h3>
           <ShieldCheck size={17} />
           Risk Assessment
         </h3>
-        <div className="risk-assessment-bar" aria-label="Risk assessment scale">
+        <div
+          className={`risk-assessment-bar ${assessment.tone}`}
+          role="meter"
+          aria-label="Account risk assessment"
+          aria-valuemin={0}
+          aria-valuemax={5}
+          aria-valuenow={assessment.meterValue}
+          aria-valuetext={assessment.ariaLabel}
+        >
           <span className="risk-assessment-fill" style={{ width: `${assessment.positionPercent}%` }} />
           <span className="risk-assessment-marker" style={{ left: `${assessment.positionPercent}%` }} />
         </div>
@@ -1202,40 +1195,14 @@ function LeaderboardAvatar({ row }: { row: TradingAcademyLeaderboardRow }) {
   );
 }
 
-function LeaderboardBadgeStrip({
-  row,
-  isExpanded,
-  onToggle
-}: {
-  row: TradingAcademyLeaderboardRow;
-  isExpanded: boolean;
-  onToggle: () => void;
-}) {
+function LeaderboardBadgeStrip({ row }: { row: TradingAcademyLeaderboardRow }) {
   if (!row.badges.length) return null;
-
-  const visibleBadges = isExpanded ? row.badges : row.badges.slice(0, 3);
-  const totalBadgeCount = Math.max(row.badge_count, row.badges.length);
-  const hiddenCount = Math.max(0, totalBadgeCount - visibleBadges.length);
-  const canToggle = row.badges.length > 3;
 
   return (
     <span className="leaderboard-badge-strip" aria-label={`${row.display_name} earned badges`}>
-      {visibleBadges.map((badge) => (
+      {row.badges.map((badge) => (
         <UserBadgePill badge={badge} size="small" showLabel={false} key={badge.id} />
       ))}
-      {canToggle ? (
-        <button
-          className="leaderboard-badge-more"
-          type="button"
-          onClick={onToggle}
-          aria-expanded={isExpanded}
-          title={isExpanded ? "Show fewer badges" : `Show ${hiddenCount} more badges`}
-        >
-          {isExpanded ? "Less" : `+${hiddenCount}`}
-        </button>
-      ) : (
-        hiddenCount > 0 && <span className="leaderboard-badge-more">+{hiddenCount}</span>
-      )}
     </span>
   );
 }
@@ -1429,15 +1396,26 @@ function isPositiveNumber(value: number): boolean {
 }
 
 function getRiskAssessment(accountRiskPercent: number | null): {
+  ariaLabel: string;
   label: string;
+  meterValue: number;
   positionPercent: number;
+  tone: "empty" | "conservative" | "moderate" | "aggressive" | "high-risk";
   valueLabel: string;
 } {
   if (accountRiskPercent === null || !Number.isFinite(accountRiskPercent)) {
-    return { label: "CONSERVATIVE", positionPercent: 0, valueLabel: "--%" };
+    return {
+      ariaLabel: "Enter trade values to calculate account risk.",
+      label: "ENTER VALUES",
+      meterValue: 0,
+      positionPercent: 0,
+      tone: "empty",
+      valueLabel: "--%"
+    };
   }
 
-  const positionPercent = Math.min(100, Math.max(0, (accountRiskPercent / 5) * 100));
+  const meterValue = Math.min(5, Math.max(0, accountRiskPercent));
+  const positionPercent = (meterValue / 5) * 100;
   const label =
     accountRiskPercent <= 1
       ? "CONSERVATIVE"
@@ -1446,10 +1424,21 @@ function getRiskAssessment(accountRiskPercent: number | null): {
         : accountRiskPercent <= 5
           ? "AGGRESSIVE"
           : "HIGH RISK";
+  const tone =
+    accountRiskPercent <= 1
+      ? "conservative"
+      : accountRiskPercent <= 2
+        ? "moderate"
+        : accountRiskPercent <= 5
+          ? "aggressive"
+          : "high-risk";
 
   return {
+    ariaLabel: `${formatPercentValue(accountRiskPercent)} account risk. ${label}.`,
     label,
+    meterValue,
     positionPercent,
+    tone,
     valueLabel: formatPercentValue(accountRiskPercent)
   };
 }
