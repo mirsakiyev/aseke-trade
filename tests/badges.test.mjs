@@ -51,8 +51,10 @@ test("loyalty badge logic uses continuous subscription periods and increasing XP
 test("dashboard lazily evaluates badges and renders them under Learning Level", () => {
   assert.match(dashboardSource, /evaluateUserBadges/);
   assert.match(dashboardSource, /setUserBadges/);
+  assert.match(dashboardSource, /areBadgesExpanded/);
   assert.match(dashboardSource, /level-badge-section/);
   assert.match(dashboardSource, /<UserBadgeRail/);
+  assert.match(dashboardSource, /Show all \$\{userBadges\.length\}/);
   assert.match(dashboardSource, /Complete course quizzes or keep Trading Academy active to earn badges/);
   assert.match(badgesApiSource, /supabase\.rpc\("evaluate_user_badges"/);
 });
@@ -63,7 +65,11 @@ test("leaderboard exposes compact public badge data without private subscription
   assert.match(badgeMigration, /jsonb_build_object\(\s*'id'/i);
   assert.match(badgeMigration, /subscriptionMonthNumber/i);
   assert.doesNotMatch(badgeMigration, /payment_reference|receive_address|email|wallet/i);
+  assert.doesNotMatch(badgeMigration, /badge_position <= 3/i);
   assert.match(academyDashboardSource, /LeaderboardBadgeStrip/);
+  assert.match(academyDashboardSource, /expandedLeaderboardBadges/);
+  assert.match(academyDashboardSource, /row\.badges\.slice\(0,\s*3\)/);
+  assert.match(academyDashboardSource, /aria-expanded=\{isExpanded\}/);
   assert.match(academyDashboardSource, /<UserBadgePill badge=\{badge\} size="small" showLabel=\{false\}/);
   assert.match(tradingAcademyApiSource, /normalizePublicBadges/);
 });

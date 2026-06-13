@@ -27,6 +27,8 @@ test("leaderboard renders public avatars with fallback support", () => {
   assert.match(dashboardSource, /<UserRound size=\{16\}/);
   assert.match(dashboardSource, /leaderboard\.slice\(0,\s*3\)/);
   assert.match(dashboardSource, /setIsLeaderboardExpanded/);
+  assert.match(dashboardSource, /leaderboard-member-info/);
+  assert.match(dashboardSource, /toggleLeaderboardBadges/);
 });
 
 test("academy dashboard includes a subscriber risk calculator", () => {

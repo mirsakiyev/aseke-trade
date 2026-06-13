@@ -132,6 +132,7 @@ export function TradingAcademyDashboard() {
   const [supportMessage, setSupportMessage] = useState<string | null>(null);
   const [isSupportSubmitting, setIsSupportSubmitting] = useState(false);
   const [isLeaderboardExpanded, setIsLeaderboardExpanded] = useState(false);
+  const [expandedLeaderboardBadges, setExpandedLeaderboardBadges] = useState<Set<string>>(() => new Set());
   const [riskForm, setRiskForm] = useState<RiskCalculatorFormState>(() => createBlankRiskForm());
   const [riskResult, setRiskResult] = useState<RiskCalculatorResult | null>(null);
   const [riskErrors, setRiskErrors] = useState<string[]>([]);
@@ -179,6 +180,17 @@ export function TradingAcademyDashboard() {
     () => (isLeaderboardExpanded ? leaderboard : leaderboard.slice(0, 3)),
     [isLeaderboardExpanded, leaderboard]
   );
+  const toggleLeaderboardBadges = useCallback((memberKey: string) => {
+    setExpandedLeaderboardBadges((currentKeys) => {
+      const nextKeys = new Set(currentKeys);
+      if (nextKeys.has(memberKey)) {
+        nextKeys.delete(memberKey);
+      } else {
+        nextKeys.add(memberKey);
+      }
+      return nextKeys;
+    });
+  }, []);
 
   const submitAml = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -386,11 +398,15 @@ export function TradingAcademyDashboard() {
                   <li className={`leaderboard-row ${leaderboardRankTone(row.rank)}`} key={row.member_key}>
                     <span className="leaderboard-rank">#{row.rank}</span>
                     <LeaderboardAvatar row={row} />
-                    <span>
+                    <div className="leaderboard-member-info">
                       <strong>{row.display_name}</strong>
                       <small>{row.total_xp} XP</small>
-                      <LeaderboardBadgeStrip row={row} />
-                    </span>
+                      <LeaderboardBadgeStrip
+                        row={row}
+                        isExpanded={expandedLeaderboardBadges.has(row.member_key)}
+                        onToggle={() => toggleLeaderboardBadges(row.member_key)}
+                      />
+                    </div>
                     <span className="level-badge">LVL {row.level}</span>
                   </li>
                 ))}
@@ -1186,17 +1202,40 @@ function LeaderboardAvatar({ row }: { row: TradingAcademyLeaderboardRow }) {
   );
 }
 
-function LeaderboardBadgeStrip({ row }: { row: TradingAcademyLeaderboardRow }) {
+function LeaderboardBadgeStrip({
+  row,
+  isExpanded,
+  onToggle
+}: {
+  row: TradingAcademyLeaderboardRow;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
   if (!row.badges.length) return null;
 
-  const hiddenCount = Math.max(0, row.badge_count - row.badges.length);
+  const visibleBadges = isExpanded ? row.badges : row.badges.slice(0, 3);
+  const totalBadgeCount = Math.max(row.badge_count, row.badges.length);
+  const hiddenCount = Math.max(0, totalBadgeCount - visibleBadges.length);
+  const canToggle = row.badges.length > 3;
 
   return (
     <span className="leaderboard-badge-strip" aria-label={`${row.display_name} earned badges`}>
-      {row.badges.map((badge) => (
+      {visibleBadges.map((badge) => (
         <UserBadgePill badge={badge} size="small" showLabel={false} key={badge.id} />
       ))}
-      {hiddenCount > 0 && <span className="leaderboard-badge-more">+{hiddenCount}</span>}
+      {canToggle ? (
+        <button
+          className="leaderboard-badge-more"
+          type="button"
+          onClick={onToggle}
+          aria-expanded={isExpanded}
+          title={isExpanded ? "Show fewer badges" : `Show ${hiddenCount} more badges`}
+        >
+          {isExpanded ? "Less" : `+${hiddenCount}`}
+        </button>
+      ) : (
+        hiddenCount > 0 && <span className="leaderboard-badge-more">+{hiddenCount}</span>
+      )}
     </span>
   );
 }

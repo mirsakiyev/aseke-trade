@@ -689,15 +689,15 @@ begin
             end
           )
           order by ranked_badges.xp_awarded desc, ranked_badges.earned_at desc
-        ) filter (where ranked_badges.badge_position <= 3),
+        ),
         '[]'::jsonb
       ) as badges
     from (
       select
-        ub.*,
-        row_number() over (order by ub.xp_awarded desc, ub.earned_at desc, ub.name asc) as badge_position
+        ub.*
       from public.user_badges as ub
       where ub.user_id = p.id
+      order by ub.xp_awarded desc, ub.earned_at desc, ub.name asc
     ) as ranked_badges
   ) as public_badges on true
   where p.role <> 'admin'

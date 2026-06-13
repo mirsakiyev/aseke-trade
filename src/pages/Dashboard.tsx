@@ -85,6 +85,7 @@ export function Dashboard() {
   const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>([]);
   const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
   const [selectedInboxMessageId, setSelectedInboxMessageId] = useState<string | null>(null);
+  const [areBadgesExpanded, setAreBadgesExpanded] = useState(false);
   const [inboxError, setInboxError] = useState<string | null>(null);
   const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
@@ -98,6 +99,7 @@ export function Dashboard() {
   const levelProgress = getProgressToNextLevel(totalXP);
   const displayName = profile?.full_name ?? profile?.username ?? user?.email ?? "Account";
   const unreadInboxCount = inboxMessages.filter((message) => !message.is_read).length;
+  const visibleBadgeLimit = areBadgesExpanded ? userBadges.length : 4;
   const filteredInboxMessages = useMemo(
     () => inboxMessages.filter((message) => matchesInboxFilter(message, inboxFilter)),
     [inboxFilter, inboxMessages]
@@ -520,8 +522,18 @@ export function Dashboard() {
             <UserBadgeRail
               badges={userBadges}
               emptyLabel="Complete course quizzes or keep Trading Academy active to earn badges."
-              maxVisible={4}
+              maxVisible={visibleBadgeLimit}
             />
+            {userBadges.length > 4 && (
+              <button
+                className="ghost-button compact badge-expand-button"
+                type="button"
+                onClick={() => setAreBadgesExpanded((expanded) => !expanded)}
+                aria-expanded={areBadgesExpanded}
+              >
+                {areBadgesExpanded ? "Show fewer badges" : `Show all ${userBadges.length}`}
+              </button>
+            )}
           </div>
         </article>
       </section>

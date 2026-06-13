@@ -872,28 +872,36 @@ p {
 }
 
 .profile-overview-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(260px, 0.78fr) minmax(240px, 0.78fr) minmax(360px, 1.44fr);
   grid-template-areas:
     "profile inbox inbox"
     "profile access level";
   align-items: stretch;
 }
 
+.profile-overview-grid > * {
+  min-width: 0;
+}
+
 .dashboard-profile-card {
   grid-area: profile;
+  min-width: 0;
 }
 
 .dashboard-inbox-card {
   grid-area: inbox;
   min-height: 500px;
+  min-width: 0;
 }
 
 .dashboard-access-card {
   grid-area: access;
+  min-width: 0;
 }
 
 .dashboard-level-card {
   grid-area: level;
+  min-width: 0;
 }
 
 .avatar-profile-row {
@@ -1044,6 +1052,7 @@ p {
 .level-badge-section {
   display: grid;
   gap: 0.48rem;
+  min-width: 0;
   padding-top: 0.25rem;
   border-top: 1px solid rgba(229, 228, 226, 0.08);
 }
@@ -1072,6 +1081,18 @@ p {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.user-badge-rail.medium {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  align-items: stretch;
+}
+
+.user-badge-rail.medium .user-badge-pill {
+  width: 100%;
 }
 
 .user-badge-pill {
@@ -1182,6 +1203,7 @@ p {
 
 .user-badge-copy {
   z-index: 1;
+  flex: 1 1 auto;
   display: grid;
   gap: 0.04rem;
   min-width: 0;
@@ -1225,6 +1247,7 @@ p {
 
 .user-badge-more,
 .leaderboard-badge-more {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1236,6 +1259,20 @@ p {
   color: var(--platinum-soft);
   font-size: 0.75rem;
   font-weight: 900;
+}
+
+button.leaderboard-badge-more {
+  cursor: pointer;
+  font: inherit;
+}
+
+button.leaderboard-badge-more:hover {
+  border-color: rgba(229, 228, 226, 0.48);
+  color: var(--platinum);
+}
+
+.badge-expand-button {
+  justify-self: start;
 }
 
 .user-badge-empty {
@@ -1297,14 +1334,17 @@ p {
 
 .dashboard-inbox-card .inbox-layout {
   grid-template-columns: minmax(230px, 0.66fr) minmax(0, 1fr);
+  min-width: 0;
   min-height: 360px;
 }
 
 .dashboard-inbox-card .inbox-list {
+  min-width: 0;
   max-height: 430px;
 }
 
 .dashboard-inbox-card .inbox-detail-panel {
+  min-width: 0;
   min-height: 360px;
 }
 
@@ -3472,8 +3512,20 @@ select:focus {
   color: var(--muted);
 }
 
+.leaderboard-member-info {
+  min-width: 0;
+}
+
+.leaderboard-member-info strong {
+  overflow: hidden;
+  display: block;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .leaderboard-badge-strip {
   margin-top: 0.34rem;
+  align-items: flex-start;
 }
 
 .leaderboard-toggle {
