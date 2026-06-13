@@ -17,22 +17,14 @@ import {
   type GuideCategory,
   type InboxMessageType,
   type InboxTargetAudience,
-  type Lesson,
   type PremiumSubscription,
   type Profile,
   type Purchase
 } from "../types/content";
 
-type AdminTab = "guides" | "courses" | "lessons" | "inbox" | "users";
+type AdminTab = "guides" | "courses" | "inbox" | "users";
 
 type FlatCourse = Omit<Course, "modules" | "guides">;
-type FlatModule = {
-  id: string;
-  course_id: string;
-  title: string;
-  sort_order: number;
-  created_at: string;
-};
 
 const blankGuideForm = {
   course_id: "",
@@ -55,26 +47,10 @@ const blankCourseForm = {
   slug: "",
   description: "",
   difficulty: "Beginner" as CourseDifficulty,
-  price_cents: "0",
   is_premium: false,
   is_archived: false,
-  sort_order: "1"
-};
-
-const blankModuleForm = {
-  course_id: "",
-  title: "",
-  sort_order: "1"
-};
-
-const blankLessonForm = {
-  module_id: "",
-  title: "",
-  content: "",
-  video_url: "",
   sort_order: "1",
-  is_preview: false,
-  is_premium: true
+  guide_ids: [] as string[]
 };
 
 const blankSubscriptionForm = {
@@ -106,8 +82,6 @@ export function Admin() {
   const [activeTab, setActiveTab] = useState<AdminTab>("guides");
   const [guides, setGuides] = useState<Guide[]>([]);
   const [courses, setCourses] = useState<FlatCourse[]>([]);
-  const [modules, setModules] = useState<FlatModule[]>([]);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [premiumSubscriptions, setPremiumSubscriptions] = useState<PremiumSubscription[]>([]);
@@ -119,12 +93,6 @@ export function Admin() {
 
   const [courseForm, setCourseForm] = useState(blankCourseForm);
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
-
-  const [moduleForm, setModuleForm] = useState(blankModuleForm);
-  const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
-
-  const [lessonForm, setLessonForm] = useState(blankLessonForm);
-  const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
 
   const [subscriptionForm, setSubscriptionForm] = useState(blankSubscriptionForm);
   const [editingSubscriptionId, setEditingSubscriptionId] = useState<string | null>(null);
@@ -142,10 +110,6 @@ export function Admin() {
           .map((course) => [course.id, course.title as GuideCategory])
       ),
     [courses]
-  );
-  const moduleNameById = useMemo(
-    () => new Map(modules.map((module) => [module.id, module.title])),
-    [modules]
   );
   const profileNameById = useMemo(
     () =>
@@ -167,19 +131,9 @@ export function Admin() {
     setIsLoading(true);
     setMessage(null);
 
-    const [
-      guideResult,
-      courseResult,
-      moduleResult,
-      lessonResult,
-      profileResult,
-      purchaseResult,
-      subscriptionResult
-    ] = await Promise.all([
+    const [guideResult, courseResult, profileResult, purchaseResult, subscriptionResult] = await Promise.all([
       supabase.from("guides").select("*").order("created_at", { ascending: false }),
       supabase.from("courses").select("*").order("created_at", { ascending: false }),
-      supabase.from("course_modules").select("*").order("sort_order", { ascending: true }),
-      supabase.from("lessons").select("*").order("sort_order", { ascending: true }),
       supabase.from("profiles").select("*").order("created_at", { ascending: false }),
       supabase.from("purchases").select("*").order("created_at", { ascending: false }),
       supabase.from("premium_subscriptions").select("*").order("created_at", { ascending: false })
@@ -188,8 +142,6 @@ export function Admin() {
     if (
       guideResult.error ||
       courseResult.error ||
-      moduleResult.error ||
-      lessonResult.error ||
       profileResult.error ||
       purchaseResult.error ||
       subscriptionResult.error
@@ -207,8 +159,6 @@ export function Admin() {
         (a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999) || a.title.localeCompare(b.title)
       )
     );
-    setModules((moduleResult.data ?? []) as FlatModule[]);
-    setLessons((lessonResult.data ?? []) as Lesson[]);
     setProfiles((profileResult.data ?? []) as Profile[]);
     setPurchases((purchaseResult.data ?? []) as Purchase[]);
     setPremiumSubscriptions((subscriptionResult.data ?? []) as PremiumSubscription[]);
@@ -279,68 +229,41 @@ export function Admin() {
       slug: courseForm.slug.trim(),
       description: sanitizePlainText(courseForm.description, 700),
       difficulty: courseForm.difficulty,
-      price_cents: Number(courseForm.price_cents),
+      price_cents: 0,
       is_premium: courseForm.is_premium,
       is_archived: courseForm.is_archived,
       sort_order: Number(courseForm.sort_order)
     };
 
     const result = editingCourseId
-      ? await supabase.from("courses").update(payload).eq("id", editingCourseId)
-      : await supabase.from("courses").insert(payload);
+      ? await supabase.from("courses").update(payload).eq("id", editingCourseId).select("id").single()
+      : await supabase.from("courses").insert(payload).select("id").single();
 
-    setMessage(result.error ? "Course could not be saved." : "Course saved.");
+    const savedCourseId = result.data?.id ?? editingCourseId;
+    if (result.error || !savedCourseId) {
+      setMessage("Course could not be saved.");
+      return;
+    }
+
+    const selectedGuideIds = [...new Set(courseForm.guide_ids)];
+    const assignedGuideIds = guides
+      .filter((guide) => guide.course_id === savedCourseId)
+      .map((guide) => guide.id);
+    const removedGuideIds = assignedGuideIds.filter((guideId) => !selectedGuideIds.includes(guideId));
+
+    const assignResult =
+      selectedGuideIds.length > 0
+        ? await supabase.from("guides").update({ course_id: savedCourseId }).in("id", selectedGuideIds)
+        : { error: null };
+    const removeResult =
+      removedGuideIds.length > 0
+        ? await supabase.from("guides").update({ course_id: null }).in("id", removedGuideIds)
+        : { error: null };
+
+    setMessage(assignResult.error || removeResult.error ? "Course saved, but guide assignments could not be updated." : "Course saved.");
     if (!result.error) {
       setCourseForm(blankCourseForm);
       setEditingCourseId(null);
-      await refreshAdminData();
-    }
-  };
-
-  const saveModule = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!supabase) return;
-
-    const payload = {
-      course_id: moduleForm.course_id,
-      title: sanitizePlainText(moduleForm.title, 160),
-      sort_order: Number(moduleForm.sort_order)
-    };
-
-    const result = editingModuleId
-      ? await supabase.from("course_modules").update(payload).eq("id", editingModuleId)
-      : await supabase.from("course_modules").insert(payload);
-
-    setMessage(result.error ? "Module could not be saved." : "Module saved.");
-    if (!result.error) {
-      setModuleForm(blankModuleForm);
-      setEditingModuleId(null);
-      await refreshAdminData();
-    }
-  };
-
-  const saveLesson = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!supabase) return;
-
-    const payload = {
-      module_id: lessonForm.module_id,
-      title: sanitizePlainText(lessonForm.title, 180),
-      content: sanitizePlainText(lessonForm.content, 14000),
-      video_url: sanitizePlainText(lessonForm.video_url, 500) || null,
-      sort_order: Number(lessonForm.sort_order),
-      is_preview: lessonForm.is_preview,
-      is_premium: lessonForm.is_premium
-    };
-
-    const result = editingLessonId
-      ? await supabase.from("lessons").update(payload).eq("id", editingLessonId)
-      : await supabase.from("lessons").insert(payload);
-
-    setMessage(result.error ? "Lesson could not be saved." : "Lesson saved.");
-    if (!result.error) {
-      setLessonForm(blankLessonForm);
-      setEditingLessonId(null);
       await refreshAdminData();
     }
   };
@@ -422,7 +345,7 @@ export function Admin() {
     }
   };
 
-  const deleteRow = async (table: "guides" | "courses" | "course_modules" | "lessons", id: string) => {
+  const deleteRow = async (table: "guides" | "courses", id: string) => {
     if (!supabase) return;
     if (!window.confirm("Delete this item?")) return;
     const { error } = await supabase.from(table).delete().eq("id", id);
@@ -498,7 +421,7 @@ export function Admin() {
       {message && <p className="soft-notice">{message}</p>}
 
       <section className="tab-bar" aria-label="Admin sections">
-        {(["guides", "courses", "lessons", "inbox", "users"] as AdminTab[]).map((tab) => (
+        {(["guides", "courses", "inbox", "users"] as AdminTab[]).map((tab) => (
           <button
             className={activeTab === tab ? "filter-pill active" : "filter-pill"}
             type="button"
@@ -516,27 +439,29 @@ export function Admin() {
         <>
           {activeTab === "guides" && (
             <section className="admin-grid">
-              <form className="section-panel stack-form" onSubmit={saveGuide}>
+              <form className="section-panel stack-form compact-admin-form" onSubmit={saveGuide}>
                 <h2>{editingGuideId ? "Edit guide" : "Create guide"}</h2>
-                <label>
-                  Title
-                  <input
-                    value={guideForm.title}
-                    onChange={(event) => {
-                      const title = event.target.value;
-                      setGuideForm((form) => ({ ...form, title, slug: form.slug || slugify(title) }));
-                    }}
-                    required
-                  />
-                </label>
-                <label>
-                  Slug
-                  <input
-                    value={guideForm.slug}
-                    onChange={(event) => setGuideForm((form) => ({ ...form, slug: event.target.value }))}
-                    required
-                  />
-                </label>
+                <div className="form-row">
+                  <label>
+                    Title
+                    <input
+                      value={guideForm.title}
+                      onChange={(event) => {
+                        const title = event.target.value;
+                        setGuideForm((form) => ({ ...form, title, slug: form.slug || slugify(title) }));
+                      }}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Slug
+                    <input
+                      value={guideForm.slug}
+                      onChange={(event) => setGuideForm((form) => ({ ...form, slug: event.target.value }))}
+                      required
+                    />
+                  </label>
+                </div>
                 <div className="form-row">
                   <label>
                     Course
@@ -574,19 +499,21 @@ export function Admin() {
                   <textarea
                     value={guideForm.description}
                     onChange={(event) => setGuideForm((form) => ({ ...form, description: event.target.value }))}
+                    rows={2}
                     required
                   />
                 </label>
                 <label>
                   Content
                   <textarea
+                    className="guide-content-input"
                     value={guideForm.content}
                     onChange={(event) => setGuideForm((form) => ({ ...form, content: event.target.value }))}
-                    rows={7}
+                    rows={4}
                     required
                   />
                 </label>
-                <div className="form-row">
+                <div className="form-row admin-compact-grid">
                   <label>
                     Category
                     <select
@@ -614,7 +541,7 @@ export function Admin() {
                     </select>
                   </label>
                 </div>
-                <div className="form-row">
+                <div className="form-row admin-compact-grid">
                   <label>
                     Read time
                     <input
@@ -672,10 +599,11 @@ export function Admin() {
                 {guides.map((guide) => (
                   <li key={guide.id}>
                     <div>
-                        <strong>{guide.title}</strong>
+                      <strong>{guide.title}</strong>
                       <span>
                         #{guide.sort_order ?? "-"} - {courseNameById.get(guide.course_id ?? "") ?? guide.category} -{" "}
-                        {guide.is_archived ? "Archived" : guide.is_premium ? "Trading Academy" : "Free"} - {guide.xp_reward} XP - {guide.price_cents} cents
+                        {guide.is_archived ? "Archived" : guide.is_premium ? "Trading Academy" : "Free"} -{" "}
+                        {guide.xp_reward} XP - {guide.price_cents} cents
                       </span>
                     </div>
                     <div className="row-actions">
@@ -756,30 +684,19 @@ export function Admin() {
                     onChange={(event) => setCourseForm((form) => ({ ...form, sort_order: event.target.value }))}
                   />
                 </label>
-                <div className="form-row">
-                  <label>
-                    Difficulty
-                    <select
-                      value={courseForm.difficulty}
-                      onChange={(event) =>
-                        setCourseForm((form) => ({ ...form, difficulty: event.target.value as CourseDifficulty }))
-                      }
-                    >
-                      {COURSE_DIFFICULTIES.map((difficulty) => (
-                        <option key={difficulty}>{difficulty}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Price cents
-                    <input
-                      type="number"
-                      min={0}
-                      value={courseForm.price_cents}
-                      onChange={(event) => setCourseForm((form) => ({ ...form, price_cents: event.target.value }))}
-                    />
-                  </label>
-                </div>
+                <label>
+                  Difficulty
+                  <select
+                    value={courseForm.difficulty}
+                    onChange={(event) =>
+                      setCourseForm((form) => ({ ...form, difficulty: event.target.value as CourseDifficulty }))
+                    }
+                  >
+                    {COURSE_DIFFICULTIES.map((difficulty) => (
+                      <option key={difficulty}>{difficulty}</option>
+                    ))}
+                  </select>
+                </label>
                 <label className="checkbox-label">
                   <input
                     type="checkbox"
@@ -796,6 +713,38 @@ export function Admin() {
                   />
                   Archived
                 </label>
+                <fieldset className="admin-guide-picker">
+                  <legend>Included guides</legend>
+                  {guides.length > 0 ? (
+                    <div className="admin-guide-picker-list">
+                      {guides.map((guide) => {
+                        const isChecked = courseForm.guide_ids.includes(guide.id);
+                        return (
+                          <label className="checkbox-label" key={guide.id}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(event) =>
+                                setCourseForm((form) => ({
+                                  ...form,
+                                  guide_ids: event.target.checked
+                                    ? [...form.guide_ids, guide.id]
+                                    : form.guide_ids.filter((guideId) => guideId !== guide.id)
+                                }))
+                              }
+                            />
+                            <span>
+                              {guide.title}
+                              <small>{guide.is_archived ? "Archived" : guide.is_premium ? "Trading Academy" : "Free"}</small>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="muted">Create guides first, then attach them to a course.</p>
+                  )}
+                </fieldset>
                 <button className="primary-button full-width" type="submit">
                   <Plus size={17} />
                   Save Course
@@ -823,10 +772,12 @@ export function Admin() {
                             slug: course.slug,
                             description: course.description,
                             difficulty: course.difficulty,
-                            price_cents: String(course.price_cents),
                             is_premium: course.is_premium,
                             is_archived: Boolean(course.is_archived),
-                            sort_order: String(course.sort_order ?? 1)
+                            sort_order: String(course.sort_order ?? 1),
+                            guide_ids: guides
+                              .filter((guide) => guide.course_id === course.id)
+                              .map((guide) => guide.id)
                           });
                         }}
                       >
@@ -841,200 +792,6 @@ export function Admin() {
                   </li>
                 ))}
               </AdminList>
-            </section>
-          )}
-
-          {activeTab === "lessons" && (
-            <section className="admin-grid">
-              <div className="admin-form-stack">
-                <form className="section-panel stack-form" onSubmit={saveModule}>
-                  <h2>{editingModuleId ? "Edit module" : "Create module"}</h2>
-                  <label>
-                    Course
-                    <select
-                      value={moduleForm.course_id}
-                      onChange={(event) => setModuleForm((form) => ({ ...form, course_id: event.target.value }))}
-                      required
-                    >
-                      <option value="">Select course</option>
-                      {courses.map((course) => (
-                        <option key={course.id} value={course.id}>
-                          {course.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Title
-                    <input
-                      value={moduleForm.title}
-                      onChange={(event) => setModuleForm((form) => ({ ...form, title: event.target.value }))}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Sort order
-                    <input
-                      type="number"
-                      value={moduleForm.sort_order}
-                      onChange={(event) => setModuleForm((form) => ({ ...form, sort_order: event.target.value }))}
-                    />
-                  </label>
-                  <button className="primary-button full-width" type="submit">
-                    <Plus size={17} />
-                    Save Module
-                  </button>
-                </form>
-
-                <form className="section-panel stack-form" onSubmit={saveLesson}>
-                  <h2>{editingLessonId ? "Edit lesson" : "Create lesson"}</h2>
-                  <label>
-                    Module
-                    <select
-                      value={lessonForm.module_id}
-                      onChange={(event) => setLessonForm((form) => ({ ...form, module_id: event.target.value }))}
-                      required
-                    >
-                      <option value="">Select module</option>
-                      {modules.map((module) => (
-                        <option key={module.id} value={module.id}>
-                          {courseNameById.get(module.course_id)} / {module.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Title
-                    <input
-                      value={lessonForm.title}
-                      onChange={(event) => setLessonForm((form) => ({ ...form, title: event.target.value }))}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Content
-                    <textarea
-                      value={lessonForm.content}
-                      onChange={(event) => setLessonForm((form) => ({ ...form, content: event.target.value }))}
-                      rows={6}
-                      required
-                    />
-                  </label>
-                  <div className="form-row">
-                    <label>
-                      Video URL
-                      <input
-                        value={lessonForm.video_url}
-                        onChange={(event) => setLessonForm((form) => ({ ...form, video_url: event.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      Sort order
-                      <input
-                        type="number"
-                        value={lessonForm.sort_order}
-                        onChange={(event) => setLessonForm((form) => ({ ...form, sort_order: event.target.value }))}
-                      />
-                    </label>
-                  </div>
-                  <div className="form-row">
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={lessonForm.is_preview}
-                        onChange={(event) => setLessonForm((form) => ({ ...form, is_preview: event.target.checked }))}
-                      />
-                      Free preview
-                    </label>
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={lessonForm.is_premium}
-                        onChange={(event) => setLessonForm((form) => ({ ...form, is_premium: event.target.checked }))}
-                      />
-                      Trading Academy lesson
-                    </label>
-                  </div>
-                  <button className="primary-button full-width" type="submit">
-                    <Plus size={17} />
-                    Save Lesson
-                  </button>
-                </form>
-              </div>
-
-              <div className="admin-form-stack">
-                <AdminList title="Modules">
-                  {modules.map((module) => (
-                    <li key={module.id}>
-                      <div>
-                        <strong>{module.title}</strong>
-                        <span>{courseNameById.get(module.course_id) ?? module.course_id}</span>
-                      </div>
-                      <div className="row-actions">
-                        <button
-                          className="icon-button"
-                          type="button"
-                          onClick={() => {
-                            setEditingModuleId(module.id);
-                            setModuleForm({
-                              course_id: module.course_id,
-                              title: module.title,
-                              sort_order: String(module.sort_order)
-                            });
-                          }}
-                        >
-                          <Edit3 size={16} />
-                          <span className="sr-only">Edit module</span>
-                        </button>
-                        <button
-                          className="icon-button danger"
-                          type="button"
-                          onClick={() => void deleteRow("course_modules", module.id)}
-                        >
-                          <Trash2 size={16} />
-                          <span className="sr-only">Delete module</span>
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </AdminList>
-
-                <AdminList title="Lessons">
-                  {lessons.map((lesson) => (
-                    <li key={lesson.id}>
-                      <div>
-                        <strong>{lesson.title}</strong>
-                        <span>{moduleNameById.get(lesson.module_id) ?? lesson.module_id}</span>
-                      </div>
-                      <div className="row-actions">
-                        <button
-                          className="icon-button"
-                          type="button"
-                          onClick={() => {
-                            setEditingLessonId(lesson.id);
-                            setLessonForm({
-                              module_id: lesson.module_id,
-                              title: lesson.title,
-                              content: lesson.content,
-                              video_url: lesson.video_url ?? "",
-                              sort_order: String(lesson.sort_order),
-                              is_preview: lesson.is_preview,
-                              is_premium: lesson.is_premium
-                            });
-                          }}
-                        >
-                          <Edit3 size={16} />
-                          <span className="sr-only">Edit lesson</span>
-                        </button>
-                        <button className="icon-button danger" type="button" onClick={() => void deleteRow("lessons", lesson.id)}>
-                          <Trash2 size={16} />
-                          <span className="sr-only">Delete lesson</span>
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </AdminList>
-              </div>
             </section>
           )}
 

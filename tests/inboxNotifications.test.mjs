@@ -4,6 +4,8 @@ import { test } from "node:test";
 
 const dashboardSource = await readFile(new URL("../src/pages/Dashboard.tsx", import.meta.url), "utf8");
 const adminSource = await readFile(new URL("../src/pages/Admin.tsx", import.meta.url), "utf8");
+const coursesSource = await readFile(new URL("../src/pages/Courses.tsx", import.meta.url), "utf8");
+const courseDetailSource = await readFile(new URL("../src/pages/CourseDetail.tsx", import.meta.url), "utf8");
 const notificationsApiSource = await readFile(new URL("../src/lib/notificationsApi.ts", import.meta.url), "utf8");
 const validationSource = await readFile(new URL("../src/lib/validation.ts", import.meta.url), "utf8");
 const typesSource = await readFile(new URL("../src/types/content.ts", import.meta.url), "utf8");
@@ -51,7 +53,7 @@ test("dashboard renders inbox, read handling, display name editing, and compact 
 });
 
 test("admin has a notification tab with constrained notification audiences", () => {
-  assert.match(adminSource, /type AdminTab = "guides" \| "courses" \| "lessons" \| "inbox" \| "users"/);
+  assert.match(adminSource, /type AdminTab = "guides" \| "courses" \| "inbox" \| "users"/);
   assert.match(adminSource, /sendAdminNotification/);
   assert.match(adminSource, /manualNotificationTypes/);
   assert.match(adminSource, /defaultAudienceForNotificationType/);
@@ -62,6 +64,21 @@ test("admin has a notification tab with constrained notification audiences", () 
   assert.ok(manualTypes);
   assert.doesNotMatch(manualTypes[0], /"trading_signal"/);
   assert.match(adminSource, /Sent automatically to premium users when a signal is created or updated/);
+});
+
+test("admin manages courses as guide bundles without lessons or course pricing", () => {
+  assert.doesNotMatch(adminSource, /activeTab === "lessons"/);
+  assert.doesNotMatch(adminSource, /saveLesson|saveModule|course_modules|setLessons|setModules/);
+  assert.doesNotMatch(adminSource, /courseForm\.price_cents|price_cents: Number\(courseForm\.price_cents\)/);
+  assert.match(adminSource, /guide_ids: \[\] as string\[\]/);
+  assert.match(adminSource, /admin-guide-picker/);
+  assert.match(adminSource, /update\(\{ course_id: savedCourseId \}\)\.in\("id", selectedGuideIds\)/);
+  assert.match(adminSource, /price_cents: 0/);
+  assert.match(coursesSource, /course\.is_premium \? "Trading Academy access" : "Free course"/);
+  assert.match(courseDetailSource, /return !course\.is_premium \|\| isAdmin \|\| isPremium/);
+  assert.match(courseDetailSource, /No guides added yet/);
+  assert.doesNotMatch(coursesSource, /formatMoney\(course\.price_cents\)|lessons/);
+  assert.doesNotMatch(courseDetailSource, /formatMoney\(course\.price_cents\)|loadPurchasedCourseIds|markLessonComplete/);
 });
 
 test("notification client types and helper validate premium-only delivery", () => {

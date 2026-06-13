@@ -928,7 +928,7 @@ p {
 .avatar-level-badge {
   position: absolute;
   bottom: 7px;
-  left: 7px;
+  left: 50%;
   z-index: 2;
   display: inline-flex;
   align-items: center;
@@ -941,6 +941,7 @@ p {
   font-size: 0.68rem;
   font-weight: 950;
   letter-spacing: 0;
+  transform: translateX(-50%);
 }
 
 .avatar-upload-button {
@@ -1038,6 +1039,213 @@ p {
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 750;
+}
+
+.level-badge-section {
+  display: grid;
+  gap: 0.48rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(229, 228, 226, 0.08);
+}
+
+.level-badge-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  color: var(--platinum-soft);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.level-badge-heading small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: none;
+}
+
+.user-badge-rail,
+.leaderboard-badge-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.user-badge-pill {
+  overflow: hidden;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+  min-width: 0;
+  min-height: 42px;
+  max-width: 100%;
+  padding: 0.42rem 0.62rem;
+  border: 1px solid rgba(229, 228, 226, 0.26);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+.user-badge-pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  opacity: 0.42;
+  transform: translateX(-55%);
+}
+
+.user-badge-pill.course_completion {
+  background:
+    linear-gradient(135deg, rgba(229, 228, 226, 0.12), rgba(29, 185, 135, 0.12)),
+    rgba(9, 12, 15, 0.92);
+}
+
+.user-badge-pill.subscription_loyalty {
+  background:
+    linear-gradient(135deg, rgba(245, 197, 92, 0.28), rgba(229, 228, 226, 0.1)),
+    rgba(10, 11, 14, 0.94);
+}
+
+.user-badge-pill.course-emerald {
+  border-color: rgba(38, 213, 151, 0.42);
+}
+
+.user-badge-pill.course-violet {
+  border-color: rgba(176, 143, 255, 0.46);
+  background:
+    linear-gradient(135deg, rgba(123, 92, 255, 0.2), rgba(60, 219, 183, 0.08)),
+    rgba(9, 12, 15, 0.92);
+}
+
+.user-badge-pill.course-blue {
+  border-color: rgba(91, 171, 255, 0.44);
+  background:
+    linear-gradient(135deg, rgba(79, 156, 255, 0.18), rgba(229, 228, 226, 0.08)),
+    rgba(9, 12, 15, 0.92);
+}
+
+.user-badge-pill.course-cyan {
+  border-color: rgba(62, 216, 221, 0.44);
+  background:
+    linear-gradient(135deg, rgba(62, 216, 221, 0.17), rgba(72, 148, 255, 0.08)),
+    rgba(9, 12, 15, 0.92);
+}
+
+.user-badge-pill.course-gold {
+  border-color: rgba(245, 197, 92, 0.48);
+  background:
+    linear-gradient(135deg, rgba(245, 197, 92, 0.18), rgba(229, 228, 226, 0.08)),
+    rgba(9, 12, 15, 0.92);
+}
+
+.user-badge-pill.course-silver {
+  border-color: rgba(210, 220, 226, 0.38);
+}
+
+.user-badge-pill.loyalty-gold {
+  border-color: rgba(245, 197, 92, 0.65);
+}
+
+.user-badge-pill.loyalty-platinum {
+  border-color: rgba(210, 220, 226, 0.7);
+  background:
+    linear-gradient(135deg, rgba(229, 228, 226, 0.26), rgba(91, 171, 255, 0.12)),
+    rgba(9, 12, 15, 0.94);
+}
+
+.user-badge-pill.loyalty-diamond {
+  border-color: rgba(91, 230, 255, 0.72);
+  background:
+    linear-gradient(135deg, rgba(91, 230, 255, 0.24), rgba(176, 143, 255, 0.18)),
+    rgba(9, 12, 15, 0.94);
+}
+
+.user-badge-icon {
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fbfc;
+}
+
+.user-badge-copy {
+  z-index: 1;
+  display: grid;
+  gap: 0.04rem;
+  min-width: 0;
+}
+
+.user-badge-copy strong,
+.user-badge-copy small {
+  overflow: hidden;
+  display: block;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-badge-copy strong {
+  color: #f8fbfc;
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.user-badge-copy small {
+  color: var(--platinum-soft);
+  font-size: 0.71rem;
+  font-weight: 800;
+}
+
+.user-badge-pill.small {
+  justify-content: center;
+  width: 29px;
+  min-height: 29px;
+  padding: 0;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.user-badge-pill.small .user-badge-icon {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.user-badge-more,
+.leaderboard-badge-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 29px;
+  padding: 0 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(229, 228, 226, 0.055);
+  color: var(--platinum-soft);
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.user-badge-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .level-hero-line,
@@ -2913,6 +3121,74 @@ select:focus {
   min-height: 18px;
 }
 
+.compact-admin-form {
+  gap: 0.62rem;
+}
+
+.compact-admin-form h2 {
+  margin-bottom: 0.1rem;
+}
+
+.compact-admin-form label {
+  gap: 0.28rem;
+}
+
+.compact-admin-form input,
+.compact-admin-form select,
+.compact-admin-form textarea {
+  min-height: 38px;
+  padding: 0.58rem 0.68rem;
+}
+
+.compact-admin-form textarea {
+  min-height: 78px;
+}
+
+.compact-admin-form .guide-content-input {
+  min-height: 132px;
+}
+
+.compact-admin-form .admin-compact-grid {
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  gap: 0.5rem;
+}
+
+.admin-guide-picker {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.035);
+}
+
+.admin-guide-picker legend {
+  padding: 0 0.35rem;
+  color: var(--platinum-soft);
+  font-weight: 900;
+}
+
+.admin-guide-picker-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.admin-guide-picker .checkbox-label {
+  min-height: 40px;
+  padding: 0.48rem 0.6rem;
+}
+
+.admin-guide-picker small {
+  display: block;
+  margin-top: 0.12rem;
+  color: var(--muted);
+  font-size: 0.73rem;
+  font-weight: 800;
+}
+
 .terms-checkbox-label span {
   line-height: 1.5;
 }
@@ -3196,6 +3472,10 @@ select:focus {
   color: var(--muted);
 }
 
+.leaderboard-badge-strip {
+  margin-top: 0.34rem;
+}
+
 .leaderboard-toggle {
   justify-self: start;
   margin-top: 0.15rem;
@@ -3447,7 +3727,9 @@ select:focus {
 }
 
 .risk-breakdown-card,
-.risk-assessment-card {
+.risk-assessment-card,
+.risk-mode-summary,
+.risk-explanation-card {
   display: grid;
   gap: 0.7rem;
   padding: 0.85rem;
@@ -3457,13 +3739,23 @@ select:focus {
 }
 
 .risk-breakdown-card h3,
-.risk-assessment-card h3 {
+.risk-assessment-card h3,
+.risk-mode-summary h3 {
   display: flex;
   align-items: center;
   gap: 0.45rem;
   margin: 0;
   color: var(--platinum);
   font-size: 0.88rem;
+}
+
+.risk-mode-summary p,
+.risk-explanation-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.45;
 }
 
 .risk-breakdown-card h3 svg,

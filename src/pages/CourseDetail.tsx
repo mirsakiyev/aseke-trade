@@ -1,19 +1,16 @@
-import { ArrowRight, BookOpen, CheckCircle2, LockKeyhole, PlayCircle, WalletCards } from "lucide-react";
+import { ArrowRight, BookOpen, LockKeyhole, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
-import { loadCourseBySlug, loadPurchasedCourseIds } from "../lib/contentApi";
-import { supabase } from "../lib/supabase";
+import { loadCourseBySlug } from "../lib/contentApi";
 import { premiumCheckoutPath } from "../lib/premiumPlans";
-import { formatMoney } from "../lib/validation";
 import type { Course } from "../types/content";
 
 export function CourseDetail() {
   const { slug } = useParams();
   const { user, isAdmin, isPremium } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
-  const [purchasedCourseIds, setPurchasedCourseIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -32,50 +29,12 @@ export function CourseDetail() {
     };
   }, [slug]);
 
-  useEffect(() => {
-    let mounted = true;
-
-    if (!user) {
-      setPurchasedCourseIds(new Set());
-      return () => {
-        mounted = false;
-      };
-    }
-
-    loadPurchasedCourseIds(user.id).then((ids) => {
-      if (mounted) setPurchasedCourseIds(ids);
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
-
   const hasAccess = useMemo(() => {
     if (!course) return false;
-    return !course.is_premium || isAdmin || isPremium || purchasedCourseIds.has(course.id);
-  }, [course, isAdmin, isPremium, purchasedCourseIds]);
+    return !course.is_premium || isAdmin || isPremium;
+  }, [course, isAdmin, isPremium]);
 
   const courseGuides = course?.guides ?? [];
-
-  const markLessonComplete = async (lessonId: string) => {
-    if (!supabase || !user) {
-      setNotice("Login with Supabase connected to track lesson progress.");
-      return;
-    }
-
-    const { error } = await supabase.from("lesson_progress").upsert(
-      {
-        user_id: user.id,
-        lesson_id: lessonId,
-        completed: true,
-        completed_at: new Date().toISOString()
-      },
-      { onConflict: "user_id,lesson_id" }
-    );
-
-    setNotice(error ? "Progress could not be saved." : "Lesson marked complete.");
-  };
 
   if (isLoading) {
     return (
@@ -109,8 +68,8 @@ export function CourseDetail() {
           <p>{course.description}</p>
           <div className="card-meta">
             <span>{course.difficulty}</span>
-            <span>{course.is_premium ? "Trading Academy access" : formatMoney(course.price_cents)}</span>
-            <span>{course.is_premium ? "Trading Academy course" : "Free course"}</span>
+            <span>{course.is_premium ? "Trading Academy access" : "Free course"}</span>
+            <span>{courseGuides.length > 0 ? `${courseGuides.length} guides` : "No guides yet"}</span>
           </div>
         </div>
 
@@ -185,47 +144,13 @@ export function CourseDetail() {
             </div>
           </article>
         ) : (
-          course.modules.map((module) => (
-            <article className="module-card" key={module.id}>
-              <div className="module-heading">
-                <span>Module {module.sort_order}</span>
-                <h2>{module.title}</h2>
-              </div>
-              <div className="lesson-list">
-                {module.lessons.map((lesson) => {
-                  const locked = lesson.is_premium && !lesson.is_preview && !hasAccess;
-                  return (
-                    <div className={locked ? "lesson-row locked" : "lesson-row"} key={lesson.id}>
-                      <div className="lesson-icon">
-                        {locked ? <LockKeyhole size={18} /> : lesson.is_preview ? <PlayCircle size={18} /> : <CheckCircle2 size={18} />}
-                      </div>
-                      <div>
-                        <div className="lesson-title-line">
-                          <h3>{lesson.title}</h3>
-                          {lesson.is_preview && <span className="status-pill free">Preview</span>}
-                          {lesson.is_premium && !lesson.is_preview && <span className="status-pill premium">Trading Academy</span>}
-                        </div>
-                        <p>
-                          {locked
-                            ? "This lesson unlocks with Trading Academy access or a verified purchase."
-                            : lesson.content}
-                        </p>
-                        {!locked && user && (
-                          <button
-                            className="ghost-button compact"
-                            type="button"
-                            onClick={() => void markLessonComplete(lesson.id)}
-                          >
-                            Mark Complete
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </article>
-          ))
+          <article className="module-card">
+            <div className="module-heading">
+              <span>Course guides</span>
+              <h2>No guides added yet</h2>
+            </div>
+            <p className="muted">This course is ready for guides to be attached from the admin dashboard.</p>
+          </article>
         )}
       </section>
     </main>

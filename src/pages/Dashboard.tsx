@@ -17,8 +17,10 @@ import {
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
+import { UserBadgeRail } from "../components/UserBadgePill";
 import { useAuth } from "../contexts/AuthContext";
 import { useAccountStatus } from "../hooks/useAccountStatus";
+import { evaluateUserBadges } from "../lib/badgesApi";
 import { getProgressToNextLevel } from "../lib/levels";
 import { fetchInboxMessages, inboxTypeLabels, markInboxMessageRead } from "../lib/notificationsApi";
 import { supabase } from "../lib/supabase";
@@ -30,6 +32,7 @@ import type {
   LessonProgress,
   Purchase,
   SavedGuide,
+  UserBadge,
   XPTransaction
 } from "../types/content";
 
@@ -78,6 +81,7 @@ export function Dashboard() {
   const [savedGuides, setSavedGuides] = useState<SavedGuide[]>([]);
   const [progress, setProgress] = useState<LessonProgress[]>([]);
   const [xpTransactions, setXPTransactions] = useState<XPTransaction[]>([]);
+  const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
   const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>([]);
   const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
   const [selectedInboxMessageId, setSelectedInboxMessageId] = useState<string | null>(null);
@@ -111,36 +115,52 @@ export function Dashboard() {
 
   useEffect(() => {
     let mounted = true;
+    const currentUser = user;
+    const client = supabase;
 
-    if (!supabase || !user) {
+    if (!client || !currentUser) {
       setIsLoading(false);
       return () => {
         mounted = false;
       };
     }
 
-    Promise.all([
-      supabase.from("purchases").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-      supabase
-        .from("saved_guides")
-        .select("id,user_id,guide_id,created_at,guides(title,slug,category)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("lesson_progress")
-        .select("id,user_id,lesson_id,completed,completed_at,lessons(title)")
-        .eq("user_id", user.id)
-        .order("completed_at", { ascending: false }),
-      supabase
-        .from("xp_transactions")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(5),
-      fetchInboxMessages()
-        .then((data) => ({ data, error: null }))
-        .catch((loadError: unknown) => ({ data: [] as InboxMessage[], error: loadError }))
-    ]).then(([purchaseResult, savedResult, progressResult, xpResult, inboxResult]) => {
+    const userId = currentUser.id;
+    const database = client;
+
+    async function loadDashboardData() {
+      let nextBadges: UserBadge[] = [];
+
+      try {
+        nextBadges = await evaluateUserBadges(userId);
+        await refreshProfile();
+      } catch {
+        nextBadges = [];
+      }
+
+      const [purchaseResult, savedResult, progressResult, xpResult, inboxResult] = await Promise.all([
+        database.from("purchases").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+        database
+          .from("saved_guides")
+          .select("id,user_id,guide_id,created_at,guides(title,slug,category)")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
+        database
+          .from("lesson_progress")
+          .select("id,user_id,lesson_id,completed,completed_at,lessons(title)")
+          .eq("user_id", userId)
+          .order("completed_at", { ascending: false }),
+        database
+          .from("xp_transactions")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(5),
+        fetchInboxMessages()
+          .then((data) => ({ data, error: null }))
+          .catch((loadError: unknown) => ({ data: [] as InboxMessage[], error: loadError }))
+      ]);
+
       if (!mounted) return;
 
       if (purchaseResult.error || savedResult.error || progressResult.error || xpResult.error) {
@@ -152,14 +172,17 @@ export function Dashboard() {
       setSavedGuides(((savedResult.data ?? []) as SavedGuideRow[]).map(normalizeSavedGuide));
       setProgress(((progressResult.data ?? []) as LessonProgressRow[]).map(normalizeLessonProgress));
       setXPTransactions((xpResult.data ?? []) as XPTransaction[]);
+      setUserBadges(nextBadges);
       setInboxMessages(inboxResult.data);
       setIsLoading(false);
-    });
+    }
+
+    void loadDashboardData();
 
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [refreshProfile, user]);
 
   const uploadAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -489,6 +512,17 @@ export function Dashboard() {
           <p className="level-next-line">
             {levelProgress.xpIntoLevel}/{levelProgress.xpRequiredForNextLevel} XP - {levelProgress.xpRemainingForNextLevel} XP to LVL {levelProgress.level + 1}
           </p>
+          <div className="level-badge-section">
+            <div className="level-badge-heading">
+              <span>Badges</span>
+              <small>{userBadges.length ? `${userBadges.length} earned` : "Course and loyalty rewards"}</small>
+            </div>
+            <UserBadgeRail
+              badges={userBadges}
+              emptyLabel="Complete course quizzes or keep Trading Academy active to earn badges."
+              maxVisible={4}
+            />
+          </div>
         </article>
       </section>
 

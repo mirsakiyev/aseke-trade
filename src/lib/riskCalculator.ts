@@ -28,6 +28,7 @@ export interface RiskTakeProfitResult {
 export interface RiskCalculatorResult {
   symbol: string;
   direction: RiskDirection;
+  positionSizeMode: PositionSizeMode;
   accountBalance: number;
   riskAmount: number;
   selectedRiskAmount: number;
@@ -67,7 +68,9 @@ export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
 
   if (!symbol) errors.push("Symbol is required.");
   if (!isPositive(input.accountBalance)) errors.push("Account balance must be greater than zero.");
-  if (!isPositive(input.riskPercent)) errors.push("Risk percent must be greater than zero.");
+  if (input.positionSizeMode === "auto" && !isPositive(input.riskPercent)) {
+    errors.push("Max loss at stop percentage must be greater than zero.");
+  }
   if (!isPositive(input.entryPrice)) errors.push("Entry price must be greater than zero.");
   if (!isPositive(input.stopLossValue)) {
     errors.push(
@@ -99,7 +102,7 @@ export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
 
   if (errors.length) return { ok: false, errors };
 
-  const selectedRiskAmount = input.accountBalance * (input.riskPercent / 100);
+  const selectedRiskAmount = input.positionSizeMode === "auto" ? input.accountBalance * (input.riskPercent / 100) : 0;
   const stopLossDecimal = stopLoss.percent / 100;
   const notionalPositionValue =
     input.positionSizeMode === "manual" && input.manualNotionalValue
@@ -118,28 +121,26 @@ export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
   const isExecutable = marginRequired <= input.accountBalance;
   const validTakeProfitValues = input.takeProfitValues.filter(isPositive);
 
-  if (actualRiskPercent > 5) {
-    warnings.push("High risk: risking more than 5% of account balance on one trade.");
-  }
+  if (input.positionSizeMode === "auto") {
+    if (input.riskPercent > 5) {
+      warnings.push("High risk: risking more than 5% of your account on one trade is aggressive.");
+    }
 
-  if (actualRiskPercent > 25) {
-    warnings.push("Extreme risk: this trade could lose a large part of the account if stop loss is hit.");
-  }
-
-  if (actualRiskPercent >= 100) {
-    warnings.push("Extreme risk: this trade risks the full account balance.");
-  }
-
-  if (input.positionSizeMode === "manual" && actualRiskAmount > selectedRiskAmount) {
-    warnings.push("Manual notional value risks more than the selected account risk.");
+    if (input.riskPercent >= 100) {
+      warnings.push("Extreme risk: this means you are willing to lose the full account balance if stop loss is hit.");
+    } else if (input.riskPercent > 25) {
+      warnings.push("Extreme risk: this trade could lose a large part of the account if stop loss is hit.");
+    }
+  } else if (actualRiskPercent > 5) {
+    warnings.push("High risk: this manual position would lose more than 5% of your account if stop loss is hit.");
   }
 
   if (!isExecutable) {
-    warnings.push("Invalid plan: required margin is higher than account balance.");
+    warnings.push("Invalid plan: insufficient margin.");
     warnings.push(
       `This position requires ${formatDollarForWarning(marginRequired)} margin at ${formatCompactNumber(
         input.leverage
-      )}x leverage, but your account balance is only ${formatDollarForWarning(input.accountBalance)}.`
+      )}x, but your account balance is ${formatDollarForWarning(input.accountBalance)}.`
     );
   }
 
@@ -171,6 +172,7 @@ export function calculateRisk(input: RiskCalculatorInput): RiskCalculation {
     result: {
       symbol: symbol.toUpperCase(),
       direction: input.direction,
+      positionSizeMode: input.positionSizeMode,
       accountBalance: input.accountBalance,
       riskAmount: actualRiskAmount,
       selectedRiskAmount,

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { loadCourses } from "../lib/contentApi";
-import { formatMoney } from "../lib/validation";
 import type { Course } from "../types/content";
 
 export function Courses() {
@@ -63,12 +62,8 @@ export function Courses() {
               <h2>{course.title}</h2>
               <p>{course.description}</p>
               <div className="card-meta">
-                <span>{course.is_premium ? "Trading Academy access" : formatMoney(course.price_cents)}</span>
-                <span>
-                  {course.guides.length > 0
-                    ? `${course.guides.length} guides`
-                    : `${course.modules.reduce((count, module) => count + module.lessons.length, 0)} lessons`}
-                </span>
+                <span>{course.is_premium ? "Trading Academy access" : "Free course"}</span>
+                <span>{course.guides.length > 0 ? `${course.guides.length} guides` : "No guides yet"}</span>
               </div>
               <Link className="text-link" to={`/courses/${course.slug}`}>
                 View learning path

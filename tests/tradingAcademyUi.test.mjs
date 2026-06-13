@@ -44,9 +44,16 @@ test("academy dashboard includes a subscriber risk calculator", () => {
   assert.match(dashboardSource, /manualNotionalValue/);
   assert.match(dashboardSource, /Stop Loss Mode/);
   assert.match(dashboardSource, /Take Profits/);
+  assert.match(dashboardSource, /Max Loss at Stop %/);
+  assert.match(dashboardSource, /form\.positionSizeMode === "auto"/);
+  assert.match(dashboardSource, /Manual: I choose position value/);
+  assert.match(dashboardSource, /Auto: Calculate position from max loss/);
+  assert.match(dashboardSource, /manualNotionalValue: form\.manualNotionalValue \|\| form\.accountBalance/);
+  assert.match(dashboardSource, /RiskModeSummary/);
+  assert.match(dashboardSource, /RiskAutoExplanation/);
   assert.match(dashboardSource, /Notional Position Value/);
   assert.match(dashboardSource, /Stop Loss Distance/);
-  assert.match(dashboardSource, /Risk is based on position value and stop-loss distance/);
+  assert.match(dashboardSource, /Position value, margin, and account risk are different/);
   assert.doesNotMatch(dashboardSource, /riskForm\.symbol|<label>\s*Pair/);
   assert.doesNotMatch(dashboardSource, /Position Risk/);
   assert.doesNotMatch(dashboardSource, /coins/);

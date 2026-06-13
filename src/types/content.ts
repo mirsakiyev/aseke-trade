@@ -107,11 +107,46 @@ export interface XPTransaction {
   id: string;
   user_id: string;
   amount: number;
-  source_type: "guide" | "puzzle_of_day" | "admin_adjustment";
+  source_type: "guide" | "puzzle_of_day" | "admin_adjustment" | "course_badge" | "loyalty_badge";
   source_id: string;
   description: string | null;
   created_at: string;
 }
+
+export type UserBadgeType = "course_completion" | "subscription_loyalty";
+
+export interface UserBadgeMetadata {
+  courseId?: string;
+  courseName?: string;
+  completedGuideIds?: string[];
+  completedQuizIds?: string[];
+  subscriptionMonthNumber?: number;
+  subscriptionPeriodStart?: string;
+  subscriptionPeriodEnd?: string;
+  continuousMonths?: number;
+  [key: string]: unknown;
+}
+
+export interface UserBadge {
+  id: string;
+  user_id: string;
+  badge_type: UserBadgeType;
+  badge_key: string;
+  name: string;
+  description: string;
+  icon: string;
+  style_variant: string;
+  xp_awarded: number;
+  earned_at: string;
+  metadata: UserBadgeMetadata;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type PublicUserBadge = Pick<
+  UserBadge,
+  "id" | "badge_type" | "name" | "description" | "icon" | "style_variant" | "xp_awarded" | "earned_at" | "metadata"
+>;
 
 export interface Puzzle {
   id: string;
@@ -379,6 +414,8 @@ export interface TradingAcademyLeaderboardRow {
   level: number;
   total_xp: number;
   joined_at: string;
+  badges: PublicUserBadge[];
+  badge_count: number;
 }
 
 export interface PremiumSubscription {

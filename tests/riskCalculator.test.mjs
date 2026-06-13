@@ -141,26 +141,90 @@ test("insufficient margin keeps the risk-based result visible and marks the plan
   assertClose(calculation.result.marginRequired, 12600);
   assertClose(calculation.result.requiredLeverage, 63);
   assert.equal(calculation.result.isExecutable, false);
-  assert.ok(calculation.result.warnings.includes("Invalid plan: required margin is higher than account balance."));
+  assert.ok(calculation.result.warnings.includes("Invalid plan: insufficient margin."));
 });
 
-test("manual notional mode shows actual risk from notional value and stop distance", () => {
+test("manual notional value equal to account balance shows actual loss instead of old max loss input", () => {
   const calculation = calculateRisk(
     autoPercentageInput({
-      riskPercent: 1,
-      entryPrice: 100,
-      stopLossValue: 10,
+      accountBalance: 1000,
+      entryPrice: 63600,
+      stopLossValue: 3,
+      takeProfitValues: [10],
+      leverage: 10,
       positionSizeMode: "manual",
-      manualNotionalValue: 500
+      manualNotionalValue: 1000
     })
   );
 
   assert.equal(calculation.ok, true);
-  assert.equal(calculation.result.notionalPositionValue, 500);
-  assert.equal(calculation.result.positionSizeUnits, 5);
-  assert.equal(calculation.result.actualRiskAmount, 50);
-  assert.equal(calculation.result.actualRiskPercent, 5);
-  assert.ok(calculation.result.warnings.includes("Manual notional value risks more than the selected account risk."));
+  assert.equal(calculation.result.positionSizeMode, "manual");
+  assert.equal(calculation.result.notionalPositionValue, 1000);
+  assertClose(calculation.result.positionSizeUnits, 0.01572327);
+  assert.equal(calculation.result.stopLossPrice, 61692);
+  assert.equal(calculation.result.stopLossPercent, 3);
+  assert.equal(calculation.result.actualRiskAmount, 30);
+  assert.equal(calculation.result.actualRiskPercent, 3);
+  assert.equal(calculation.result.marginRequired, 100);
+  assert.equal(calculation.result.marginUsedPercent, 10);
+  assert.equal(calculation.result.marginShortfall, 0);
+  assert.equal(calculation.result.takeProfits[0].price, 69960);
+  assertClose(calculation.result.takeProfits[0].profitAmount, 100);
+  assertClose(calculation.result.takeProfits[0].riskReward, 3.33333333);
+  assert.equal(calculation.result.warnings.length, 0);
+});
+
+test("auto risk-based size with 100 percent max loss explains the larger notional value", () => {
+  const calculation = calculateRisk(
+    autoPercentageInput({
+      accountBalance: 1000,
+      riskPercent: 100,
+      entryPrice: 63600,
+      stopLossValue: 3,
+      takeProfitValues: [10],
+      leverage: 10
+    })
+  );
+
+  assert.equal(calculation.ok, true);
+  assert.equal(calculation.result.positionSizeMode, "auto");
+  assert.equal(calculation.result.selectedRiskAmount, 1000);
+  assert.equal(calculation.result.actualRiskPercent, 100);
+  assertClose(calculation.result.notionalPositionValue, 33333.33333333);
+  assertClose(calculation.result.positionSizeUnits, 0.52410901);
+  assert.equal(calculation.result.stopLossPrice, 61692);
+  assert.equal(calculation.result.stopLossPercent, 3);
+  assertClose(calculation.result.marginRequired, 3333.33333333);
+  assertClose(calculation.result.marginUsedPercent, 333.33333333);
+  assertClose(calculation.result.requiredLeverage, 33.33333333);
+  assertClose(calculation.result.marginShortfall, 2333.33333333);
+  assert.equal(calculation.result.takeProfits[0].price, 69960);
+  assertClose(calculation.result.takeProfits[0].profitAmount, 3333.33333333);
+  assertClose(calculation.result.takeProfits[0].riskReward, 3.33333333);
+  assert.ok(calculation.result.warnings.includes("Invalid plan: insufficient margin."));
+  assert.ok(
+    calculation.result.warnings.includes(
+      "Extreme risk: this means you are willing to lose the full account balance if stop loss is hit."
+    )
+  );
+});
+
+test("auto mode with 3 percent max loss matches a 1000 dollar manual position at a 3 percent stop", () => {
+  const calculation = calculateRisk(
+    autoPercentageInput({
+      accountBalance: 1000,
+      riskPercent: 3,
+      entryPrice: 63600,
+      stopLossValue: 3,
+      leverage: 10
+    })
+  );
+
+  assert.equal(calculation.ok, true);
+  assert.equal(calculation.result.selectedRiskAmount, 30);
+  assertClose(calculation.result.notionalPositionValue, 1000);
+  assertClose(calculation.result.positionSizeUnits, 0.01572327);
+  assertClose(calculation.result.marginRequired, 100);
 });
 
 test("risk calculator rejects an invalid long stop price", () => {

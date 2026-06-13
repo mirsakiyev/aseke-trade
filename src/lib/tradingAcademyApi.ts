@@ -5,6 +5,7 @@ import type {
   TradingAcademyLeaderboardRow,
   TradingSignal
 } from "../types/content";
+import { normalizePublicBadges } from "./badgesApi";
 import { supabase } from "./supabase";
 import { sanitizePlainText } from "./validation";
 
@@ -25,7 +26,14 @@ export async function fetchTradingAcademyLeaderboard(): Promise<TradingAcademyLe
   const { data, error } = await supabase.rpc("get_trading_academy_leaderboard");
   if (error) return [];
 
-  return (data ?? []) as TradingAcademyLeaderboardRow[];
+  return ((data ?? []) as Array<TradingAcademyLeaderboardRow & { badges?: unknown; badge_count?: unknown }>).map((row) => {
+    const badges = normalizePublicBadges(row.badges);
+    return {
+      ...row,
+      badges,
+      badge_count: Number.isFinite(Number(row.badge_count)) ? Number(row.badge_count) : badges.length
+    };
+  });
 }
 
 export async function fetchTradingSignals(options: { includeInactive?: boolean } = {}): Promise<TradingSignal[]> {

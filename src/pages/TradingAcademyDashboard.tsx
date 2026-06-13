@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { LoadingState } from "../components/LoadingState";
+import { UserBadgePill } from "../components/UserBadgePill";
 import { useAuth } from "../contexts/AuthContext";
 import { useAccountStatus } from "../hooks/useAccountStatus";
 import { formatUsd } from "../lib/accountStatus";
@@ -300,7 +301,17 @@ export function TradingAcademyDashboard() {
   };
 
   const updateRiskForm = (field: RiskCalculatorEditableField, value: string) => {
-    setRiskForm((form) => ({ ...form, [field]: value }));
+    setRiskForm((form) => {
+      if (field === "positionSizeMode" && value === "manual") {
+        return {
+          ...form,
+          positionSizeMode: value,
+          manualNotionalValue: form.manualNotionalValue || form.accountBalance
+        };
+      }
+
+      return { ...form, [field]: value };
+    });
   };
 
   const updateRiskTakeProfit = (takeProfitId: string, price: string) => {
@@ -378,6 +389,7 @@ export function TradingAcademyDashboard() {
                     <span>
                       <strong>{row.display_name}</strong>
                       <small>{row.total_xp} XP</small>
+                      <LeaderboardBadgeStrip row={row} />
                     </span>
                     <span className="level-badge">LVL {row.level}</span>
                   </li>
@@ -685,17 +697,20 @@ function RiskCalculatorPanel({
               </span>
             </label>
 
-            <label className="risk-field-group">
-              <span className="risk-field-label">Risk Per Trade</span>
-              <span className="risk-prefixed-input">
-                <span>%</span>
-                <input
-                  inputMode="decimal"
-                  value={form.riskPercent}
-                  onChange={(event) => onChange("riskPercent", event.target.value)}
-                />
-              </span>
-            </label>
+            {form.positionSizeMode === "auto" && (
+              <label className="risk-field-group">
+                <span className="risk-field-label">Max Loss at Stop %</span>
+                <span className="risk-prefixed-input">
+                  <span>%</span>
+                  <input
+                    inputMode="decimal"
+                    value={form.riskPercent}
+                    onChange={(event) => onChange("riskPercent", event.target.value)}
+                  />
+                </span>
+                <small className="risk-derived-line">{formatMaxLossHelper(form)}</small>
+              </label>
+            )}
 
             <div className="risk-form-grid">
               <label>
@@ -722,8 +737,8 @@ function RiskCalculatorPanel({
                   value={form.positionSizeMode}
                   onChange={(event) => onChange("positionSizeMode", event.target.value)}
                 >
-                  <option value="auto">Auto risk-based size</option>
-                  <option value="manual">Manual notional value</option>
+                  <option value="auto">Auto: Calculate position from max loss</option>
+                  <option value="manual">Manual: I choose position value</option>
                 </select>
               </label>
             </div>
@@ -739,6 +754,10 @@ function RiskCalculatorPanel({
                     onChange={(event) => onChange("manualNotionalValue", event.target.value)}
                   />
                 </span>
+                <small className="risk-derived-line">
+                  This is your full position value, not your margin and not your max loss.
+                  {formatManualMarginHelper(form)}
+                </small>
               </label>
             )}
 
@@ -834,9 +853,9 @@ function RiskCalculatorPanel({
             </div>
 
             <p className="risk-education-note">
-              Risk is based on position value and stop-loss distance. If two assets have the same stop-loss percentage,
-              the account risk is the same. The asset price only changes the coin quantity. This calculator is for
-              educational purposes only and does not guarantee profit or prevent loss.
+              Position value, margin, and account risk are different. A $1,000 position with a 3% stop risks $30. To
+              risk $1,000 with a 3% stop, the position must be $33,333.33. This calculator is for educational purposes
+              only and does not guarantee profit or prevent loss.
             </p>
 
             {errors.length > 0 && (
@@ -867,6 +886,7 @@ function RiskCalculatorPanel({
 
 function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null }) {
   const assessment = getRiskAssessment(result?.accountRiskPercent ?? null);
+  const isAutoMode = result?.positionSizeMode !== "manual";
 
   return (
     <article className="risk-result-panel">
@@ -880,8 +900,12 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
 
       <dl className="risk-summary-list">
         <RiskMetricRow
-          label="Account Risk"
-          value={result ? `${formatUsdAmount(result.actualRiskAmount)} (${formatPercentValue(result.actualRiskPercent)})` : "$-- (--)"}
+          label={isAutoMode ? "Max Loss at Stop" : "Actual Loss at Stop"}
+          value={
+            result
+              ? `${formatUsdAmount(result.actualRiskAmount)} (${formatPercentValue(result.actualRiskPercent)})`
+              : "$-- (--)"
+          }
         />
         <RiskMetricRow label="Stop Loss Distance" value={result ? formatPercentValue(result.stopLossPercent) : "--%"} />
         <RiskMetricRow label="Stop Loss Price" value={result ? formatUsdAmount(result.stopLossPrice) : "$--"} />
@@ -891,13 +915,20 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
         />
       </dl>
 
+      <RiskModeSummary result={result} />
+
+      {result?.positionSizeMode === "auto" && <RiskAutoExplanation result={result} />}
+
       <section className="risk-breakdown-card">
         <h3>
           <ShieldCheck size={17} />
           Risk Breakdown
         </h3>
         <dl className="risk-result-grid">
-          <RiskMetricBox label="Account Risk %" value={result ? formatPercentValue(result.actualRiskPercent) : "--%"} />
+          <RiskMetricBox
+            label={isAutoMode ? "Max Account Risk" : "Actual Account Risk"}
+            value={result ? formatPercentValue(result.actualRiskPercent) : "--%"}
+          />
           <RiskMetricBox label="Stop Loss Distance" value={result ? formatPercentValue(result.stopLossPercent) : "--%"} />
           <RiskMetricBox label="Margin Used" value={result ? formatPercentValue(result.marginUsedPercent) : "--%"} />
           <RiskMetricBox label="Required Leverage" value={result ? `${formatRiskDecimal(result.requiredLeverage)}x` : "--x"} />
@@ -960,6 +991,59 @@ function RiskCalculatorResults({ result }: { result: RiskCalculatorResult | null
         </ul>
       )}
     </article>
+  );
+}
+
+function RiskModeSummary({ result }: { result: RiskCalculatorResult | null }) {
+  if (!result) {
+    return (
+      <section className="risk-mode-summary">
+        <h3>Position sizing mode</h3>
+        <p>Choose auto mode to size from max loss, or manual mode to choose the position value yourself.</p>
+      </section>
+    );
+  }
+
+  if (result.positionSizeMode === "auto") {
+    return (
+      <section className="risk-mode-summary">
+        <h3>Auto position sizing</h3>
+        <p>The calculator chooses the position size needed to match your max loss at stop.</p>
+        <dl className="risk-summary-list">
+          <RiskMetricRow label="Max Loss at Stop" value={formatUsdAmount(result.selectedRiskAmount)} />
+          <RiskMetricRow label="Stop Loss Distance" value={formatPercentValue(result.stopLossPercent)} />
+          <RiskMetricRow label="Required Notional Position" value={formatUsdAmount(result.notionalPositionValue)} />
+        </dl>
+      </section>
+    );
+  }
+
+  return (
+    <section className="risk-mode-summary">
+      <h3>Manual position sizing</h3>
+      <p>You choose the position value. The calculator shows how much you would actually lose if stop loss is hit.</p>
+      <dl className="risk-summary-list">
+        <RiskMetricRow label="Chosen Position Value" value={formatUsdAmount(result.notionalPositionValue)} />
+        <RiskMetricRow label="Stop Loss Distance" value={formatPercentValue(result.stopLossPercent)} />
+        <RiskMetricRow label="Actual Loss at Stop" value={formatUsdAmount(result.actualRiskAmount)} />
+        <RiskMetricRow label="Actual Account Risk" value={formatPercentValue(result.actualRiskPercent)} />
+      </dl>
+    </section>
+  );
+}
+
+function RiskAutoExplanation({ result }: { result: RiskCalculatorResult }) {
+  return (
+    <section className="risk-explanation-card">
+      <p>
+        You selected to risk {formatUsdAmount(result.selectedRiskAmount)} if stop loss is hit. Since your stop loss is{" "}
+        {formatPercentValue(result.stopLossPercent)} away, the calculator needs a{" "}
+        {formatUsdAmount(result.notionalPositionValue)} position because{" "}
+        {formatPercentValue(result.stopLossPercent)} of {formatUsdAmount(result.notionalPositionValue)} equals{" "}
+        {formatUsdAmount(result.selectedRiskAmount)}.
+      </p>
+      <p>This is why Auto mode can create a much larger position than Manual mode.</p>
+    </section>
   );
 }
 
@@ -1102,6 +1186,21 @@ function LeaderboardAvatar({ row }: { row: TradingAcademyLeaderboardRow }) {
   );
 }
 
+function LeaderboardBadgeStrip({ row }: { row: TradingAcademyLeaderboardRow }) {
+  if (!row.badges.length) return null;
+
+  const hiddenCount = Math.max(0, row.badge_count - row.badges.length);
+
+  return (
+    <span className="leaderboard-badge-strip" aria-label={`${row.display_name} earned badges`}>
+      {row.badges.map((badge) => (
+        <UserBadgePill badge={badge} size="small" showLabel={false} key={badge.id} />
+      ))}
+      {hiddenCount > 0 && <span className="leaderboard-badge-more">+{hiddenCount}</span>}
+    </span>
+  );
+}
+
 function SignalLevel({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
@@ -1220,6 +1319,34 @@ function mergeTakeProfitHitState(
 
 function numberFromInput(value: string): number {
   return Number(value.replace(/,/g, "").trim());
+}
+
+function formatMaxLossHelper(form: RiskCalculatorFormState): string {
+  const accountBalance = numberFromInput(form.accountBalance);
+  const maxLossPercent = numberFromInput(form.riskPercent);
+
+  if (isPositiveNumber(accountBalance) && isPositiveNumber(maxLossPercent)) {
+    const maxLossAmount = accountBalance * (maxLossPercent / 100);
+    if (maxLossPercent >= 100) {
+      return `You selected 100%, meaning you are risking the full ${formatUsdAmount(accountBalance)} account if stop loss is hit.`;
+    }
+
+    return `This is the percentage of your account you are willing to lose if stop loss is hit. It is not the position size. Example: With a ${formatUsdAmount(
+      accountBalance
+    )} account and ${formatPercentValue(maxLossPercent)} max loss, you are risking ${formatUsdAmount(maxLossAmount)}.`;
+  }
+
+  return "This is the percentage of your account you are willing to lose if stop loss is hit. It is not the position size.";
+}
+
+function formatManualMarginHelper(form: RiskCalculatorFormState): string {
+  const manualNotionalValue = numberFromInput(form.manualNotionalValue);
+  const leverage = numberFromInput(form.leverage);
+  if (!isPositiveNumber(manualNotionalValue) || !isPositiveNumber(leverage) || leverage <= 1) return "";
+
+  return ` At ${formatRiskDecimal(leverage)}x, this position requires approximately ${formatUsdAmount(
+    manualNotionalValue / leverage
+  )} margin.`;
 }
 
 function formatDerivedStopLossLine(form: RiskCalculatorFormState): string | null {
