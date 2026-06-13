@@ -28,13 +28,14 @@ test("leaderboard renders public avatars with fallback support", () => {
   assert.match(dashboardSource, /leaderboard\.slice\(0,\s*3\)/);
   assert.match(dashboardSource, /setIsLeaderboardExpanded/);
   assert.match(dashboardSource, /leaderboard-member-info/);
+  assert.match(dashboardSource, /<h2 className="title-with-leading-icon">\s*<Trophy size=\{28\}/);
   assert.match(dashboardSource, /<LeaderboardBadgeStrip row=\{row\}/);
   assert.doesNotMatch(dashboardSource, /toggleLeaderboardBadges/);
 });
 
 test("academy dashboard includes a subscriber risk calculator", () => {
   assert.match(dashboardSource, /RiskCalculatorPanel/);
-  assert.match(dashboardSource, /<h2>Risk Calculator<\/h2>/);
+  assert.match(dashboardSource, /<h2 className="title-with-leading-icon">\s*<Calculator size=\{28\}/);
   assert.doesNotMatch(dashboardSource, /Position plan/);
   assert.match(dashboardSource, /form\.direction === "long" \? "long active" : "long"/);
   assert.match(dashboardSource, /form\.direction === "short" \? "short active" : "short"/);

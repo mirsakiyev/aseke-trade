@@ -72,6 +72,7 @@ test("admin manages courses as guide bundles without lessons or course pricing",
   assert.doesNotMatch(adminSource, /saveLesson|saveModule|course_modules|setLessons|setModules/);
   assert.doesNotMatch(adminSource, /courseForm\.price_cents|price_cents: Number\(courseForm\.price_cents\)/);
   assert.match(adminSource, /guide_ids: \[\] as string\[\]/);
+  assert.match(adminSource, /admin-guides-grid/);
   assert.match(adminSource, /admin-guide-picker/);
   assert.match(adminSource, /update\(\{ course_id: savedCourseId \}\)\.in\("id", selectedGuideIds\)/);
   assert.match(adminSource, /price_cents: 0/);

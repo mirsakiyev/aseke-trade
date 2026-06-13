@@ -6,6 +6,10 @@ const badgeMigration = await readFile(
   new URL("../supabase/migrations/202606130001_badge_system.sql", import.meta.url),
   "utf8"
 );
+const fullLeaderboardBadgesMigration = await readFile(
+  new URL("../supabase/migrations/202606130002_full_leaderboard_badges.sql", import.meta.url),
+  "utf8"
+);
 const dashboardSource = await readFile(new URL("../src/pages/Dashboard.tsx", import.meta.url), "utf8");
 const academyDashboardSource = await readFile(
   new URL("../src/pages/TradingAcademyDashboard.tsx", import.meta.url),
@@ -60,12 +64,15 @@ test("dashboard lazily evaluates badges and renders them under Learning Level", 
 });
 
 test("leaderboard exposes compact public badge data without private subscription fields", () => {
-  assert.match(badgeMigration, /badges jsonb/i);
-  assert.match(badgeMigration, /badge_count integer/i);
-  assert.match(badgeMigration, /jsonb_build_object\(\s*'id'/i);
-  assert.match(badgeMigration, /subscriptionMonthNumber/i);
-  assert.doesNotMatch(badgeMigration, /payment_reference|receive_address|email|wallet/i);
-  assert.doesNotMatch(badgeMigration, /badge_position <= 3/i);
+  const leaderboardBadgeSql = badgeMigration + fullLeaderboardBadgesMigration;
+  assert.match(fullLeaderboardBadgesMigration, /drop function if exists public\.get_trading_academy_leaderboard\(\)/i);
+  assert.match(leaderboardBadgeSql, /badges jsonb/i);
+  assert.match(leaderboardBadgeSql, /badge_count integer/i);
+  assert.match(leaderboardBadgeSql, /jsonb_build_object\(\s*'id'/i);
+  assert.match(leaderboardBadgeSql, /subscriptionMonthNumber/i);
+  assert.match(fullLeaderboardBadgesMigration, /order by ub\.xp_awarded desc,\s*ub\.earned_at desc,\s*ub\.name asc/i);
+  assert.doesNotMatch(leaderboardBadgeSql, /payment_reference|receive_address|email|wallet/i);
+  assert.doesNotMatch(fullLeaderboardBadgesMigration, /badge_position <= 3|filter\s*\(\s*where/i);
   assert.match(academyDashboardSource, /LeaderboardBadgeStrip/);
   assert.match(academyDashboardSource, /row\.badges\.map/);
   assert.doesNotMatch(academyDashboardSource, /expandedLeaderboardBadges/);

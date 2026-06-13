@@ -2680,6 +2680,17 @@ button.leaderboard-badge-more:hover {
   flex-wrap: wrap;
 }
 
+.title-with-leading-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.title-with-leading-icon svg {
+  flex: 0 0 auto;
+  color: var(--platinum-soft);
+}
+
 .card-topline {
   justify-content: space-between;
 }
@@ -3172,35 +3183,53 @@ select:focus {
 }
 
 .compact-admin-form {
+  align-self: start;
   gap: 0.62rem;
+  padding: 1rem;
 }
 
 .compact-admin-form h2 {
-  margin-bottom: 0.1rem;
+  margin: 0 0 0.1rem;
+  font-size: clamp(1.45rem, 2.2vw, 2rem);
 }
 
 .compact-admin-form label {
-  gap: 0.28rem;
+  gap: 0.24rem;
+  font-size: 0.82rem;
 }
 
 .compact-admin-form input,
 .compact-admin-form select,
 .compact-admin-form textarea {
-  min-height: 38px;
-  padding: 0.58rem 0.68rem;
+  min-height: 36px;
+  padding: 0.5rem 0.62rem;
 }
 
 .compact-admin-form textarea {
-  min-height: 78px;
+  min-height: 64px;
 }
 
 .compact-admin-form .guide-content-input {
-  min-height: 132px;
+  min-height: 104px;
 }
 
 .compact-admin-form .admin-compact-grid {
   grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
   gap: 0.5rem;
+}
+
+.compact-admin-form .form-row {
+  gap: 0.5rem;
+}
+
+.compact-admin-form .checkbox-label {
+  min-height: 36px;
+  padding: 0.48rem 0.58rem;
+}
+
+.admin-guides-grid {
+  align-items: start;
+  grid-template-columns: minmax(300px, 0.88fr) minmax(360px, 1.12fr);
 }
 
 .admin-guide-picker {
@@ -3983,7 +4012,8 @@ select:focus {
       90deg,
       rgba(126, 224, 167, 0.82) 0 20%,
       rgba(184, 214, 222, 0.78) 20% 40%,
-      rgba(245, 197, 92, 0.82) 40% 100%
+      rgba(245, 197, 92, 0.82) 40% 78%,
+      rgba(255, 107, 107, 0.86) 78% 100%
     );
 }
 
@@ -3992,17 +4022,6 @@ select:focus {
   inset: 0 auto 0 0;
   border-radius: inherit;
   background: rgba(246, 248, 250, 0.18);
-}
-
-.risk-assessment-bar.high-risk {
-  background:
-    linear-gradient(
-      90deg,
-      rgba(126, 224, 167, 0.82) 0 20%,
-      rgba(184, 214, 222, 0.78) 20% 40%,
-      rgba(245, 197, 92, 0.82) 40% 78%,
-      rgba(255, 107, 107, 0.86) 78% 100%
-    );
 }
 
 .risk-assessment-marker {

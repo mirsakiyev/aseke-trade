@@ -438,7 +438,7 @@ export function Admin() {
       ) : (
         <>
           {activeTab === "guides" && (
-            <section className="admin-grid">
+            <section className="admin-grid admin-guides-grid">
               <form className="section-panel stack-form compact-admin-form" onSubmit={saveGuide}>
                 <h2>{editingGuideId ? "Edit guide" : "Create guide"}</h2>
                 <div className="form-row">

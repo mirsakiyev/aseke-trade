@@ -376,9 +376,11 @@ export function TradingAcademyDashboard() {
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Leaderboard</p>
-                <h2>Top Academy learners</h2>
+                <h2 className="title-with-leading-icon">
+                  <Trophy size={28} aria-hidden="true" />
+                  Top Academy learners
+                </h2>
               </div>
-              <Trophy size={28} aria-hidden="true" />
             </div>
             {leaderboard.length ? (
               <ol className="leaderboard-list">
@@ -413,9 +415,11 @@ export function TradingAcademyDashboard() {
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Trading Signals</p>
-                <h2>Trading Signal by ASEKE TRADE</h2>
+                <h2 className="title-with-leading-icon">
+                  <LineChart size={28} aria-hidden="true" />
+                  Trading Signal by ASEKE TRADE
+                </h2>
               </div>
-              <LineChart size={28} aria-hidden="true" />
             </div>
             {activeSignals.length ? (
               <div className="signal-grid academy-signal-grid">
@@ -435,9 +439,11 @@ export function TradingAcademyDashboard() {
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Past Trades</p>
-                <h2>Completed signal history</h2>
+                <h2 className="title-with-leading-icon">
+                  <Trophy size={28} aria-hidden="true" />
+                  Completed signal history
+                </h2>
               </div>
-              <Trophy size={28} aria-hidden="true" />
             </div>
             {pastTrades.length ? (
               <div className="signal-grid academy-signal-grid">
@@ -651,9 +657,11 @@ function RiskCalculatorPanel({
     <section className="section-panel risk-calculator-panel">
       <div className="lesson-title-line">
         <div>
-          <h2>Risk Calculator</h2>
+          <h2 className="title-with-leading-icon">
+            <Calculator size={28} aria-hidden="true" />
+            Risk Calculator
+          </h2>
         </div>
-        <Calculator size={28} aria-hidden="true" />
       </div>
 
       {isLocked ? (
