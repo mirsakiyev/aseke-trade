@@ -1,5 +1,13 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  hasPasswordIdentity,
+  LOGIN_AGAIN_MESSAGE,
+  PASSWORD_UPDATED_MESSAGE,
+  PASSWORD_UPDATE_GENERIC_ERROR,
+  SOCIAL_PASSWORD_MESSAGE,
+  validatePasswordChangeInput
+} from "../lib/passwordAuth";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import { hasTradingAcademyAccess } from "../lib/tradingAcademyAccess";
 import { safeErrorMessage, sanitizePlainText, validateEmail, validatePassword } from "../lib/validation";
@@ -23,6 +31,11 @@ interface AuthContextValue {
   signUp: (fullName: string, email: string, password: string, termsAccepted: boolean) => Promise<AuthActionResult>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<AuthActionResult>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ) => Promise<AuthActionResult>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -183,6 +196,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true, message: "If an account exists for that email, a reset link has been sent." };
   }, []);
 
+  const changePassword = useCallback(
+    async (
+      currentPassword: string,
+      newPassword: string,
+      confirmPassword: string
+    ): Promise<AuthActionResult> => {
+      if (!supabase) {
+        return { ok: false, message: "Connect Supabase environment variables before changing your password." };
+      }
+
+      if (!user?.email) {
+        return { ok: false, message: LOGIN_AGAIN_MESSAGE };
+      }
+
+      if (!hasPasswordIdentity(user)) {
+        return { ok: false, message: SOCIAL_PASSWORD_MESSAGE };
+      }
+
+      const validationError = validatePasswordChangeInput({
+        currentPassword,
+        newPassword,
+        confirmPassword
+      });
+      if (validationError) return { ok: false, message: validationError };
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email.trim(),
+        password: currentPassword
+      });
+
+      if (signInError) {
+        return { ok: false, message: PASSWORD_UPDATE_GENERIC_ERROR };
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) {
+        return { ok: false, message: PASSWORD_UPDATE_GENERIC_ERROR };
+      }
+
+      return { ok: true, message: PASSWORD_UPDATED_MESSAGE };
+    },
+    [user]
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -197,9 +257,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       resetPassword,
+      changePassword,
       refreshProfile
     }),
-    [isLoading, profile, refreshProfile, resetPassword, session, signIn, signOut, signUp, user]
+    [changePassword, isLoading, profile, refreshProfile, resetPassword, session, signIn, signOut, signUp, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

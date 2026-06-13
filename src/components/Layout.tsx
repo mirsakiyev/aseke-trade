@@ -3,13 +3,13 @@ import {
   BrainCircuit,
   Crown,
   GraduationCap,
-  LayoutDashboard,
   LockKeyhole,
   LogOut,
   Menu,
   ShieldCheck,
   Sparkles,
   TrendingUp,
+  UserRound,
   X
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -27,8 +27,7 @@ const navItems = [
   { to: "/courses", label: "Courses", icon: GraduationCap },
   { to: "/charts", label: "Charts", icon: TrendingUp },
   { to: "/puzzle-of-the-day", label: "Puzzle", icon: BrainCircuit },
-  { to: "/trading-academy", label: "Trading Academy", icon: Crown },
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }
+  { to: "/trading-academy", label: "Trading Academy", icon: Crown }
 ];
 
 export function Layout() {
@@ -179,7 +178,9 @@ function AccountSummary({ accountStatus }: { accountStatus: ReturnType<typeof us
         <span className="account-summary-meta">Balance: {accountStatus.balanceLabel}</span>
         <span
           className={
-            accountStatus.isPremiumActive ? "account-plan-tag premium icon-only" : "account-plan-tag"
+            accountStatus.isPremiumActive
+              ? "account-plan-tag premium icon-only"
+              : "account-plan-tag basic icon-only"
           }
           title={accountStatus.planLabel}
         >
@@ -189,7 +190,10 @@ function AccountSummary({ accountStatus }: { accountStatus: ReturnType<typeof us
               <span className="sr-only">{accountStatus.planLabel}</span>
             </>
           ) : (
-            accountStatus.planLabel
+            <>
+              <UserRound size={13} aria-hidden="true" />
+              <span className="sr-only">{accountStatus.planLabel}</span>
+            </>
           )}
         </span>
       </span>

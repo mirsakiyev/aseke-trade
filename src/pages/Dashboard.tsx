@@ -7,6 +7,7 @@ import {
   Crown,
   Edit3,
   GraduationCap,
+  KeyRound,
   Mail,
   MailOpen,
   Save,
@@ -23,6 +24,7 @@ import { useAccountStatus } from "../hooks/useAccountStatus";
 import { evaluateUserBadges } from "../lib/badgesApi";
 import { getProgressToNextLevel } from "../lib/levels";
 import { fetchInboxMessages, inboxTypeLabels, markInboxMessageRead } from "../lib/notificationsApi";
+import { hasPasswordIdentity, SOCIAL_PASSWORD_MESSAGE } from "../lib/passwordAuth";
 import { supabase } from "../lib/supabase";
 import { sanitizePlainText } from "../lib/validation";
 import type {
@@ -75,7 +77,7 @@ function normalizeLessonProgress(row: LessonProgressRow): LessonProgress {
 }
 
 export function Dashboard() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, changePassword } = useAuth();
   const accountStatus = useAccountStatus();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [savedGuides, setSavedGuides] = useState<SavedGuide[]>([]);
@@ -93,11 +95,18 @@ export function Dashboard() {
   const [nameMessage, setNameMessage] = useState<string | null>(null);
   const [isNameSaving, setIsNameSaving] = useState(false);
   const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [isPasswordSuccess, setIsPasswordSuccess] = useState(false);
+  const [isPasswordSaving, setIsPasswordSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [error, setError] = useState<string | null>(null);
   const totalXP = profile?.total_xp ?? 0;
   const levelProgress = getProgressToNextLevel(totalXP);
   const displayName = profile?.full_name ?? profile?.username ?? user?.email ?? "Account";
+  const canChangeAccountPassword = hasPasswordIdentity(user);
   const unreadInboxCount = inboxMessages.filter((message) => !message.is_read).length;
   const visibleBadgeLimit = areBadgesExpanded ? userBadges.length : 4;
   const filteredInboxMessages = useMemo(
@@ -281,6 +290,32 @@ export function Dashboard() {
     setIsEditingDisplayName(false);
   };
 
+  const saveAccountPassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasswordMessage(null);
+    setIsPasswordSuccess(false);
+
+    if (!canChangeAccountPassword) {
+      setPasswordMessage(SOCIAL_PASSWORD_MESSAGE);
+      return;
+    }
+
+    setIsPasswordSaving(true);
+    const result = await changePassword(currentPassword, newPassword, confirmNewPassword);
+    setIsPasswordSaving(false);
+
+    setPasswordMessage(result.message);
+    setIsPasswordSuccess(result.ok);
+
+    if (result.ok) {
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } else {
+      setCurrentPassword("");
+    }
+  };
+
   const openInboxMessage = async (message: InboxMessage) => {
     setSelectedInboxMessageId(message.id);
     if (message.is_read) return;
@@ -397,6 +432,70 @@ export function Dashboard() {
               </div>
             )}
           </dl>
+          <section className="profile-password-section" aria-labelledby="change-password-title">
+            <div className="profile-password-heading">
+              <span className="feature-icon compact-icon">
+                <KeyRound size={18} />
+              </span>
+              <div>
+                <h3 id="change-password-title">Change Password</h3>
+                <p className="muted">
+                  Update your account password. For security, enter your current password before choosing a new one.
+                </p>
+              </div>
+            </div>
+
+            {canChangeAccountPassword ? (
+              <form className="password-change-form" onSubmit={saveAccountPassword}>
+                <label>
+                  Current Password
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                    disabled={isPasswordSaving}
+                    required
+                  />
+                </label>
+                <label>
+                  New Password
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    disabled={isPasswordSaving}
+                    minLength={8}
+                    required
+                  />
+                </label>
+                <label>
+                  Confirm New Password
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmNewPassword}
+                    onChange={(event) => setConfirmNewPassword(event.target.value)}
+                    disabled={isPasswordSaving}
+                    minLength={8}
+                    required
+                  />
+                </label>
+                {passwordMessage && (
+                  <p className={isPasswordSuccess ? "form-success" : "form-error"} aria-live="polite">
+                    {passwordMessage}
+                  </p>
+                )}
+                <button className="ghost-button compact" type="submit" disabled={isPasswordSaving || !supabase}>
+                  <ShieldCheck size={16} />
+                  {isPasswordSaving ? "Updating..." : "Update password"}
+                </button>
+              </form>
+            ) : (
+              <p className="soft-notice">{SOCIAL_PASSWORD_MESSAGE}</p>
+            )}
+          </section>
         </article>
 
         <article className="section-panel inbox-panel dashboard-inbox-card">

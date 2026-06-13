@@ -4,6 +4,7 @@ import { test } from "node:test";
 import ts from "typescript";
 
 const source = await readFile(new URL("../src/lib/tradingAcademyAccess.ts", import.meta.url), "utf8");
+const layoutSource = await readFile(new URL("../src/components/Layout.tsx", import.meta.url), "utf8");
 const transpiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -41,6 +42,18 @@ test("Trading Academy header routes active Academy users to dashboard", () => {
   };
 
   assert.equal(academyAccess.tradingAcademyNavPath(true, academyProfile, now), "/trading-academy/dashboard");
+});
+
+test("site header keeps dashboard access in the account chip only", () => {
+  assert.doesNotMatch(layoutSource, /label:\s*"Dashboard"/);
+  assert.doesNotMatch(layoutSource, /LayoutDashboard/);
+  assert.equal([...layoutSource.matchAll(/<Link to="\/dashboard" className="account-chip"/g)].length, 2);
+});
+
+test("site header shows account plan badges as icons", () => {
+  assert.match(layoutSource, /account-plan-tag basic icon-only/);
+  assert.match(layoutSource, /<UserRound size=\{13\} aria-hidden="true" \/>/);
+  assert.match(layoutSource, /<Crown size=\{13\} aria-hidden="true" \/>/);
 });
 
 test("dashboard access decision separates logged-out, regular, and Academy users", () => {
