@@ -56,76 +56,49 @@ export function Layout() {
       <ScrollMemory />
 
       <header className="site-header">
-        <div className="site-header-inner">
-          <div className="header-left">
-            <Link to="/" className="brand" onClick={closeMenu} aria-label="ASEKE TRADE home">
-              <span className="brand-mark" aria-hidden="true">
-                <img src="/assets/aseke-trade-logo.png" alt="" />
-              </span>
-              <span>
-                <strong>ASEKE TRADE</strong>
-                <small>Crypto Education</small>
-              </span>
-            </Link>
+        <Link to="/" className="brand" onClick={closeMenu} aria-label="ASEKE TRADE home">
+          <span className="brand-mark" aria-hidden="true">
+            <img src="/assets/aseke-trade-logo.png" alt="" />
+          </span>
+          <span>
+            <strong>ASEKE TRADE</strong>
+            <small>Crypto Education</small>
+          </span>
+        </Link>
 
-            <BtcTicker />
-          </div>
+        <BtcTicker />
 
-          <button
-            className="icon-button menu-button"
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-controls="primary-navigation"
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
-            <span className="sr-only">Toggle navigation</span>
-          </button>
+        <button
+          className="icon-button menu-button"
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-controls="primary-navigation"
+          aria-expanded={menuOpen}
+        >
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          <span className="sr-only">Toggle navigation</span>
+        </button>
 
-          <nav
-            className={menuOpen ? "primary-nav open" : "primary-nav"}
-            id="primary-navigation"
-            aria-label="Primary navigation"
-          >
-            {resolvedNavItems.map((item) => (
-              <NavItem item={item} closeMenu={closeMenu} key={item.to} />
-            ))}
+        <nav
+          className={menuOpen ? "primary-nav open" : "primary-nav"}
+          id="primary-navigation"
+          aria-label="Primary navigation"
+        >
+          {resolvedNavItems.map((item) => (
+            <NavItem item={item} closeMenu={closeMenu} key={item.to} />
+          ))}
 
-            {isAdmin && (
-              <NavLink to="/admin" onClick={closeMenu}>
-                <ShieldCheck size={17} />
-                Admin
-              </NavLink>
-            )}
+          {isAdmin && (
+            <NavLink to="/admin" onClick={closeMenu}>
+              <ShieldCheck size={17} />
+              Admin
+            </NavLink>
+          )}
 
-            <div className="mobile-actions">
-              {user ? (
-                <>
-                  <Link to="/dashboard" className="account-chip" onClick={closeMenu}>
-                    <AccountSummary accountStatus={accountStatus} />
-                  </Link>
-                  <button className="ghost-button compact" type="button" onClick={handleSignOut}>
-                    <LogOut size={16} />
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link className="ghost-button compact" to="/login" onClick={closeMenu}>
-                    Login
-                  </Link>
-                  <Link className="primary-button compact" to="/register" onClick={closeMenu}>
-                    Register
-                  </Link>
-                </>
-              )}
-            </div>
-          </nav>
-
-          <div className="account-actions desktop-actions">
+          <div className="mobile-actions">
             {user ? (
               <>
-                <Link to="/dashboard" className="account-chip">
+                <Link to="/dashboard" className="account-chip" onClick={closeMenu}>
                   <AccountSummary accountStatus={accountStatus} />
                 </Link>
                 <button className="ghost-button compact" type="button" onClick={handleSignOut}>
@@ -135,15 +108,38 @@ export function Layout() {
               </>
             ) : (
               <>
-                <Link className="ghost-button compact" to="/login">
+                <Link className="ghost-button compact" to="/login" onClick={closeMenu}>
                   Login
                 </Link>
-                <Link className="primary-button compact" to="/register">
+                <Link className="primary-button compact" to="/register" onClick={closeMenu}>
                   Register
                 </Link>
               </>
             )}
           </div>
+        </nav>
+
+        <div className="account-actions desktop-actions">
+          {user ? (
+            <>
+              <Link to="/dashboard" className="account-chip">
+                <AccountSummary accountStatus={accountStatus} />
+              </Link>
+              <button className="ghost-button compact" type="button" onClick={handleSignOut}>
+                <LogOut size={16} />
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link className="ghost-button compact" to="/login">
+                Login
+              </Link>
+              <Link className="primary-button compact" to="/register">
+                Register
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
