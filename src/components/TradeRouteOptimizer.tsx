@@ -222,6 +222,16 @@ export function TradeRouteOptimizer({ userId, onXpAwarded }: TradeRouteOptimizer
           <p className="muted">
             Buy low, move smart, sell high. Fees can turn a winning route into a losing one.
           </p>
+          <div className="trade-how-it-works" aria-label="How the route puzzle works">
+            <span>Choose an asset</span>
+            <span>Buy on one market</span>
+            <span>Pick a transfer route</span>
+            <span>Sell somewhere else</span>
+          </div>
+          <p className="muted trade-how-it-works-copy">
+            The preview estimates your final USDT after trading fees, network cost, and slippage. Lock in once to
+            reveal the optimal route and today's XP result.
+          </p>
           <p className="trade-sim-note">Simulated educational puzzle. Not financial advice.</p>
         </div>
         <span className="quiz-title-mark" aria-hidden="true">
@@ -342,35 +352,6 @@ export function TradeRouteOptimizer({ userId, onXpAwarded }: TradeRouteOptimizer
             onSubmit={submitRoute}
           />
         </aside>
-      </section>
-
-      <section className="section-panel trade-market-panel">
-        <div className="lesson-title-line">
-          <div>
-            <p className="eyebrow">Market Board</p>
-            <h2>Simulated prices</h2>
-          </div>
-          <span className="status-pill">Fictional markets</span>
-        </div>
-        <div className="trade-market-board">
-          {puzzle.markets.map((market) => (
-            <article className="trade-market-tile" key={market.id}>
-              <header>
-                <h3>{market.name}</h3>
-                <span>{formatPercent(market.tradingFeePercent)} fee</span>
-              </header>
-              <div className="trade-price-grid">
-                {tradeRouteAssets.map((asset) => (
-                  <div className="trade-price-row" key={asset}>
-                    <strong>{asset}</strong>
-                    <span>Buy {formatPrice(asset, market.prices[asset].buy)}</span>
-                    <span>Sell {formatPrice(asset, market.prices[asset].sell)}</span>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
       </section>
 
       {completion && <ResultPanel puzzle={puzzle} completion={completion} />}
@@ -963,13 +944,6 @@ function formatUSDT(value: number): string {
 function formatSignedUSDT(value: number): string {
   const prefix = value >= 0 ? "+" : "-";
   return `${prefix}${formatUSDT(Math.abs(value))}`;
-}
-
-function formatPrice(asset: Asset, value: number): string {
-  return `${new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: asset === "SOL" ? 3 : 2,
-    maximumFractionDigits: asset === "SOL" ? 3 : 2
-  }).format(value)} USDT`;
 }
 
 function formatQuantity(asset: Asset, value: number): string {
