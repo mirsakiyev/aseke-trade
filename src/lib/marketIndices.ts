@@ -1,22 +1,18 @@
 import {
-  buildBinanceFallbackLongShortIndex,
+  binanceLongShortUnavailableMessage,
+  buildBinanceLongShortIndex,
   createUnavailableMarketIndices,
-  defaultLongShortExchanges,
   getFearGreedBand,
-  majorLongShortSelection,
-  normalizeLongShortPercentPair,
-  normalizeLongShortExchangeSelection,
-  ratioToLongShortPercent,
   roundTo,
   type FearGreedIndex,
   type LongShortIndex,
-  type LongShortExchangeSelection,
   type MarketIndicesResponse,
   type VolatilityIndex
 } from "./marketIndexMath";
 import { supabase } from "./supabase";
 
 const clientCacheMs = 5 * 60 * 1000;
+const marketIndicesCacheKey = "market-indices:binance-only";
 const fearGreedEndpoint = "https://api.alternative.me/fng/?limit=1&format=json";
 const binanceLongShortEndpoint =
   "https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=5m&limit=1";
@@ -24,14 +20,8 @@ const deribitVolatilityEndpoint = "https://www.deribit.com/api/v2/public/get_vol
 
 const clientMarketIndicesCache = new Map<string, { expiresAt: number; data: MarketIndicesResponse }>();
 
-export interface FetchMarketIndicesOptions {
-  longShortExchange?: LongShortExchangeSelection;
-}
-
-export async function fetchMarketIndices(options: FetchMarketIndicesOptions = {}): Promise<MarketIndicesResponse> {
-  const selectedExchange = normalizeLongShortExchangeSelection(options.longShortExchange);
-  const cacheKey = marketIndicesCacheKey(selectedExchange);
-  const cached = clientMarketIndicesCache.get(cacheKey);
+export async function fetchMarketIndices(): Promise<MarketIndicesResponse> {
+  const cached = clientMarketIndicesCache.get(marketIndicesCacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data;
@@ -39,38 +29,28 @@ export async function fetchMarketIndices(options: FetchMarketIndicesOptions = {}
 
   if (supabase) {
     try {
-      const { data, error } = await supabase.functions.invoke("market-indices", {
-        body: {
-          longShortExchange: selectedExchange
-        }
-      });
+      const { data, error } = await supabase.functions.invoke("market-indices");
 
       if (!error) {
-        return cacheMarketIndices(cacheKey, normalizeMarketIndicesResponse(data, selectedExchange));
+        return cacheMarketIndices(normalizeMarketIndicesResponse(data));
       }
     } catch {
       // Public fallback below keeps the charts page useful when the function is not deployed yet.
     }
   }
 
-  return cacheMarketIndices(cacheKey, await fetchPublicMarketIndices(selectedExchange));
+  return cacheMarketIndices(await fetchPublicMarketIndices());
 }
 
-function normalizeMarketIndicesResponse(
-  data: unknown,
-  selectedExchange: LongShortExchangeSelection
-): MarketIndicesResponse {
+function normalizeMarketIndicesResponse(data: unknown): MarketIndicesResponse {
   if (!isRecord(data)) {
-    return createUnavailableMarketIndices("Market index response was malformed.", selectedExchange);
+    return createUnavailableMarketIndices("Market index response was malformed.");
   }
 
-  const fallback = createUnavailableMarketIndices("Market index data unavailable.", selectedExchange);
+  const fallback = createUnavailableMarketIndices("Market index data unavailable.");
   const fearGreed = isRecord(data.fearGreed) ? data.fearGreed : fallback.fearGreed;
   const longShort = isRecord(data.longShort) ? data.longShort : fallback.longShort;
   const volatility = isRecord(data.volatility) ? data.volatility : fallback.volatility;
-  const availableExchanges = Array.isArray(longShort.availableExchanges)
-    ? longShort.availableExchanges.filter(isLongShortExchangeValue)
-    : fallback.longShort.availableExchanges;
 
   return {
     generatedAt: typeof data.generatedAt === "string" ? data.generatedAt : fallback.generatedAt,
@@ -82,27 +62,28 @@ function normalizeMarketIndicesResponse(
     longShort: {
       ...fallback.longShort,
       ...longShort,
-      selectedExchange: normalizeLongShortExchangeSelection(longShort.selectedExchange),
-      includedExchanges: Array.isArray(longShort.includedExchanges) ? longShort.includedExchanges.map(String) : [],
-      failedExchanges: Array.isArray(longShort.failedExchanges) ? longShort.failedExchanges.map(String) : [],
-      availableExchanges,
-      requestedExchanges: Array.isArray(longShort.requestedExchanges)
-        ? longShort.requestedExchanges.map(String)
-        : fallback.longShort.requestedExchanges
-    },
+      selectedExchange: "Binance",
+      mode: longShort.mode === "binance-only" && longShort.status === "ready" ? "binance-only" : fallback.longShort.mode,
+      includedExchanges: longShort.status === "ready" ? ["Binance"] : [],
+      failedExchanges: longShort.status === "ready" ? [] : ["Binance"],
+      availableExchanges: ["Binance"],
+      requestedExchanges: ["Binance"],
+      source: longShort.status === "ready" ? "Binance" : null,
+      error: typeof longShort.error === "string" ? longShort.error : fallback.longShort.error
+    } as LongShortIndex,
     volatility: {
       ...fallback.volatility,
       ...volatility,
       source: "Deribit"
     }
-  } as MarketIndicesResponse;
+  };
 }
 
-async function fetchPublicMarketIndices(selectedExchange: LongShortExchangeSelection): Promise<MarketIndicesResponse> {
-  const fallback = createUnavailableMarketIndices("Live market index data is temporarily unavailable.", selectedExchange);
+async function fetchPublicMarketIndices(): Promise<MarketIndicesResponse> {
+  const fallback = createUnavailableMarketIndices("Live market index data is temporarily unavailable.");
   const [fearGreed, longShort, volatility] = await Promise.all([
     fetchPublicFearGreed().catch(() => fallback.fearGreed),
-    fetchPublicBinanceLongShort(selectedExchange).catch(() => fallback.longShort),
+    fetchPublicBinanceLongShort().catch(() => fallback.longShort),
     fetchPublicVolatility().catch(() => fallback.volatility)
   ]);
 
@@ -137,49 +118,26 @@ async function fetchPublicFearGreed(): Promise<FearGreedIndex> {
   };
 }
 
-async function fetchPublicBinanceLongShort(selectedExchange: LongShortExchangeSelection): Promise<LongShortIndex> {
-  if (selectedExchange !== majorLongShortSelection && selectedExchange !== "Binance") {
-    return {
-      ...createUnavailableMarketIndices(
-        "Add COINGLASS_API_KEY to enable multi-exchange data.",
-        selectedExchange
-      ).longShort,
-      availableExchanges: ["Binance"],
-      failedExchanges: defaultLongShortExchanges.filter((exchange) => exchange !== "Binance")
-    };
-  }
-
+async function fetchPublicBinanceLongShort(): Promise<LongShortIndex> {
   const payload = await fetchJson(binanceLongShortEndpoint);
   const row = Array.isArray(payload) ? payload.find(isRecord) : null;
 
   if (!row) {
-    throw new Error("Binance long/short data unavailable.");
+    throw new Error(binanceLongShortUnavailableMessage);
   }
 
-  const direct = normalizeLongShortPercentPair(
-    firstNumber(row, ["longAccount", "longAccountRatio", "longPct"]),
-    firstNumber(row, ["shortAccount", "shortAccountRatio", "shortPct"])
-  );
-  const fromRatio = direct ?? ratioToLongShortPercent(firstNumber(row, ["longShortRatio", "ratio"]));
-
-  if (!fromRatio) {
-    throw new Error("Binance long/short data unavailable.");
-  }
-
-  const fallback = buildBinanceFallbackLongShortIndex({
-    exchange: "Binance",
-    longPct: fromRatio.longPct,
-    shortPct: fromRatio.shortPct,
+  const longShort = buildBinanceLongShortIndex({
+    longAccount: firstNumber(row, ["longAccount"]),
+    shortAccount: firstNumber(row, ["shortAccount"]),
+    longShortRatio: firstNumber(row, ["longShortRatio"]),
     timestamp: firstTimestamp(row)
-  }, defaultLongShortExchanges, {
-    error: "Add COINGLASS_API_KEY to enable multi-exchange data."
   });
 
-  if (!fallback) {
-    throw new Error("Binance long/short data unavailable.");
+  if (!longShort) {
+    throw new Error(binanceLongShortUnavailableMessage);
   }
 
-  return fallback;
+  return longShort;
 }
 
 async function fetchPublicVolatility(): Promise<VolatilityIndex> {
@@ -338,21 +296,13 @@ function average(values: number[]): number {
   return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
-function cacheMarketIndices(cacheKey: string, data: MarketIndicesResponse): MarketIndicesResponse {
-  clientMarketIndicesCache.set(cacheKey, {
+function cacheMarketIndices(data: MarketIndicesResponse): MarketIndicesResponse {
+  clientMarketIndicesCache.set(marketIndicesCacheKey, {
     data,
     expiresAt: Date.now() + clientCacheMs
   });
 
   return data;
-}
-
-function marketIndicesCacheKey(selectedExchange: LongShortExchangeSelection): string {
-  return `long-short:${selectedExchange}`;
-}
-
-function isLongShortExchangeValue(value: unknown) {
-  return defaultLongShortExchanges.includes(value as never);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

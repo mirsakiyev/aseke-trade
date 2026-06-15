@@ -2214,50 +2214,12 @@ button.leaderboard-badge-more:hover {
 }
 
 .long-short-card-header {
-  grid-template-columns: auto minmax(0, 1fr) minmax(112px, auto);
-}
-
-.long-short-exchange-select {
-  align-self: start;
-  justify-self: end;
-}
-
-.long-short-exchange-select select {
-  width: min(160px, 100%);
-  min-height: 34px;
-  padding: 0 2rem 0 0.65rem;
-  border: 1px solid rgba(229, 228, 226, 0.18);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(21, 25, 31, 0.98), rgba(8, 10, 12, 0.98)),
-    rgba(229, 228, 226, 0.05);
-  color: var(--platinum-soft);
-  font-size: 0.74rem;
-  font-weight: 850;
-}
-
-.long-short-exchange-select select:disabled {
-  opacity: 0.72;
-}
-
-.long-short-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem;
-  min-width: 0;
-}
-
-.long-short-status-row > span:last-child {
-  min-width: 0;
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 800;
-  line-height: 1.4;
-  text-align: right;
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .market-index-pill.exchange-badge {
+  align-self: start;
+  justify-self: end;
   min-height: 26px;
   border-color: rgba(184, 214, 222, 0.35);
   background: rgba(184, 214, 222, 0.1);
@@ -5930,22 +5892,9 @@ select:focus {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .long-short-exchange-select {
-    grid-column: 1 / -1;
-    justify-self: stretch;
-  }
-
-  .long-short-exchange-select select {
-    width: 100%;
-  }
-
-  .long-short-status-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .long-short-status-row > span:last-child {
-    text-align: left;
+  .market-index-pill.exchange-badge {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .coin-picker {

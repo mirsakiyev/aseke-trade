@@ -120,11 +120,16 @@ test("charts page renders market sentiment and risk widgets after the chart", ()
   assert.match(chartsSource, /<MarketSentimentSection[\s\S]*indices=\{marketIndices\}/);
   assert.match(chartsSource, /Market Sentiment & Risk/);
   assert.match(chartsSource, /Crypto Fear & Greed Index/);
-  assert.match(chartsSource, /Longs vs Shorts Futures Index/);
+  assert.match(chartsSource, /Longs vs Shorts Futures/);
   assert.match(chartsSource, /Crypto Market Volatility Index/);
   assert.match(chartsSource, /fetchMarketIndices/);
-  assert.match(chartsSource, /aria-label="Select futures exchange"/);
-  assert.match(chartsSource, /Major CEX Average/);
+  assert.match(chartsSource, /BINANCE ONLY/);
+  assert.match(chartsSource, /Source: Binance public futures data/);
+  assert.doesNotMatch(chartsSource, /aria-label="Select futures exchange"/);
+  assert.doesNotMatch(chartsSource, /Major CEX Average/);
   assert.match(marketIndicesSource, /fetchPublicMarketIndices/);
-  assert.match(marketIndicesSource, /buildBinanceFallbackLongShortIndex/);
+  assert.match(marketIndicesSource, /buildBinanceLongShortIndex/);
+  for (const removedProviderTerm of ["COIN" + "GLASS_API_KEY", "open-api-v4." + "coin" + "glass.com", "CG-" + "API-KEY"]) {
+    assert.equal(marketIndicesSource.includes(removedProviderTerm), false);
+  }
 });

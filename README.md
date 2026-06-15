@@ -116,18 +116,9 @@ implemented with Supabase Edge Functions. Keep blockchain API keys, receiving ad
 
 The `/charts` page loads its Market Sentiment & Risk widgets through the `market-indices` Supabase
 Edge Function. The function reads public Alternative.me, Binance, and Deribit endpoints without
-browser secrets. The Longs vs Shorts card includes a futures exchange selector with a default Major
-CEX Average option. For multi-exchange and non-Binance futures long/short data, add the CoinGlass
-key as a Supabase secret:
-
-```bash
-supabase secrets set COINGLASS_API_KEY=your-coinglass-api-key
-supabase functions deploy market-indices
-```
-
-Do not add `COINGLASS_API_KEY` to Vite or Netlify browser variables. If the secret is missing, the
-widget disables non-Binance exchange options, falls back to Binance-only public futures positioning,
-and labels it that way.
+browser secrets. The Longs vs Shorts Futures card uses Binance public futures account-ratio data
+from `https://fapi.binance.com/futures/data/globalLongShortAccountRatio` and does not require an API
+key.
 
 ## Netlify Deployment
 

@@ -1,18 +1,10 @@
 import {
-  buildBinanceFallbackLongShortIndex,
-  buildMajorLongShortIndex,
-  buildSingleExchangeLongShortIndex,
+  binanceLongShortUnavailableMessage,
+  buildBinanceLongShortIndex,
   createUnavailableMarketIndices,
-  defaultLongShortExchanges,
   getFearGreedBand,
-  majorLongShortSelection,
-  normalizeLongShortPercentPair,
-  normalizeLongShortExchangeSelection,
-  ratioToLongShortPercent,
   roundTo,
   type FearGreedIndex,
-  type LongShortExchangeInput,
-  type LongShortExchangeSelection,
   type LongShortIndex,
   type MarketIndicesResponse,
   type VolatilityIndex
@@ -27,14 +19,12 @@ const corsHeaders = {
 const cacheMs = 5 * 60 * 1000;
 const requestTimeoutMs = 8000;
 const longShortSymbol = "BTCUSDT";
-const longShortInterval = "5m";
-const coinglassEndpoint =
-  "https://open-api-v4.coinglass.com/api/futures/global-long-short-account-ratio/history";
+const longShortPeriod = "5m";
 const binanceLongShortEndpoint = "https://fapi.binance.com/futures/data/globalLongShortAccountRatio";
 const fearGreedEndpoint = "https://api.alternative.me/fng/?limit=1&format=json";
 const deribitVolatilityEndpoint = "https://www.deribit.com/api/v2/public/get_volatility_index_data";
 
-const cachedPayloads = new Map<string, { expiresAt: number; payload: MarketIndicesResponse }>();
+let cachedPayload: { expiresAt: number; payload: MarketIndicesResponse } | null = null;
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
@@ -45,17 +35,13 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "Method not allowed.", code: "method_not_allowed" }, 405);
   }
 
-  const selectedExchange = await readLongShortSelection(request);
-  const cacheKey = `long-short:${selectedExchange}`;
-  const cachedPayload = cachedPayloads.get(cacheKey);
-
   if (cachedPayload && cachedPayload.expiresAt > Date.now()) {
     return jsonResponse(cachedPayload.payload);
   }
 
   const [fearGreed, longShort, volatility] = await Promise.all([
     fetchFearGreedIndex().catch((error) => unavailableFearGreed(error)),
-    fetchLongShortIndex(selectedExchange).catch((error) => unavailableLongShort(error, selectedExchange)),
+    fetchBinanceLongShortIndex().catch((error) => unavailableLongShort(error)),
     fetchVolatilityIndex().catch((error) => unavailableVolatility(error))
   ]);
 
@@ -66,10 +52,10 @@ Deno.serve(async (request) => {
     generatedAt: new Date().toISOString()
   };
 
-  cachedPayloads.set(cacheKey, {
+  cachedPayload = {
     expiresAt: Date.now() + cacheMs,
     payload
-  });
+  };
 
   return jsonResponse(payload);
 });
@@ -99,164 +85,27 @@ async function fetchFearGreedIndex(): Promise<FearGreedIndex> {
   };
 }
 
-async function fetchLongShortIndex(selectedExchange: LongShortExchangeSelection): Promise<LongShortIndex> {
-  const apiKey = Deno.env.get("COINGLASS_API_KEY")?.trim();
-
-  if (!apiKey) {
-    return selectedExchange === majorLongShortSelection || selectedExchange === "Binance"
-      ? fetchBinanceLongShortIndex({
-          error: "Add COINGLASS_API_KEY to enable multi-exchange data."
-        })
-      : {
-          ...unavailableLongShort("Add COINGLASS_API_KEY to enable multi-exchange data.", selectedExchange, {
-            availableExchanges: ["Binance"],
-            failedExchanges: defaultLongShortExchanges.filter((exchange) => exchange !== "Binance")
-          })
-        };
-  }
-
-  if (selectedExchange !== majorLongShortSelection) {
-    const row = await fetchCoinGlassExchangeLongShort(selectedExchange, apiKey);
-    const singleExchange = row ? buildSingleExchangeLongShortIndex(row) : null;
-
-    if (singleExchange) {
-      return singleExchange;
-    }
-
-    if (selectedExchange === "Binance") {
-      return fetchBinanceLongShortIndex({
-        availableExchanges: defaultLongShortExchanges,
-        error: "CoinGlass Binance data unavailable. Showing Binance public fallback."
-      });
-    }
-
-    return unavailableLongShort(`CoinGlass ${selectedExchange} long/short data unavailable.`, selectedExchange, {
-      availableExchanges: defaultLongShortExchanges,
-      failedExchanges: [selectedExchange]
-    });
-  }
-
-  const exchangeRows = await Promise.all(
-    defaultLongShortExchanges.map(async (exchange) => {
-      try {
-        return await fetchCoinGlassExchangeLongShort(exchange, apiKey);
-      } catch {
-        return null;
-      }
-    })
-  );
-
-  const validRows = exchangeRows.filter((row): row is LongShortExchangeInput => Boolean(row));
-  const aggregate = buildMajorLongShortIndex(validRows);
-
-  if (aggregate) {
-    return aggregate;
-  }
-
-  if (validRows.length === 1) {
-    const singleExchange = buildSingleExchangeLongShortIndex(validRows[0]);
-    if (singleExchange) return singleExchange;
-  }
-
-  return fetchBinanceLongShortIndex({
-    availableExchanges: defaultLongShortExchanges,
-    error: "CoinGlass average unavailable. Showing Binance public fallback."
-  }).catch(() =>
-    unavailableLongShort("CoinGlass long/short data unavailable.", majorLongShortSelection, {
-      availableExchanges: defaultLongShortExchanges,
-      failedExchanges: defaultLongShortExchanges
-    })
-  );
-}
-
-async function fetchCoinGlassExchangeLongShort(
-  exchange: string,
-  apiKey: string
-): Promise<LongShortExchangeInput | null> {
-  const params = new URLSearchParams({
-    exchange,
-    symbol: longShortSymbol,
-    interval: longShortInterval,
-    limit: "1"
-  });
-  const payload = await fetchJson(`${coinglassEndpoint}?${params.toString()}`, {
-    headers: {
-      accept: "application/json",
-      "CG-API-KEY": apiKey
-    }
-  });
-  const record = findLongShortRecord(payload);
-
-  if (!record) {
-    return null;
-  }
-
-  return {
-    exchange,
-    longPct: firstNumber(record, [
-      "longAccount",
-      "longAccountRatio",
-      "longRate",
-      "longRatio",
-      "longPct",
-      "longPercent",
-      "long_percentage"
-    ]),
-    shortPct: firstNumber(record, [
-      "shortAccount",
-      "shortAccountRatio",
-      "shortRate",
-      "shortRatio",
-      "shortPct",
-      "shortPercent",
-      "short_percentage"
-    ]),
-    longShortRatio: firstNumber(record, ["longShortRatio", "long_short_ratio", "ratio"]),
-    timestamp: firstTimestamp(record)
-  };
-}
-
-interface LongShortFallbackOptions {
-  availableExchanges?: LongShortExchangeInput["exchange"][];
-  failedExchanges?: string[];
-  error?: string;
-}
-
-async function fetchBinanceLongShortIndex(options: LongShortFallbackOptions = {}): Promise<LongShortIndex> {
+async function fetchBinanceLongShortIndex(): Promise<LongShortIndex> {
   const params = new URLSearchParams({
     symbol: longShortSymbol,
-    period: longShortInterval,
+    period: longShortPeriod,
     limit: "1"
   });
   const payload = await fetchJson(`${binanceLongShortEndpoint}?${params.toString()}`);
   const row = Array.isArray(payload) ? payload.find(isRecord) : null;
 
   if (!row) {
-    return unavailableLongShort("Binance long/short data unavailable.", "Binance", options);
+    return unavailableLongShort(binanceLongShortUnavailableMessage);
   }
 
-  const direct = normalizeLongShortPercentPair(
-    firstNumber(row, ["longAccount", "longAccountRatio", "longPct"]),
-    firstNumber(row, ["shortAccount", "shortAccountRatio", "shortPct"])
-  );
-  const fromRatio = direct ?? ratioToLongShortPercent(firstNumber(row, ["longShortRatio", "ratio"]));
-
-  if (!fromRatio) {
-    return unavailableLongShort("Binance long/short data unavailable.", "Binance", options);
-  }
-
-  const fallback = buildBinanceFallbackLongShortIndex({
-    exchange: "Binance",
-    longPct: fromRatio.longPct,
-    shortPct: fromRatio.shortPct,
+  const longShort = buildBinanceLongShortIndex({
+    longAccount: firstNumber(row, ["longAccount"]),
+    shortAccount: firstNumber(row, ["shortAccount"]),
+    longShortRatio: firstNumber(row, ["longShortRatio"]),
     timestamp: firstTimestamp(row)
-  }, defaultLongShortExchanges, options);
+  });
 
-  if (!fallback) {
-    return unavailableLongShort("Binance long/short data unavailable.", "Binance", options);
-  }
-
-  return fallback;
+  return longShort ?? unavailableLongShort(binanceLongShortUnavailableMessage);
 }
 
 async function fetchVolatilityIndex(): Promise<VolatilityIndex> {
@@ -382,22 +231,9 @@ function unavailableFearGreed(error: unknown): FearGreedIndex {
   return fallback.fearGreed;
 }
 
-function unavailableLongShort(
-  error: unknown,
-  selectedExchange: LongShortExchangeSelection = majorLongShortSelection,
-  options: LongShortFallbackOptions = {}
-): LongShortIndex {
-  const fallback = createUnavailableMarketIndices(readError(error), selectedExchange);
-  return {
-    ...fallback.longShort,
-    availableExchanges: options.availableExchanges ?? defaultLongShortExchanges,
-    failedExchanges:
-      options.failedExchanges ??
-      (selectedExchange === majorLongShortSelection
-        ? defaultLongShortExchanges
-        : defaultLongShortExchanges.filter((exchange) => exchange === selectedExchange)),
-    error: options.error ?? fallback.longShort.error
-  };
+function unavailableLongShort(error: unknown): LongShortIndex {
+  const fallback = createUnavailableMarketIndices(readError(error));
+  return fallback.longShort;
 }
 
 function unavailableVolatility(error: unknown): VolatilityIndex {
@@ -414,52 +250,6 @@ function jsonResponse(body: unknown, status = 200): Response {
       "Cache-Control": `public, max-age=${Math.floor(cacheMs / 1000)}`
     }
   });
-}
-
-async function readLongShortSelection(request: Request): Promise<LongShortExchangeSelection> {
-  const url = new URL(request.url);
-  const querySelection = url.searchParams.get("longShortExchange");
-  if (querySelection) return normalizeLongShortExchangeSelection(querySelection);
-
-  if (request.method !== "POST") return majorLongShortSelection;
-
-  try {
-    const body = (await request.clone().json()) as { longShortExchange?: unknown };
-    return normalizeLongShortExchangeSelection(body.longShortExchange);
-  } catch {
-    return majorLongShortSelection;
-  }
-}
-
-function findLongShortRecord(value: unknown, depth = 0): Record<string, unknown> | null {
-  if (depth > 5) return null;
-
-  if (Array.isArray(value)) {
-    return value.map((item) => findLongShortRecord(item, depth + 1)).find(Boolean) ?? null;
-  }
-
-  if (!isRecord(value)) return null;
-
-  if (
-    firstNumber(value, [
-      "longShortRatio",
-      "long_short_ratio",
-      "ratio",
-      "longAccount",
-      "longAccountRatio",
-      "longPct",
-      "longPercent"
-    ]) !== null
-  ) {
-    return value;
-  }
-
-  for (const nestedValue of Object.values(value)) {
-    const found = findLongShortRecord(nestedValue, depth + 1);
-    if (found) return found;
-  }
-
-  return null;
 }
 
 function firstNumber(record: Record<string, unknown>, keys: string[]): number | null {

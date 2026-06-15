@@ -25,76 +25,43 @@ test("long short ratio converts to normalized long and short percentages", () =>
   assertClose(result.shortPct, 40);
 });
 
-test("long short averaging ignores invalid exchanges and keeps included exchange names", () => {
-  const result = marketIndexMath.averageLongShortExchanges([
-    { exchange: "Binance", longShortRatio: 1.5, timestamp: "2026-06-15T01:00:00.000Z" },
-    { exchange: "OKX", longPct: 0.7, shortPct: 0.3, timestamp: "2026-06-15T01:05:00.000Z" },
-    { exchange: "Bybit", longShortRatio: null },
-    { exchange: "Gate", longPct: 0, shortPct: 0 }
-  ]);
-
-  assert.deepEqual(result.includedExchanges, ["Binance", "OKX"]);
-  assertClose(result.longPct, 65);
-  assertClose(result.shortPct, 35);
-  assert.equal(result.timestamp, "2026-06-15T01:05:00.000Z");
-});
-
-test("single exchange long short index returns only the selected exchange", () => {
-  const result = marketIndexMath.buildSingleExchangeLongShortIndex({
-    exchange: "OKX",
-    longShortRatio: 1.5,
-    timestamp: "2026-06-15T01:00:00.000Z"
-  });
-
-  assert.equal(result.selectedExchange, "OKX");
-  assert.equal(result.mode, "single-exchange");
-  assert.deepEqual(result.includedExchanges, ["OKX"]);
-  assert.equal(result.source, "CoinGlass");
-  assertClose(result.longPct, 60);
-  assertClose(result.shortPct, 40);
-});
-
-test("major cex average averages valid exchanges and tracks failed exchanges", () => {
-  const result = marketIndexMath.buildMajorLongShortIndex(
-    [
-      { exchange: "Binance", longShortRatio: 1.5 },
-      { exchange: "OKX", longPct: 70, shortPct: 30 },
-      { exchange: "Bybit", longShortRatio: null }
-    ],
-    ["Binance", "OKX", "Bybit"]
-  );
-
-  assert.equal(result.selectedExchange, "major-average");
-  assert.equal(result.mode, "major-average");
-  assert.deepEqual(result.includedExchanges, ["Binance", "OKX"]);
-  assert.deepEqual(result.failedExchanges, ["Bybit"]);
-  assertClose(result.longPct, 65);
-  assertClose(result.shortPct, 35);
-});
-
-test("major cex average is not used when fewer than two exchanges are valid", () => {
-  const result = marketIndexMath.buildMajorLongShortIndex(
-    [
-      { exchange: "Binance", longShortRatio: 1.5 },
-      { exchange: "OKX", longShortRatio: null }
-    ],
-    ["Binance", "OKX"]
-  );
-
-  assert.equal(result, null);
-});
-
-test("binance fallback is explicitly labeled as binance fallback only", () => {
-  const result = marketIndexMath.buildBinanceFallbackLongShortIndex({
-    exchange: "Binance",
-    longShortRatio: 1.5,
+test("binance account ratios build a Binance-only long short index", () => {
+  const result = marketIndexMath.buildBinanceLongShortIndex({
+    longAccount: 0.58,
+    shortAccount: 0.42,
+    longShortRatio: 1.381,
     timestamp: "2026-06-15T01:00:00.000Z"
   });
 
   assert.equal(result.selectedExchange, "Binance");
-  assert.equal(result.mode, "binance-fallback");
+  assert.equal(result.mode, "binance-only");
   assert.deepEqual(result.availableExchanges, ["Binance"]);
+  assert.deepEqual(result.includedExchanges, ["Binance"]);
+  assert.deepEqual(result.failedExchanges, []);
   assert.equal(result.source, "Binance");
+  assert.equal(result.timestamp, "2026-06-15T01:00:00.000Z");
+  assertClose(result.longPct, 58);
+  assertClose(result.shortPct, 42);
+});
+
+test("binance long short index rejects missing account ratios", () => {
+  assert.equal(
+    marketIndexMath.buildBinanceLongShortIndex({
+      longShortRatio: 1.5,
+      timestamp: "2026-06-15T01:00:00.000Z"
+    }),
+    null
+  );
+});
+
+test("unavailable market indices use Binance-only long short messaging", () => {
+  const result = marketIndexMath.createUnavailableMarketIndices();
+
+  assert.equal(result.longShort.selectedExchange, "Binance");
+  assert.equal(result.longShort.mode, "unavailable");
+  assert.equal(result.longShort.source, null);
+  assert.deepEqual(result.longShort.availableExchanges, ["Binance"]);
+  assert.equal(result.longShort.error, "Binance long/short data temporarily unavailable.");
 });
 
 test("fear and greed score maps to the expected classification band", () => {

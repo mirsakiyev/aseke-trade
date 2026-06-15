@@ -24,13 +24,10 @@ import { fetchMarketIndices } from "../lib/marketIndices";
 import {
   classifyVolatilityRisk,
   createUnavailableMarketIndices,
-  defaultLongShortExchanges,
+  binanceLongShortUnavailableMessage,
   formatIndexTimestamp,
   getFearGreedBand,
-  majorLongShortSelection,
-  normalizeLongShortExchangeSelection,
   type FearGreedIndex,
-  type LongShortExchangeSelection,
   type LongShortIndex,
   type MarketIndicesResponse,
   type VolatilityIndex
@@ -44,9 +41,6 @@ export function Charts() {
   const [coinError, setCoinError] = useState<string | null>(null);
   const [marketIndices, setMarketIndices] = useState<MarketIndicesResponse | null>(null);
   const [isLoadingMarketIndices, setIsLoadingMarketIndices] = useState(true);
-  const [isLoadingLongShort, setIsLoadingLongShort] = useState(false);
-  const [selectedLongShortExchange, setSelectedLongShortExchange] =
-    useState<LongShortExchangeSelection>(majorLongShortSelection);
   const hasLoadedMarketIndices = useRef(false);
 
   const loadCoinList = async () => {
@@ -73,44 +67,23 @@ export function Charts() {
     async function loadMarketIndices() {
       const isInitialLoad = !hasLoadedMarketIndices.current;
       setIsLoadingMarketIndices(isInitialLoad);
-      setIsLoadingLongShort(!isInitialLoad);
 
       try {
-        const nextMarketIndices = await fetchMarketIndices({
-          longShortExchange: selectedLongShortExchange
-        });
+        const nextMarketIndices = await fetchMarketIndices();
         if (isMounted) {
-          setMarketIndices((currentMarketIndices) =>
-            isInitialLoad || !currentMarketIndices
-              ? nextMarketIndices
-              : {
-                  ...currentMarketIndices,
-                  longShort: nextMarketIndices.longShort,
-                  generatedAt: nextMarketIndices.generatedAt
-                }
-          );
+          setMarketIndices(nextMarketIndices);
           hasLoadedMarketIndices.current = true;
         }
       } catch (error) {
         if (isMounted) {
           const fallback = createUnavailableMarketIndices(
-            error instanceof Error ? error.message : "Market index data unavailable.",
-            selectedLongShortExchange
+            error instanceof Error ? error.message : "Market index data unavailable."
           );
-          setMarketIndices((currentMarketIndices) =>
-            isInitialLoad || !currentMarketIndices
-              ? fallback
-              : {
-                  ...currentMarketIndices,
-                  longShort: fallback.longShort,
-                  generatedAt: fallback.generatedAt
-                }
-          );
+          setMarketIndices(fallback);
         }
       } finally {
         if (isMounted) {
           setIsLoadingMarketIndices(false);
-          setIsLoadingLongShort(false);
         }
       }
     }
@@ -120,7 +93,7 @@ export function Charts() {
     return () => {
       isMounted = false;
     };
-  }, [selectedLongShortExchange]);
+  }, []);
 
   const filteredCoins = useMemo(
     () => filterCryptoCoins(coins, coinSearch).slice(0, coinSearch.trim() ? 16 : 12),
@@ -228,13 +201,10 @@ export function Charts() {
         />
       </section>
 
-      <MarketSentimentSection
-        indices={marketIndices}
-        isLoading={isLoadingMarketIndices}
-        isLoadingLongShort={isLoadingLongShort}
-        onLongShortExchangeChange={setSelectedLongShortExchange}
-        selectedLongShortExchange={selectedLongShortExchange}
-      />
+        <MarketSentimentSection
+          indices={marketIndices}
+          isLoading={isLoadingMarketIndices}
+        />
 
       <p className="soft-notice">
         Charts are for education and market observation only. They are not financial advice.
@@ -257,16 +227,10 @@ export function Charts() {
 
 function MarketSentimentSection({
   indices,
-  isLoading,
-  isLoadingLongShort,
-  onLongShortExchangeChange,
-  selectedLongShortExchange
+  isLoading
 }: {
   indices: MarketIndicesResponse | null;
   isLoading: boolean;
-  isLoadingLongShort: boolean;
-  onLongShortExchangeChange: (exchange: LongShortExchangeSelection) => void;
-  selectedLongShortExchange: LongShortExchangeSelection;
 }) {
   const data = indices ?? createUnavailableMarketIndices();
 
@@ -284,18 +248,13 @@ function MarketSentimentSection({
         {isLoading ? (
           <>
             <MarketIndexSkeleton title="Crypto Fear & Greed Index" />
-            <MarketIndexSkeleton title="Longs vs Shorts Futures Index" />
+            <MarketIndexSkeleton title="Longs vs Shorts Futures" />
             <MarketIndexSkeleton title="Crypto Market Volatility Index" />
           </>
         ) : (
           <>
             <FearGreedCard data={data.fearGreed} />
-            <LongShortCard
-              data={data.longShort}
-              isLoading={isLoadingLongShort}
-              onExchangeChange={onLongShortExchangeChange}
-              selectedExchange={selectedLongShortExchange}
-            />
+            <LongShortCard data={data.longShort} />
             <VolatilityCard data={data.volatility} />
           </>
         )}
@@ -367,43 +326,10 @@ function FearGreedCard({ data }: { data: FearGreedIndex }) {
   );
 }
 
-function LongShortCard({
-  data,
-  isLoading,
-  onExchangeChange,
-  selectedExchange
-}: {
-  data: LongShortIndex;
-  isLoading: boolean;
-  onExchangeChange: (exchange: LongShortExchangeSelection) => void;
-  selectedExchange: LongShortExchangeSelection;
-}) {
+function LongShortCard({ data }: { data: LongShortIndex }) {
   const longPct = data.longPct ?? 0;
   const shortPct = data.shortPct ?? 0;
   const isReady = data.status === "ready" && data.longPct !== null && data.shortPct !== null;
-  const availableExchangeSet = new Set(data.availableExchanges);
-  const enabledAverage = data.mode !== "binance-fallback" && data.availableExchanges.length >= 2;
-  const displaySelection = data.mode === "binance-fallback" ? "Binance" : selectedExchange;
-  const badgeLabel =
-    data.mode === "major-average"
-      ? "Major CEX Avg"
-      : data.mode === "binance-fallback"
-        ? "Binance Only"
-        : data.selectedExchange;
-  const coverage =
-    data.mode === "major-average"
-      ? `${data.includedExchanges.length}/${data.requestedExchanges.length} exchanges included`
-      : data.mode === "binance-fallback"
-        ? data.error ?? "Binance public fallback active."
-        : data.includedExchanges.length
-          ? `${data.selectedExchange} futures account ratio`
-          : "Select futures exchange";
-  const exchangeLabel =
-    data.mode === "major-average"
-      ? `Average futures account ratio across ${data.includedExchanges.join(", ")}`
-      : data.mode === "binance-fallback"
-        ? "Binance futures account ratio"
-        : `${data.selectedExchange} futures account ratio`;
 
   return (
     <article className="market-index-card long-short-card">
@@ -413,40 +339,12 @@ function LongShortCard({
         </span>
         <div>
           <span className="market-index-eyebrow">Positioning</span>
-          <h3>Longs vs Shorts Futures Index</h3>
+          <h3>Longs vs Shorts Futures</h3>
         </div>
-        <label className="long-short-exchange-select">
-          <span className="sr-only">Select futures exchange</span>
-          <select
-            aria-label="Select futures exchange"
-            disabled={isLoading}
-            onChange={(event) => onExchangeChange(normalizeLongShortExchangeSelection(event.target.value))}
-            value={displaySelection}
-          >
-            <option disabled={!enabledAverage} value={majorLongShortSelection}>
-              Major CEX Average
-            </option>
-            {defaultLongShortExchanges.map((exchange) => (
-              <option disabled={!availableExchangeSet.has(exchange)} key={exchange} value={exchange}>
-                {exchange}
-              </option>
-            ))}
-          </select>
-        </label>
+        <span className="market-index-pill exchange-badge">BINANCE ONLY</span>
       </div>
 
-      <div className="long-short-status-row">
-        <span className="market-index-pill exchange-badge">{badgeLabel}</span>
-        <span>{coverage}</span>
-      </div>
-
-      {isLoading ? (
-        <div className="long-short-update-state" role="status">
-          <span className="skeleton-line score" />
-          <span className="skeleton-line" />
-          <span className="skeleton-line medium" />
-        </div>
-      ) : isReady ? (
+      {isReady ? (
         <>
           <div className="market-index-score-row compact">
             <strong>{Math.round(longPct)}% Longs</strong>
@@ -465,17 +363,17 @@ function LongShortCard({
             <span>Longs</span>
             <span>Shorts</span>
           </div>
-          <p className="market-index-detail">{exchangeLabel}</p>
+          <p className="market-index-detail">BTCUSDT 5m account ratio</p>
         </>
       ) : (
         <MarketIndexEmpty
           title="Long/short data unavailable"
-          note={data.error ?? "Add COINGLASS_API_KEY to enable multi-exchange data."}
+          note={data.error ?? binanceLongShortUnavailableMessage}
         />
       )}
 
       <MarketIndexFooter
-        source={data.source ? `Source: ${data.source}` : "Source: CoinGlass or Binance"}
+        source="Source: Binance public futures data"
         timestamp={data.timestamp}
       />
     </article>
