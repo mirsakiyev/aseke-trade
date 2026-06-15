@@ -83,20 +83,24 @@ export function Home() {
 
       <section className="page market-showcase">
         <div className="market-image">
-          <img src="/assets/aseke-trade-hero.png" alt="Crypto market desk with Bitcoin and Ethereum coins" />
+          <img src="/assets/aseke-trade-hero.png" alt="Crypto market desk representing Trading Academy signals" />
         </div>
         <div className="market-copy">
-          <p className="eyebrow">Market Discipline</p>
-          <h2>Understand the market before risking capital</h2>
+          <p className="eyebrow">Trading Academy Signals</p>
+          <h2>Get educational trade signals with Academy access</h2>
           <p>
-            Study price action, security habits, leverage control, and repeatable review so every
-            decision has a clear reason and a defined risk.
+            Join Trading Academy to review active ASEKE TRADE signals with entry zones, leverage,
+            take-profit targets, stop-loss updates, and completed trade history in one dashboard.
           </p>
           <div className="market-tags" aria-label="Market focus areas">
-            <span>BTC</span>
-            <span>ETH</span>
-            <span>RISK</span>
+            <span>Active Signals</span>
+            <span>TP / SL Updates</span>
+            <span>Past Trades</span>
           </div>
+          <Link className="primary-button compact market-signal-cta" to="/trading-academy">
+            Join Trading Academy
+            <ArrowRight size={17} />
+          </Link>
         </div>
       </section>
 

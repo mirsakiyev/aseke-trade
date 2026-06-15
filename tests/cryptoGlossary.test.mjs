@@ -37,8 +37,11 @@ test("crypto glossary route is linked from the footer and not the main nav", asy
   const layoutSource = await readFile(new URL("../src/components/Layout.tsx", import.meta.url), "utf8");
   const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
   const navItemsBlock = layoutSource.match(/const navItems = \[[\s\S]*?\];/)?.[0] ?? "";
+  const footerLinksBlock = layoutSource.match(/<nav className="footer-links"[\s\S]*?<\/nav>/)?.[0] ?? "";
 
   assert.match(appSource, /path="crypto-glossary"/);
   assert.match(layoutSource, /<Link to="\/crypto-glossary">Crypto Glossary<\/Link>/);
   assert.equal(navItemsBlock.includes("crypto-glossary"), false);
+  assert.equal(footerLinksBlock.includes('to="/guides"'), false);
+  assert.equal(footerLinksBlock.includes('to="/charts"'), false);
 });

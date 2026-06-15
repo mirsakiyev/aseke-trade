@@ -154,8 +154,6 @@ export function Layout() {
           <p>Crypto trading education built around safety, structure, and discipline.</p>
           <nav className="footer-links" aria-label="Footer links">
             <Link to="/terms">Terms</Link>
-            <Link to="/guides">Guides</Link>
-            <Link to="/charts">Charts</Link>
             <Link to="/crypto-glossary">Crypto Glossary</Link>
             <Link to="/trading-academy">Trading Academy</Link>
             <Link to="/support">Support</Link>
