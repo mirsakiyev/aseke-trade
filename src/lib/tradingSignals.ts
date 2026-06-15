@@ -28,6 +28,12 @@ export function generateSignalTitle(direction: TradingSignalDirection, leverage:
   return `${direction.toUpperCase()} ${normalizeLeverage(leverage) ?? 1}X`;
 }
 
+export function getSignalDisplayTitle(
+  signal: Pick<TradingSignal, "direction" | "leverage" | "generated_title" | "title">
+): string {
+  return generateSignalTitle(signal.direction, signal.leverage ?? 1);
+}
+
 export function normalizeLeverage(value: string | number): number | null {
   const leverage = Number(value);
   if (!Number.isInteger(leverage) || leverage < 1 || leverage > 100) return null;

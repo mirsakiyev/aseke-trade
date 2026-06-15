@@ -18,6 +18,18 @@ test("generated signal title uses direction and leverage", () => {
   assert.equal(tradingSignals.generateSignalTitle("short", 25), "SHORT 25X");
 });
 
+test("signal display title follows current direction and leverage", () => {
+  assert.equal(
+    tradingSignals.getSignalDisplayTitle({
+      direction: "long",
+      leverage: 7,
+      generated_title: "LONG 1X",
+      title: "LONG 1X"
+    }),
+    "LONG 7X"
+  );
+});
+
 test("take profit percentages split evenly and total 100", () => {
   assert.deepEqual(tradingSignals.splitTakeProfitPercentages(1), [100]);
   assert.deepEqual(tradingSignals.splitTakeProfitPercentages(2), [50, 50]);

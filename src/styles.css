@@ -4683,6 +4683,47 @@ select:focus {
   font-weight: 800;
 }
 
+.signal-level-grid .signal-stop-loss-level.updated {
+  border-color: rgba(126, 224, 167, 0.34);
+  background: rgba(126, 224, 167, 0.07);
+}
+
+.signal-sl-stack {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.signal-sl-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.signal-sl-label {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.signal-sl-row.old {
+  opacity: 0.78;
+}
+
+.signal-sl-row.old s {
+  color: var(--muted);
+  text-decoration-color: rgba(255, 111, 111, 0.78);
+  text-decoration-thickness: 2px;
+}
+
+.signal-sl-row.current strong {
+  color: var(--success);
+  font-size: 0.98rem;
+}
+
 .signal-tp-list {
   padding: 0;
   margin: 0;

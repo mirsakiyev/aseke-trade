@@ -30,6 +30,7 @@ import {
   formatPercent,
   formatSignalStatus,
   generateSignalTitle,
+  getSignalDisplayTitle,
   getSignalTakeProfits,
   getSignalUpdates,
   normalizeLeverage,
@@ -651,7 +652,7 @@ function AdminSignalRow({
   const takeProfits = getSignalTakeProfits(signal);
   const updates = getSignalUpdates(signal);
   const isFinal = TRADING_SIGNAL_FINAL_STATUSES.includes(signal.status);
-  const title = signal.generated_title || signal.title || generateSignalTitle(signal.direction, signal.leverage ?? 1);
+  const title = getSignalDisplayTitle(signal);
   const [updateNote, setUpdateNote] = useState("");
   const [manualClosePrice, setManualClosePrice] = useState("");
   const [manualCloseNote, setManualCloseNote] = useState("");

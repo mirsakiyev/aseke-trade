@@ -21,6 +21,14 @@ test("academy dashboard uses compact AML and support history previews", () => {
   assert.match(dashboardSource, /<details className="compact-history-details">/);
 });
 
+test("trading signal card renders live title and updated stop loss state", () => {
+  assert.match(dashboardSource, /getSignalDisplayTitle\(signal\)/);
+  assert.match(dashboardSource, /function SignalStopLossLevel/);
+  assert.match(dashboardSource, /signal-stop-loss-level updated/);
+  assert.match(dashboardSource, /<s>\{formatSignalPrice\(originalValue\)\}<\/s>/);
+  assert.match(dashboardSource, /<strong>\{formatSignalPrice\(currentValue\)\}<\/strong>/);
+});
+
 test("leaderboard renders public avatars with fallback support", () => {
   assert.match(dashboardSource, /resolvePublicAvatarUrl\(row\.avatar_url\)/);
   assert.match(dashboardSource, /onError=\{\(\) => setHasImageError\(true\)\}/);

@@ -42,7 +42,7 @@ import {
   calculateSignalFinalRoi,
   formatPercent,
   formatSignalStatus,
-  generateSignalTitle,
+  getSignalDisplayTitle,
   getSignalTakeProfits,
   getSignalUpdates
 } from "../lib/tradingSignals";
@@ -52,8 +52,7 @@ import type {
   PremiumSupportPriority,
   PremiumSupportRequest,
   TradingAcademyLeaderboardRow,
-  TradingSignal,
-  TradingSignalTakeProfit
+  TradingSignal
 } from "../types/content";
 
 const blankAmlForm = {
@@ -1224,20 +1223,47 @@ function SignalLevel({ label, value }: { label: string; value: string | number }
   );
 }
 
+function SignalStopLossLevel({
+  currentValue,
+  originalValue
+}: {
+  currentValue: string | number;
+  originalValue?: string | number | null;
+}) {
+  const wasUpdated =
+    originalValue !== null && originalValue !== undefined && !signalPriceValuesMatch(originalValue, currentValue);
+
+  return (
+    <div className={wasUpdated ? "signal-stop-loss-level updated" : "signal-stop-loss-level"}>
+      <dt>SL</dt>
+      <dd>
+        {wasUpdated ? (
+          <span className="signal-sl-stack">
+            <span className="signal-sl-row old">
+              <span className="signal-sl-label">Initial</span>
+              <s>{formatSignalPrice(originalValue)}</s>
+            </span>
+            <span className="signal-sl-row current">
+              <span className="signal-sl-label">Updated</span>
+              <strong>{formatSignalPrice(currentValue)}</strong>
+            </span>
+          </span>
+        ) : (
+          formatSignalPrice(currentValue)
+        )}
+      </dd>
+    </div>
+  );
+}
+
 function SignalCard({ signal, showPastSummary = false }: { signal: TradingSignal; showPastSummary?: boolean }) {
   const original = signal.original_signal;
   const currentTakeProfits = getSignalTakeProfits(signal);
-  const displayTakeProfits = original?.takeProfits?.length
-    ? original.takeProfits.map((takeProfit, index) => mergeTakeProfitHitState(takeProfit, currentTakeProfits[index]))
-    : currentTakeProfits;
+  const displayTakeProfits = currentTakeProfits;
   const updates = getSignalUpdates(signal);
-  const title =
-    original?.generatedTitle ||
-    signal.generated_title ||
-    signal.title ||
-    generateSignalTitle(signal.direction, signal.leverage ?? 1);
-  const direction = original?.direction ?? signal.direction;
-  const leverage = original?.leverage ?? signal.leverage ?? 1;
+  const title = getSignalDisplayTitle(signal);
+  const direction = signal.direction;
+  const leverage = signal.leverage ?? 1;
   const finalRoi = signal.final_roi ?? calculateSignalFinalRoi(signal);
 
   return (
@@ -1262,9 +1288,9 @@ function SignalCard({ signal, showPastSummary = false }: { signal: TradingSignal
           <dl className="signal-level-grid">
             <SignalLevel label="Direction" value={direction.toUpperCase()} />
             <SignalLevel label="Leverage" value={`${leverage}X`} />
-            <SignalLevel label="Entry" value={original?.entryPrice ?? signal.entry_price} />
-            <SignalLevel label="SL" value={original?.stopLoss ?? signal.stop_loss} />
-            <SignalLevel label="Opened" value={formatDateTime(original?.createdAt ?? signal.created_at)} />
+            <SignalLevel label="Entry" value={signal.entry_price} />
+            <SignalStopLossLevel currentValue={signal.stop_loss} originalValue={original?.stopLoss} />
+            <SignalLevel label="Opened" value={formatDateTime(signal.created_at)} />
           </dl>
 
           <div className="signal-detail-block">
@@ -1290,7 +1316,7 @@ function SignalCard({ signal, showPastSummary = false }: { signal: TradingSignal
             </dl>
           )}
 
-          {(original?.notes || signal.notes) && <p className="muted">{original?.notes ?? signal.notes}</p>}
+          {(signal.notes || original?.notes) && <p className="muted">{signal.notes ?? original?.notes}</p>}
         </div>
       </div>
 
@@ -1320,19 +1346,24 @@ function TelegramIcon() {
   );
 }
 
-function mergeTakeProfitHitState(
-  originalTakeProfit: TradingSignalTakeProfit,
-  currentTakeProfit: TradingSignalTakeProfit | undefined
-): TradingSignalTakeProfit {
-  return {
-    ...originalTakeProfit,
-    isHit: currentTakeProfit?.isHit ?? originalTakeProfit.isHit,
-    hitAt: currentTakeProfit?.hitAt ?? originalTakeProfit.hitAt
-  };
-}
-
 function numberFromInput(value: string): number {
   return Number(value.replace(/,/g, "").trim());
+}
+
+function signalPriceValuesMatch(first: string | number, second: string | number): boolean {
+  const firstNumber = numberFromSignalPrice(first);
+  const secondNumber = numberFromSignalPrice(second);
+
+  if (firstNumber !== null && secondNumber !== null) {
+    return firstNumber === secondNumber;
+  }
+
+  return String(first).trim() === String(second).trim();
+}
+
+function numberFromSignalPrice(value: string | number): number | null {
+  const numericValue = Number(String(value).replace(/,/g, "").trim());
+  return Number.isFinite(numericValue) ? numericValue : null;
 }
 
 function formatMaxLossHelper(form: RiskCalculatorFormState): string {
