@@ -34,6 +34,25 @@ test("trading signal card renders live title and updated stop loss state", () =>
   assert.match(dashboardSource, /<strong>\{formatSignalPrice\(currentValue\)\}<\/strong>/);
 });
 
+test("past trades render as a compact expandable table with reusable details", () => {
+  assert.match(dashboardSource, /const PAST_TRADES_PREVIEW_LIMIT = 5/);
+  assert.match(dashboardSource, /setIsPastTradesExpanded/);
+  assert.match(dashboardSource, /setSelectedPastTradeId/);
+  assert.match(dashboardSource, /function PastTradesTable/);
+  assert.match(dashboardSource, /pastTrades\.slice\(0,\s*PAST_TRADES_PREVIEW_LIMIT\)/);
+  assert.match(dashboardSource, /getPastTradeCloseTimestamp\(second\) - getPastTradeCloseTimestamp\(first\)/);
+  assert.match(dashboardSource, /<th scope="col">Symbol \/ Pair<\/th>/);
+  assert.match(dashboardSource, /<th scope="col">Direction<\/th>/);
+  assert.match(dashboardSource, /<th scope="col">Trade Open Date<\/th>/);
+  assert.match(dashboardSource, /<th scope="col">Trade Close Date<\/th>/);
+  assert.match(dashboardSource, /<th scope="col">ROI<\/th>/);
+  assert.match(dashboardSource, /aria-label=\{`View full trade details for \$\{trade\.symbol\}`\}/);
+  assert.match(dashboardSource, /View all \$\{totalTrades\}/);
+  assert.match(dashboardSource, /Show less/);
+  assert.match(dashboardSource, /<SignalCard signal=\{selectedPastTrade\} showPastSummary \/>/);
+  assert.doesNotMatch(dashboardSource, /pastTrades\.map\(\(signal\) =>\s*\(\s*<SignalCard signal=\{signal\} showPastSummary key=\{signal\.id\} \/>/);
+});
+
 test("leaderboard renders public avatars with fallback support", () => {
   assert.match(dashboardSource, /resolvePublicAvatarUrl\(row\.avatar_url\)/);
   assert.match(dashboardSource, /onError=\{\(\) => setHasImageError\(true\)\}/);

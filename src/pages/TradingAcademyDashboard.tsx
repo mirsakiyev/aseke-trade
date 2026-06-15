@@ -56,6 +56,8 @@ const blankAmlForm = {
   notes: ""
 };
 
+const PAST_TRADES_PREVIEW_LIMIT = 5;
+
 type RiskCalculatorFormState = {
   direction: RiskDirection;
   accountBalance: string;
@@ -115,6 +117,8 @@ export function TradingAcademyDashboard() {
   const [amlMessage, setAmlMessage] = useState<string | null>(null);
   const [isAmlSubmitting, setIsAmlSubmitting] = useState(false);
   const [isLeaderboardExpanded, setIsLeaderboardExpanded] = useState(false);
+  const [isPastTradesExpanded, setIsPastTradesExpanded] = useState(false);
+  const [selectedPastTradeId, setSelectedPastTradeId] = useState<string | null>(null);
   const [riskForm, setRiskForm] = useState<RiskCalculatorFormState>(() => createBlankRiskForm());
   const [riskResult, setRiskResult] = useState<RiskCalculatorResult | null>(null);
   const [riskErrors, setRiskErrors] = useState<string[]>([]);
@@ -153,8 +157,19 @@ export function TradingAcademyDashboard() {
   );
   const activeSignals = useMemo(() => signals.filter((signal) => signal.status === "active"), [signals]);
   const pastTrades = useMemo(
-    () => signals.filter((signal) => TRADING_SIGNAL_FINAL_STATUSES.includes(signal.status)),
+    () =>
+      signals
+        .filter((signal) => TRADING_SIGNAL_FINAL_STATUSES.includes(signal.status))
+        .sort((first, second) => getPastTradeCloseTimestamp(second) - getPastTradeCloseTimestamp(first)),
     [signals]
+  );
+  const visiblePastTrades = useMemo(
+    () => (isPastTradesExpanded ? pastTrades : pastTrades.slice(0, PAST_TRADES_PREVIEW_LIMIT)),
+    [isPastTradesExpanded, pastTrades]
+  );
+  const selectedPastTrade = useMemo(
+    () => pastTrades.find((signal) => signal.id === selectedPastTradeId) ?? null,
+    [pastTrades, selectedPastTradeId]
   );
   const visibleLeaderboard = useMemo(
     () => (isLeaderboardExpanded ? leaderboard : leaderboard.slice(0, 3)),
@@ -389,11 +404,34 @@ export function TradingAcademyDashboard() {
               </div>
             </div>
             {pastTrades.length ? (
-              <div className="signal-grid academy-signal-grid">
-                {pastTrades.map((signal) => (
-                  <SignalCard signal={signal} showPastSummary key={signal.id} />
-                ))}
-              </div>
+              <>
+                <PastTradesTable
+                  isExpanded={isPastTradesExpanded}
+                  onSelectTrade={setSelectedPastTradeId}
+                  onToggleExpanded={() => setIsPastTradesExpanded((expanded) => !expanded)}
+                  selectedTradeId={selectedPastTradeId}
+                  totalTrades={pastTrades.length}
+                  trades={visiblePastTrades}
+                />
+                {selectedPastTrade && (
+                  <section className="past-trade-detail-panel" aria-label="Selected past trade details">
+                    <div className="compact-panel-header">
+                      <div>
+                        <p className="eyebrow">Trade Details</p>
+                        <h3>{selectedPastTrade.symbol}</h3>
+                      </div>
+                      <button
+                        className="ghost-button compact"
+                        type="button"
+                        onClick={() => setSelectedPastTradeId(null)}
+                      >
+                        Hide details
+                      </button>
+                    </div>
+                    <SignalCard signal={selectedPastTrade} showPastSummary />
+                  </section>
+                )}
+              </>
             ) : (
               <div className="compact-empty-state">
                 <Trophy size={20} aria-hidden="true" />
@@ -503,6 +541,92 @@ export function TradingAcademyDashboard() {
         </>
       )}
     </main>
+  );
+}
+
+function PastTradesTable({
+  isExpanded,
+  onSelectTrade,
+  onToggleExpanded,
+  selectedTradeId,
+  totalTrades,
+  trades
+}: {
+  isExpanded: boolean;
+  onSelectTrade: (tradeId: string) => void;
+  onToggleExpanded: () => void;
+  selectedTradeId: string | null;
+  totalTrades: number;
+  trades: TradingSignal[];
+}) {
+  return (
+    <div className="past-trades-panel">
+      <div className="past-trades-table-wrap">
+        <table className="past-trades-table">
+          <thead>
+            <tr>
+              <th scope="col">Symbol / Pair</th>
+              <th scope="col">Direction</th>
+              <th scope="col">Trade Open Date</th>
+              <th scope="col">Trade Close Date</th>
+              <th scope="col">ROI</th>
+            </tr>
+          </thead>
+          <tbody>
+            {trades.map((trade) => {
+              const finalRoi = trade.final_roi ?? calculateSignalFinalRoi(trade);
+              const isSelected = trade.id === selectedTradeId;
+              const roiClassName =
+                finalRoi === null
+                  ? "past-trade-roi"
+                  : Number(finalRoi) >= 0
+                    ? "past-trade-roi positive"
+                    : "past-trade-roi negative";
+
+              return (
+                <tr
+                  className={isSelected ? "selected" : ""}
+                  key={trade.id}
+                  onClick={() => onSelectTrade(trade.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onSelectTrade(trade.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  aria-label={`View full trade details for ${trade.symbol}`}
+                >
+                  <td data-label="Symbol / Pair">
+                    <span className="past-trade-link">{trade.symbol}</span>
+                  </td>
+                  <td data-label="Direction">
+                    <span className={`past-trade-direction ${trade.direction}`}>
+                      {formatSignalDirection(trade.direction)}
+                    </span>
+                  </td>
+                  <td data-label="Trade Open Date">{formatDateTime(trade.created_at)}</td>
+                  <td data-label="Trade Close Date">
+                    {trade.closed_at ? formatDateTime(trade.closed_at) : "Unknown date"}
+                  </td>
+                  <td data-label="ROI">
+                    <span className={roiClassName}>{finalRoi === null ? "N/A" : formatRoi(finalRoi)}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {totalTrades > PAST_TRADES_PREVIEW_LIMIT && (
+        <button className="ghost-button compact past-trades-toggle" type="button" onClick={onToggleExpanded}>
+          {isExpanded ? "Show less" : `View all ${totalTrades}`}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -1171,6 +1295,17 @@ function TelegramIcon() {
       />
     </svg>
   );
+}
+
+function getPastTradeCloseTimestamp(signal: TradingSignal): number {
+  if (!signal.closed_at) return 0;
+
+  const timestamp = new Date(signal.closed_at).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function formatSignalDirection(direction: TradingSignal["direction"]): string {
+  return direction === "long" ? "Long" : "Short";
 }
 
 function numberFromInput(value: string): number {
