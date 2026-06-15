@@ -1,4 +1,4 @@
-import { ExternalLink, HelpCircle, MessageCircle, Send, ShieldCheck, Users } from "lucide-react";
+import { ExternalLink, HelpCircle, MessageCircle, Send, ShieldCheck } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaqAccordion, type FaqItem } from "../components/FaqAccordion";
@@ -116,68 +116,58 @@ export function Support() {
             Get help with your account, billing, Trading Academy access, payments, and platform questions.
           </p>
         </div>
-        <a
-          className="primary-button compact"
-          href="https://t.me/aseketrade"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Users size={17} />
-          Join Telegram
-          <ExternalLink size={15} />
-        </a>
       </section>
 
       <section className="support-overview-grid">
         <article className="section-panel support-info-panel">
-          <span className="feature-icon">
-            <HelpCircle size={22} />
-          </span>
-          <div>
+          <div className="support-card-kicker">
+            <span className="feature-icon">
+              <HelpCircle size={20} />
+            </span>
             <p className="eyebrow">Help Center</p>
-            <h2>Start with quick answers</h2>
-            <p className="muted">
-              Find the common ASEKE TRADE questions below, then send a support request if you still need help.
-            </p>
           </div>
+          <h2>Start with quick answers</h2>
+          <p className="muted">
+            Find the common ASEKE TRADE questions below, then send a support request if you still need help.
+          </p>
         </article>
 
         <article className="section-panel support-info-panel">
-          <span className="feature-icon">
-            <MessageCircle size={22} />
-          </span>
-          <div>
+          <div className="support-card-kicker">
+            <span className="feature-icon">
+              <MessageCircle size={20} />
+            </span>
             <p className="eyebrow">Community</p>
-            <h2>Telegram community</h2>
-            <p className="muted">
-              Join the ASEKE TRADE Telegram Community for platform updates and community discussion.
-            </p>
-            <a
-              className="ghost-button compact"
-              href="https://t.me/aseketrade"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Join the ASEKE TRADE Telegram Community
-              <ExternalLink size={15} />
-            </a>
           </div>
+          <h2>Telegram community</h2>
+          <p className="muted">
+            Join the ASEKE TRADE Telegram Community for platform updates and community discussion.
+          </p>
+          <a
+            className="ghost-button compact"
+            href="https://t.me/aseketrade"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Join the ASEKE TRADE Telegram Community
+            <ExternalLink size={15} />
+          </a>
         </article>
 
         <article className="section-panel support-info-panel">
-          <span className="feature-icon">
-            <ShieldCheck size={22} />
-          </span>
-          <div>
+          <div className="support-card-kicker">
+            <span className="feature-icon">
+              <ShieldCheck size={20} />
+            </span>
             <p className="eyebrow">Account</p>
-            <h2>Manage access</h2>
-            <p className="muted">
-              Signed-in users can review payments, balance activity, and Trading Academy access from the dashboard.
-            </p>
-            <Link className="ghost-button compact" to={user ? "/dashboard" : "/login"}>
-              {user ? "Open Dashboard" : "Login"}
-            </Link>
           </div>
+          <h2>Manage access</h2>
+          <p className="muted">
+            Signed-in users can review payments, balance activity, and Trading Academy access from the dashboard.
+          </p>
+          <Link className="ghost-button compact" to={user ? "/dashboard" : "/login"}>
+            {user ? "Open Dashboard" : "Login"}
+          </Link>
         </article>
       </section>
 
