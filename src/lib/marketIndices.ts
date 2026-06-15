@@ -11,35 +11,25 @@ import {
 } from "./marketIndexMath";
 import { supabase } from "./supabase";
 
-const clientCacheMs = 5 * 60 * 1000;
-const marketIndicesCacheKey = "market-indices:binance-only";
 const fearGreedEndpoint = "https://api.alternative.me/fng/?limit=1&format=json";
 const binanceLongShortEndpoint =
   "https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=5m&limit=1";
 const deribitVolatilityEndpoint = "https://www.deribit.com/api/v2/public/get_volatility_index_data";
 
-const clientMarketIndicesCache = new Map<string, { expiresAt: number; data: MarketIndicesResponse }>();
-
 export async function fetchMarketIndices(): Promise<MarketIndicesResponse> {
-  const cached = clientMarketIndicesCache.get(marketIndicesCacheKey);
-
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data;
-  }
-
   if (supabase) {
     try {
       const { data, error } = await supabase.functions.invoke("market-indices");
 
       if (!error) {
-        return cacheMarketIndices(normalizeMarketIndicesResponse(data));
+        return normalizeMarketIndicesResponse(data);
       }
     } catch {
       // Public fallback below keeps the charts page useful when the function is not deployed yet.
     }
   }
 
-  return cacheMarketIndices(await fetchPublicMarketIndices());
+  return fetchPublicMarketIndices();
 }
 
 function normalizeMarketIndicesResponse(data: unknown): MarketIndicesResponse {
@@ -294,15 +284,6 @@ function newestIso(values: Array<string | null>): string | null {
 
 function average(values: number[]): number {
   return values.reduce((total, value) => total + value, 0) / values.length;
-}
-
-function cacheMarketIndices(data: MarketIndicesResponse): MarketIndicesResponse {
-  clientMarketIndicesCache.set(marketIndicesCacheKey, {
-    data,
-    expiresAt: Date.now() + clientCacheMs
-  });
-
-  return data;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -16,15 +16,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
 };
 
-const cacheMs = 5 * 60 * 1000;
 const requestTimeoutMs = 8000;
 const longShortSymbol = "BTCUSDT";
 const longShortPeriod = "5m";
 const binanceLongShortEndpoint = "https://fapi.binance.com/futures/data/globalLongShortAccountRatio";
 const fearGreedEndpoint = "https://api.alternative.me/fng/?limit=1&format=json";
 const deribitVolatilityEndpoint = "https://www.deribit.com/api/v2/public/get_volatility_index_data";
-
-let cachedPayload: { expiresAt: number; payload: MarketIndicesResponse } | null = null;
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
@@ -33,10 +30,6 @@ Deno.serve(async (request) => {
 
   if (request.method !== "POST" && request.method !== "GET") {
     return jsonResponse({ error: "Method not allowed.", code: "method_not_allowed" }, 405);
-  }
-
-  if (cachedPayload && cachedPayload.expiresAt > Date.now()) {
-    return jsonResponse(cachedPayload.payload);
   }
 
   const [fearGreed, longShort, volatility] = await Promise.all([
@@ -50,11 +43,6 @@ Deno.serve(async (request) => {
     longShort,
     volatility,
     generatedAt: new Date().toISOString()
-  };
-
-  cachedPayload = {
-    expiresAt: Date.now() + cacheMs,
-    payload
   };
 
   return jsonResponse(payload);
@@ -247,7 +235,7 @@ function jsonResponse(body: unknown, status = 200): Response {
     headers: {
       ...corsHeaders,
       "Content-Type": "application/json",
-      "Cache-Control": `public, max-age=${Math.floor(cacheMs / 1000)}`
+      "Cache-Control": "no-store"
     }
   });
 }
