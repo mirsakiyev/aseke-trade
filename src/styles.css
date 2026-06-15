@@ -2332,23 +2332,33 @@ button.leaderboard-badge-more:hover {
 
 .long-short-split {
   display: flex;
+  position: relative;
   overflow: hidden;
   height: 22px;
   border: 1px solid rgba(229, 228, 226, 0.18);
   border-radius: 999px;
-  background: rgba(229, 228, 226, 0.06);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(126, 224, 167, 0.52) 0%,
+      rgba(132, 218, 181, 0.72) calc(var(--long-pct) - 18%),
+      rgba(187, 218, 214, 0.94) calc(var(--long-pct) - 4%),
+      rgba(236, 168, 99, 0.96) calc(var(--long-pct) + 4%),
+      rgba(222, 115, 94, 0.72) calc(var(--long-pct) + 18%),
+      rgba(255, 107, 107, 0.52) 100%
+    );
 }
 
 .long-side {
   flex: 0 0 var(--long-pct);
   min-width: 0;
-  background: linear-gradient(90deg, rgba(126, 224, 167, 0.78), rgba(184, 214, 222, 0.92));
+  background: transparent;
 }
 
 .short-side {
   flex: 1 1 auto;
   min-width: 0;
-  background: linear-gradient(90deg, rgba(245, 159, 86, 0.82), rgba(255, 107, 107, 0.82));
+  background: transparent;
 }
 
 .market-index-detail {
