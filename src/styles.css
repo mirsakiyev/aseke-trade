@@ -2213,6 +2213,58 @@ button.leaderboard-badge-more:hover {
   text-align: right;
 }
 
+.long-short-card-header {
+  grid-template-columns: auto minmax(0, 1fr) minmax(112px, auto);
+}
+
+.long-short-exchange-select {
+  align-self: start;
+  justify-self: end;
+}
+
+.long-short-exchange-select select {
+  width: min(160px, 100%);
+  min-height: 34px;
+  padding: 0 2rem 0 0.65rem;
+  border: 1px solid rgba(229, 228, 226, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(21, 25, 31, 0.98), rgba(8, 10, 12, 0.98)),
+    rgba(229, 228, 226, 0.05);
+  color: var(--platinum-soft);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.long-short-exchange-select select:disabled {
+  opacity: 0.72;
+}
+
+.long-short-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.long-short-status-row > span:last-child {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.market-index-pill.exchange-badge {
+  min-height: 26px;
+  border-color: rgba(184, 214, 222, 0.35);
+  background: rgba(184, 214, 222, 0.1);
+  color: #dbeaf0;
+  text-transform: uppercase;
+}
+
 .market-index-score-row {
   display: flex;
   align-items: flex-end;
@@ -2322,6 +2374,12 @@ button.leaderboard-badge-more:hover {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.long-short-update-state {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.55rem 0 0.15rem;
 }
 
 .long-short-split {
@@ -5712,6 +5770,28 @@ select:focus {
   .chart-market-actions {
     flex-wrap: wrap;
     justify-content: stretch;
+  }
+
+  .long-short-card-header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .long-short-exchange-select {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  .long-short-exchange-select select {
+    width: 100%;
+  }
+
+  .long-short-status-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .long-short-status-row > span:last-child {
+    text-align: left;
   }
 
   .coin-picker {

@@ -1,5 +1,17 @@
 export type MarketIndexStatus = "ready" | "unavailable";
-export type LongShortMode = "multi-exchange" | "binance-only" | "unavailable";
+export type LongShortExchangeName =
+  | "Binance"
+  | "OKX"
+  | "Bybit"
+  | "Bitget"
+  | "Gate"
+  | "KuCoin"
+  | "MEXC"
+  | "HTX"
+  | "Kraken"
+  | "Deribit";
+export type LongShortExchangeSelection = "major-average" | LongShortExchangeName;
+export type LongShortMode = "major-average" | "single-exchange" | "binance-fallback" | "unavailable";
 export type LongShortSource = "CoinGlass" | "Binance" | null;
 export type VolatilityBasis = "BTC/ETH DVOL average" | "BTC DVOL" | "ETH DVOL" | "unavailable";
 
@@ -17,8 +29,11 @@ export interface LongShortIndex {
   status: MarketIndexStatus;
   longPct: number | null;
   shortPct: number | null;
+  selectedExchange: LongShortExchangeSelection;
   mode: LongShortMode;
   includedExchanges: string[];
+  failedExchanges: string[];
+  availableExchanges: LongShortExchangeName[];
   requestedExchanges: string[];
   timestamp: string | null;
   source: LongShortSource;
@@ -58,15 +73,26 @@ export interface LongShortPercent {
 }
 
 export interface LongShortExchangeInput {
-  exchange: string;
+  exchange: LongShortExchangeName;
   longPct?: number | null;
   shortPct?: number | null;
   longShortRatio?: number | null;
   timestamp?: string | null;
 }
 
+export interface BinanceFallbackLongShortOptions {
+  availableExchanges?: LongShortExchangeName[];
+  failedExchanges?: string[];
+  error?: string;
+}
+
 export interface AggregatedLongShort extends LongShortPercent {
-  includedExchanges: string[];
+  includedExchanges: LongShortExchangeName[];
+  timestamp: string | null;
+}
+
+export interface NormalizedLongShortExchange extends LongShortPercent {
+  exchange: LongShortExchangeName;
   timestamp: string | null;
 }
 
@@ -75,7 +101,20 @@ export interface VolatilityRiskBand {
   className: string;
 }
 
-export const defaultLongShortExchanges = ["Binance", "OKX", "Bybit", "Bitget", "Gate"];
+export const majorLongShortSelection = "major-average" as const;
+
+export const defaultLongShortExchanges: LongShortExchangeName[] = [
+  "Binance",
+  "OKX",
+  "Bybit",
+  "Bitget",
+  "Gate",
+  "KuCoin",
+  "MEXC",
+  "HTX",
+  "Kraken",
+  "Deribit"
+];
 
 export const fearGreedBands: FearGreedBand[] = [
   { min: 0, max: 24, label: "Extreme Fear", className: "extreme-fear", color: "#ff6b6b" },
@@ -104,6 +143,29 @@ export function ratioToLongShortPercent(ratio: number | null | undefined): LongS
   return normalizeLongShortPercentPair(longPct, shortPct);
 }
 
+export function isLongShortExchangeName(value: unknown): value is LongShortExchangeName {
+  return typeof value === "string" && defaultLongShortExchanges.includes(value as LongShortExchangeName);
+}
+
+export function normalizeLongShortExchangeSelection(value: unknown): LongShortExchangeSelection {
+  return value === majorLongShortSelection || isLongShortExchangeName(value) ? value : majorLongShortSelection;
+}
+
+export function normalizeLongShortExchangeInput(
+  input: LongShortExchangeInput
+): NormalizedLongShortExchange | null {
+  const direct = normalizeLongShortPercentPair(input.longPct, input.shortPct);
+  const fromRatio = direct ?? ratioToLongShortPercent(input.longShortRatio);
+
+  return fromRatio
+    ? {
+        ...fromRatio,
+        exchange: input.exchange,
+        timestamp: input.timestamp ?? null
+      }
+    : null;
+}
+
 export function normalizeLongShortPercentPair(
   longPct: number | null | undefined,
   shortPct: number | null | undefined
@@ -122,20 +184,9 @@ export function normalizeLongShortPercentPair(
 }
 
 export function averageLongShortExchanges(inputs: LongShortExchangeInput[]): AggregatedLongShort | null {
-  const validRows = inputs
-    .map((input) => {
-      const direct = normalizeLongShortPercentPair(input.longPct, input.shortPct);
-      const fromRatio = direct ?? ratioToLongShortPercent(input.longShortRatio);
-
-      return fromRatio
-        ? {
-            ...fromRatio,
-            exchange: input.exchange,
-            timestamp: input.timestamp ?? null
-          }
-        : null;
-    })
-    .filter((row): row is LongShortPercent & { exchange: string; timestamp: string | null } => Boolean(row));
+  const validRows = inputs.map(normalizeLongShortExchangeInput).filter((row): row is NormalizedLongShortExchange =>
+    Boolean(row)
+  );
 
   if (!validRows.length) return null;
 
@@ -148,6 +199,77 @@ export function averageLongShortExchanges(inputs: LongShortExchangeInput[]): Agg
     ...normalized,
     includedExchanges: validRows.map((row) => row.exchange),
     timestamp: newestTimestamp(validRows.map((row) => row.timestamp))
+  };
+}
+
+export function buildMajorLongShortIndex(
+  inputs: LongShortExchangeInput[],
+  requestedExchanges = defaultLongShortExchanges
+): LongShortIndex | null {
+  const aggregate = averageLongShortExchanges(inputs);
+  if (!aggregate || aggregate.includedExchanges.length < 2) return null;
+
+  return {
+    status: "ready",
+    longPct: roundTo(aggregate.longPct, 2),
+    shortPct: roundTo(aggregate.shortPct, 2),
+    selectedExchange: majorLongShortSelection,
+    mode: "major-average",
+    includedExchanges: aggregate.includedExchanges,
+    failedExchanges: requestedExchanges.filter((exchange) => !aggregate.includedExchanges.includes(exchange)),
+    availableExchanges: requestedExchanges,
+    requestedExchanges,
+    timestamp: aggregate.timestamp,
+    source: "CoinGlass"
+  };
+}
+
+export function buildSingleExchangeLongShortIndex(
+  input: LongShortExchangeInput,
+  requestedExchanges = defaultLongShortExchanges
+): LongShortIndex | null {
+  const row = normalizeLongShortExchangeInput(input);
+  if (!row) return null;
+
+  return {
+    status: "ready",
+    longPct: roundTo(row.longPct, 2),
+    shortPct: roundTo(row.shortPct, 2),
+    selectedExchange: row.exchange,
+    mode: "single-exchange",
+    includedExchanges: [row.exchange],
+    failedExchanges: [],
+    availableExchanges: requestedExchanges,
+    requestedExchanges,
+    timestamp: row.timestamp,
+    source: "CoinGlass"
+  };
+}
+
+export function buildBinanceFallbackLongShortIndex(
+  input: LongShortExchangeInput,
+  requestedExchanges = defaultLongShortExchanges,
+  options: BinanceFallbackLongShortOptions = {}
+): LongShortIndex | null {
+  const row = normalizeLongShortExchangeInput({ ...input, exchange: "Binance" });
+  if (!row) return null;
+
+  const availableExchanges = options.availableExchanges ?? ["Binance"];
+
+  return {
+    status: "ready",
+    longPct: roundTo(row.longPct, 2),
+    shortPct: roundTo(row.shortPct, 2),
+    selectedExchange: "Binance",
+    mode: "binance-fallback",
+    includedExchanges: ["Binance"],
+    failedExchanges:
+      options.failedExchanges ?? requestedExchanges.filter((exchange) => !availableExchanges.includes(exchange)),
+    availableExchanges,
+    requestedExchanges,
+    timestamp: row.timestamp,
+    source: "Binance",
+    error: options.error
   };
 }
 
@@ -175,7 +297,10 @@ export function formatIndexTimestamp(value: string | number | null | undefined):
   }).format(date);
 }
 
-export function createUnavailableMarketIndices(message = "Market index data unavailable."): MarketIndicesResponse {
+export function createUnavailableMarketIndices(
+  message = "Market index data unavailable.",
+  selectedExchange: LongShortExchangeSelection = majorLongShortSelection
+): MarketIndicesResponse {
   const generatedAt = new Date().toISOString();
 
   return {
@@ -193,8 +318,11 @@ export function createUnavailableMarketIndices(message = "Market index data unav
       status: "unavailable",
       longPct: null,
       shortPct: null,
+      selectedExchange,
       mode: "unavailable",
       includedExchanges: [],
+      failedExchanges: [],
+      availableExchanges: [],
       requestedExchanges: defaultLongShortExchanges,
       timestamp: null,
       source: null,

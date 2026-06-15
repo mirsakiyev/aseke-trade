@@ -39,6 +39,64 @@ test("long short averaging ignores invalid exchanges and keeps included exchange
   assert.equal(result.timestamp, "2026-06-15T01:05:00.000Z");
 });
 
+test("single exchange long short index returns only the selected exchange", () => {
+  const result = marketIndexMath.buildSingleExchangeLongShortIndex({
+    exchange: "OKX",
+    longShortRatio: 1.5,
+    timestamp: "2026-06-15T01:00:00.000Z"
+  });
+
+  assert.equal(result.selectedExchange, "OKX");
+  assert.equal(result.mode, "single-exchange");
+  assert.deepEqual(result.includedExchanges, ["OKX"]);
+  assert.equal(result.source, "CoinGlass");
+  assertClose(result.longPct, 60);
+  assertClose(result.shortPct, 40);
+});
+
+test("major cex average averages valid exchanges and tracks failed exchanges", () => {
+  const result = marketIndexMath.buildMajorLongShortIndex(
+    [
+      { exchange: "Binance", longShortRatio: 1.5 },
+      { exchange: "OKX", longPct: 70, shortPct: 30 },
+      { exchange: "Bybit", longShortRatio: null }
+    ],
+    ["Binance", "OKX", "Bybit"]
+  );
+
+  assert.equal(result.selectedExchange, "major-average");
+  assert.equal(result.mode, "major-average");
+  assert.deepEqual(result.includedExchanges, ["Binance", "OKX"]);
+  assert.deepEqual(result.failedExchanges, ["Bybit"]);
+  assertClose(result.longPct, 65);
+  assertClose(result.shortPct, 35);
+});
+
+test("major cex average is not used when fewer than two exchanges are valid", () => {
+  const result = marketIndexMath.buildMajorLongShortIndex(
+    [
+      { exchange: "Binance", longShortRatio: 1.5 },
+      { exchange: "OKX", longShortRatio: null }
+    ],
+    ["Binance", "OKX"]
+  );
+
+  assert.equal(result, null);
+});
+
+test("binance fallback is explicitly labeled as binance fallback only", () => {
+  const result = marketIndexMath.buildBinanceFallbackLongShortIndex({
+    exchange: "Binance",
+    longShortRatio: 1.5,
+    timestamp: "2026-06-15T01:00:00.000Z"
+  });
+
+  assert.equal(result.selectedExchange, "Binance");
+  assert.equal(result.mode, "binance-fallback");
+  assert.deepEqual(result.availableExchanges, ["Binance"]);
+  assert.equal(result.source, "Binance");
+});
+
 test("fear and greed score maps to the expected classification band", () => {
   assert.equal(marketIndexMath.getFearGreedBand(12).label, "Extreme Fear");
   assert.equal(marketIndexMath.getFearGreedBand(44).label, "Fear");

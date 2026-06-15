@@ -1,13 +1,18 @@
 import {
-  averageLongShortExchanges,
+  buildBinanceFallbackLongShortIndex,
+  buildMajorLongShortIndex,
+  buildSingleExchangeLongShortIndex,
   createUnavailableMarketIndices,
   defaultLongShortExchanges,
   getFearGreedBand,
+  majorLongShortSelection,
   normalizeLongShortPercentPair,
+  normalizeLongShortExchangeSelection,
   ratioToLongShortPercent,
   roundTo,
   type FearGreedIndex,
   type LongShortExchangeInput,
+  type LongShortExchangeSelection,
   type LongShortIndex,
   type MarketIndicesResponse,
   type VolatilityIndex
@@ -29,7 +34,7 @@ const binanceLongShortEndpoint = "https://fapi.binance.com/futures/data/globalLo
 const fearGreedEndpoint = "https://api.alternative.me/fng/?limit=1&format=json";
 const deribitVolatilityEndpoint = "https://www.deribit.com/api/v2/public/get_volatility_index_data";
 
-let cachedPayload: { expiresAt: number; payload: MarketIndicesResponse } | null = null;
+const cachedPayloads = new Map<string, { expiresAt: number; payload: MarketIndicesResponse }>();
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
@@ -40,13 +45,17 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "Method not allowed.", code: "method_not_allowed" }, 405);
   }
 
+  const selectedExchange = await readLongShortSelection(request);
+  const cacheKey = `long-short:${selectedExchange}`;
+  const cachedPayload = cachedPayloads.get(cacheKey);
+
   if (cachedPayload && cachedPayload.expiresAt > Date.now()) {
     return jsonResponse(cachedPayload.payload);
   }
 
   const [fearGreed, longShort, volatility] = await Promise.all([
     fetchFearGreedIndex().catch((error) => unavailableFearGreed(error)),
-    fetchLongShortIndex().catch((error) => unavailableLongShort(error)),
+    fetchLongShortIndex(selectedExchange).catch((error) => unavailableLongShort(error, selectedExchange)),
     fetchVolatilityIndex().catch((error) => unavailableVolatility(error))
   ]);
 
@@ -57,10 +66,10 @@ Deno.serve(async (request) => {
     generatedAt: new Date().toISOString()
   };
 
-  cachedPayload = {
+  cachedPayloads.set(cacheKey, {
     expiresAt: Date.now() + cacheMs,
     payload
-  };
+  });
 
   return jsonResponse(payload);
 });
@@ -90,11 +99,41 @@ async function fetchFearGreedIndex(): Promise<FearGreedIndex> {
   };
 }
 
-async function fetchLongShortIndex(): Promise<LongShortIndex> {
+async function fetchLongShortIndex(selectedExchange: LongShortExchangeSelection): Promise<LongShortIndex> {
   const apiKey = Deno.env.get("COINGLASS_API_KEY")?.trim();
 
   if (!apiKey) {
-    return fetchBinanceLongShortIndex();
+    return selectedExchange === majorLongShortSelection || selectedExchange === "Binance"
+      ? fetchBinanceLongShortIndex({
+          error: "Add COINGLASS_API_KEY to enable multi-exchange data."
+        })
+      : {
+          ...unavailableLongShort("Add COINGLASS_API_KEY to enable multi-exchange data.", selectedExchange, {
+            availableExchanges: ["Binance"],
+            failedExchanges: defaultLongShortExchanges.filter((exchange) => exchange !== "Binance")
+          })
+        };
+  }
+
+  if (selectedExchange !== majorLongShortSelection) {
+    const row = await fetchCoinGlassExchangeLongShort(selectedExchange, apiKey);
+    const singleExchange = row ? buildSingleExchangeLongShortIndex(row) : null;
+
+    if (singleExchange) {
+      return singleExchange;
+    }
+
+    if (selectedExchange === "Binance") {
+      return fetchBinanceLongShortIndex({
+        availableExchanges: defaultLongShortExchanges,
+        error: "CoinGlass Binance data unavailable. Showing Binance public fallback."
+      });
+    }
+
+    return unavailableLongShort(`CoinGlass ${selectedExchange} long/short data unavailable.`, selectedExchange, {
+      availableExchanges: defaultLongShortExchanges,
+      failedExchanges: [selectedExchange]
+    });
   }
 
   const exchangeRows = await Promise.all(
@@ -107,24 +146,27 @@ async function fetchLongShortIndex(): Promise<LongShortIndex> {
     })
   );
 
-  const aggregate = averageLongShortExchanges(
-    exchangeRows.filter((row): row is LongShortExchangeInput => Boolean(row))
-  );
+  const validRows = exchangeRows.filter((row): row is LongShortExchangeInput => Boolean(row));
+  const aggregate = buildMajorLongShortIndex(validRows);
 
-  if (!aggregate) {
-    return unavailableLongShort("CoinGlass long/short data unavailable.");
+  if (aggregate) {
+    return aggregate;
   }
 
-  return {
-    status: "ready",
-    longPct: roundTo(aggregate.longPct, 2),
-    shortPct: roundTo(aggregate.shortPct, 2),
-    mode: "multi-exchange",
-    includedExchanges: aggregate.includedExchanges,
-    requestedExchanges: defaultLongShortExchanges,
-    timestamp: aggregate.timestamp,
-    source: "CoinGlass"
-  };
+  if (validRows.length === 1) {
+    const singleExchange = buildSingleExchangeLongShortIndex(validRows[0]);
+    if (singleExchange) return singleExchange;
+  }
+
+  return fetchBinanceLongShortIndex({
+    availableExchanges: defaultLongShortExchanges,
+    error: "CoinGlass average unavailable. Showing Binance public fallback."
+  }).catch(() =>
+    unavailableLongShort("CoinGlass long/short data unavailable.", majorLongShortSelection, {
+      availableExchanges: defaultLongShortExchanges,
+      failedExchanges: defaultLongShortExchanges
+    })
+  );
 }
 
 async function fetchCoinGlassExchangeLongShort(
@@ -174,7 +216,13 @@ async function fetchCoinGlassExchangeLongShort(
   };
 }
 
-async function fetchBinanceLongShortIndex(): Promise<LongShortIndex> {
+interface LongShortFallbackOptions {
+  availableExchanges?: LongShortExchangeInput["exchange"][];
+  failedExchanges?: string[];
+  error?: string;
+}
+
+async function fetchBinanceLongShortIndex(options: LongShortFallbackOptions = {}): Promise<LongShortIndex> {
   const params = new URLSearchParams({
     symbol: longShortSymbol,
     period: longShortInterval,
@@ -184,7 +232,7 @@ async function fetchBinanceLongShortIndex(): Promise<LongShortIndex> {
   const row = Array.isArray(payload) ? payload.find(isRecord) : null;
 
   if (!row) {
-    return unavailableLongShort("Binance long/short data unavailable.");
+    return unavailableLongShort("Binance long/short data unavailable.", "Binance", options);
   }
 
   const direct = normalizeLongShortPercentPair(
@@ -194,19 +242,21 @@ async function fetchBinanceLongShortIndex(): Promise<LongShortIndex> {
   const fromRatio = direct ?? ratioToLongShortPercent(firstNumber(row, ["longShortRatio", "ratio"]));
 
   if (!fromRatio) {
-    return unavailableLongShort("Binance long/short data unavailable.");
+    return unavailableLongShort("Binance long/short data unavailable.", "Binance", options);
   }
 
-  return {
-    status: "ready",
-    longPct: roundTo(fromRatio.longPct, 2),
-    shortPct: roundTo(fromRatio.shortPct, 2),
-    mode: "binance-only",
-    includedExchanges: ["Binance"],
-    requestedExchanges: defaultLongShortExchanges,
-    timestamp: firstTimestamp(row),
-    source: "Binance"
-  };
+  const fallback = buildBinanceFallbackLongShortIndex({
+    exchange: "Binance",
+    longPct: fromRatio.longPct,
+    shortPct: fromRatio.shortPct,
+    timestamp: firstTimestamp(row)
+  }, defaultLongShortExchanges, options);
+
+  if (!fallback) {
+    return unavailableLongShort("Binance long/short data unavailable.", "Binance", options);
+  }
+
+  return fallback;
 }
 
 async function fetchVolatilityIndex(): Promise<VolatilityIndex> {
@@ -332,9 +382,22 @@ function unavailableFearGreed(error: unknown): FearGreedIndex {
   return fallback.fearGreed;
 }
 
-function unavailableLongShort(error: unknown): LongShortIndex {
-  const fallback = createUnavailableMarketIndices(readError(error));
-  return fallback.longShort;
+function unavailableLongShort(
+  error: unknown,
+  selectedExchange: LongShortExchangeSelection = majorLongShortSelection,
+  options: LongShortFallbackOptions = {}
+): LongShortIndex {
+  const fallback = createUnavailableMarketIndices(readError(error), selectedExchange);
+  return {
+    ...fallback.longShort,
+    availableExchanges: options.availableExchanges ?? defaultLongShortExchanges,
+    failedExchanges:
+      options.failedExchanges ??
+      (selectedExchange === majorLongShortSelection
+        ? defaultLongShortExchanges
+        : defaultLongShortExchanges.filter((exchange) => exchange === selectedExchange)),
+    error: options.error ?? fallback.longShort.error
+  };
 }
 
 function unavailableVolatility(error: unknown): VolatilityIndex {
@@ -351,6 +414,21 @@ function jsonResponse(body: unknown, status = 200): Response {
       "Cache-Control": `public, max-age=${Math.floor(cacheMs / 1000)}`
     }
   });
+}
+
+async function readLongShortSelection(request: Request): Promise<LongShortExchangeSelection> {
+  const url = new URL(request.url);
+  const querySelection = url.searchParams.get("longShortExchange");
+  if (querySelection) return normalizeLongShortExchangeSelection(querySelection);
+
+  if (request.method !== "POST") return majorLongShortSelection;
+
+  try {
+    const body = (await request.clone().json()) as { longShortExchange?: unknown };
+    return normalizeLongShortExchangeSelection(body.longShortExchange);
+  } catch {
+    return majorLongShortSelection;
+  }
 }
 
 function findLongShortRecord(value: unknown, depth = 0): Record<string, unknown> | null {

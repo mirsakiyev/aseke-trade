@@ -98,12 +98,14 @@ test("charts market picker is a compact toolbar above the TradingView chart", ()
 });
 
 test("charts page renders market sentiment and risk widgets after the chart", () => {
-  assert.match(chartsSource, /<MarketSentimentSection indices=\{marketIndices\}/);
+  assert.match(chartsSource, /<MarketSentimentSection[\s\S]*indices=\{marketIndices\}/);
   assert.match(chartsSource, /Market Sentiment & Risk/);
   assert.match(chartsSource, /Crypto Fear & Greed Index/);
   assert.match(chartsSource, /Longs vs Shorts Futures Index/);
   assert.match(chartsSource, /Crypto Market Volatility Index/);
   assert.match(chartsSource, /fetchMarketIndices/);
+  assert.match(chartsSource, /aria-label="Select futures exchange"/);
+  assert.match(chartsSource, /Major CEX Average/);
   assert.match(marketIndicesSource, /fetchPublicMarketIndices/);
-  assert.match(marketIndicesSource, /mode:\s*"binance-only"/);
+  assert.match(marketIndicesSource, /buildBinanceFallbackLongShortIndex/);
 });
