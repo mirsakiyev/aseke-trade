@@ -112,6 +112,21 @@ implemented with Supabase Edge Functions. Keep blockchain API keys, receiving ad
 `SERVICE_ROLE_KEY` in Supabase secrets, not Vite or Netlify browser variables. See
 [`docs/crypto-payments.md`](docs/crypto-payments.md) for deployment and testing.
 
+## Market Index Data
+
+The `/charts` page loads its Market Sentiment & Risk widgets through the `market-indices` Supabase
+Edge Function. The function reads public Alternative.me, Binance, and Deribit endpoints without
+browser secrets. For multi-exchange futures long/short data, add the CoinGlass key as a Supabase
+secret:
+
+```bash
+supabase secrets set COINGLASS_API_KEY=your-coinglass-api-key
+supabase functions deploy market-indices
+```
+
+Do not add `COINGLASS_API_KEY` to Vite or Netlify browser variables. If the secret is missing, the
+widget falls back to Binance-only public futures positioning and labels it that way.
+
 ## Netlify Deployment
 
 1. Push the project to GitHub.

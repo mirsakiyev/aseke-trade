@@ -88,7 +88,19 @@ test("academy dashboard includes a subscriber risk calculator", () => {
 test("charts market picker is a compact toolbar above the TradingView chart", () => {
   assert.match(chartsSource, /className="chart-market-toolbar"/);
   assert.match(chartsSource, /<details className="coin-picker">/);
-  assert.match(chartsSource, /coreChartAssets\.map/);
+  assert.match(chartsSource, /<summary>Select Crypto<\/summary>/);
+  assert.doesNotMatch(chartsSource, /coreChartAssets\.map/);
+  assert.doesNotMatch(chartsSource, /Core cryptocurrency chart selector/);
+  assert.doesNotMatch(chartsSource, /Top 200/);
   assert.match(cryptoMarketsSource, /BTC\/USDT/);
   assert.match(cryptoMarketsSource, /ETH\/USDT/);
+});
+
+test("charts page renders market sentiment and risk widgets after the chart", () => {
+  assert.match(chartsSource, /<MarketSentimentSection indices=\{marketIndices\}/);
+  assert.match(chartsSource, /Market Sentiment & Risk/);
+  assert.match(chartsSource, /Crypto Fear & Greed Index/);
+  assert.match(chartsSource, /Longs vs Shorts Futures Index/);
+  assert.match(chartsSource, /Crypto Market Volatility Index/);
+  assert.match(chartsSource, /fetchMarketIndices/);
 });

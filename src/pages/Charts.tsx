@@ -1,5 +1,15 @@
-import { AlertCircle, ArrowRight, BarChart3, RefreshCw, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  AlertCircle,
+  ArrowRight,
+  BarChart3,
+  Gauge,
+  RefreshCw,
+  Scale,
+  Search,
+  TrendingUp
+} from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { TradingViewChart } from "../components/TradingViewChart";
 import {
@@ -10,6 +20,17 @@ import {
   type ChartAsset,
   type CryptoMarketCoin
 } from "../lib/cryptoMarkets";
+import { fetchMarketIndices } from "../lib/marketIndices";
+import {
+  classifyVolatilityRisk,
+  createUnavailableMarketIndices,
+  formatIndexTimestamp,
+  getFearGreedBand,
+  type FearGreedIndex,
+  type LongShortIndex,
+  type MarketIndicesResponse,
+  type VolatilityIndex
+} from "../lib/marketIndexMath";
 
 export function Charts() {
   const [selectedAsset, setSelectedAsset] = useState<ChartAsset>(coreChartAssets[0]);
@@ -17,6 +38,8 @@ export function Charts() {
   const [coinSearch, setCoinSearch] = useState("");
   const [isLoadingCoins, setIsLoadingCoins] = useState(true);
   const [coinError, setCoinError] = useState<string | null>(null);
+  const [marketIndices, setMarketIndices] = useState<MarketIndicesResponse | null>(null);
+  const [isLoadingMarketIndices, setIsLoadingMarketIndices] = useState(true);
 
   const loadCoinList = async () => {
     setIsLoadingCoins(true);
@@ -34,6 +57,39 @@ export function Charts() {
 
   useEffect(() => {
     void loadCoinList();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadMarketIndices() {
+      setIsLoadingMarketIndices(true);
+
+      try {
+        const nextMarketIndices = await fetchMarketIndices();
+        if (isMounted) {
+          setMarketIndices(nextMarketIndices);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setMarketIndices(
+            createUnavailableMarketIndices(
+              error instanceof Error ? error.message : "Market index data unavailable."
+            )
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingMarketIndices(false);
+        }
+      }
+    }
+
+    void loadMarketIndices();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const filteredCoins = useMemo(
@@ -62,7 +118,7 @@ export function Charts() {
         </span>
       </section>
 
-      <section className="chart-market-toolbar" aria-label="Choose chart asset">
+      <section className="chart-market-toolbar" aria-label="Select crypto market">
         <div className="chart-market-current">
           <span>Select Market</span>
           <strong>{selectedAsset.ticker}</strong>
@@ -70,37 +126,22 @@ export function Charts() {
         </div>
 
         <div className="chart-market-actions">
-          <div className="chart-selector" role="tablist" aria-label="Core cryptocurrency chart selector">
-            {coreChartAssets.map((asset) => (
-              <button
-                className={asset.id === selectedAsset.id ? "filter-pill active" : "filter-pill"}
-                type="button"
-                onClick={() => setSelectedAsset(asset)}
-                aria-selected={asset.id === selectedAsset.id}
-                role="tab"
-                key={asset.id}
-              >
-                {asset.ticker}
-              </button>
-            ))}
-          </div>
-
           <details className="coin-picker">
-            <summary>Top 200</summary>
+            <summary>Select Crypto</summary>
             <div className="coin-search-panel">
               <label className="coin-search-label">
                 <Search size={17} aria-hidden="true" />
-                <span className="sr-only">Search top crypto markets</span>
+                <span className="sr-only">Search crypto markets</span>
                 <input
                   value={coinSearch}
                   onChange={(event) => setCoinSearch(event.target.value)}
-                  placeholder="Search top 200 coins"
+                  placeholder="Search crypto markets"
                   aria-controls="coin-search-results"
                 />
               </label>
 
               <div className="coin-search-meta">
-                <span>Top 200 by market cap</span>
+                <span>Sorted by market cap</span>
                 <button className="icon-button compact-icon-button" type="button" onClick={() => void loadCoinList()}>
                   <RefreshCw size={15} />
                   <span className="sr-only">Refresh market list</span>
@@ -157,6 +198,8 @@ export function Charts() {
         />
       </section>
 
+      <MarketSentimentSection indices={marketIndices} isLoading={isLoadingMarketIndices} />
+
       <p className="soft-notice">
         Charts are for education and market observation only. They are not financial advice.
       </p>
@@ -173,5 +216,263 @@ export function Charts() {
         </Link>
       </section>
     </main>
+  );
+}
+
+function MarketSentimentSection({
+  indices,
+  isLoading
+}: {
+  indices: MarketIndicesResponse | null;
+  isLoading: boolean;
+}) {
+  const data = indices ?? createUnavailableMarketIndices();
+
+  return (
+    <section className="market-indices-section" aria-labelledby="market-indices-title">
+      <div className="market-indices-heading">
+        <div>
+          <p className="eyebrow">Market Indices</p>
+          <h2 id="market-indices-title">Market Sentiment & Risk</h2>
+          <p>Live crypto sentiment, positioning, and volatility indicators.</p>
+        </div>
+      </div>
+
+      <div className="market-index-grid">
+        {isLoading ? (
+          <>
+            <MarketIndexSkeleton title="Crypto Fear & Greed Index" />
+            <MarketIndexSkeleton title="Longs vs Shorts Futures Index" />
+            <MarketIndexSkeleton title="Crypto Market Volatility Index" />
+          </>
+        ) : (
+          <>
+            <FearGreedCard data={data.fearGreed} />
+            <LongShortCard data={data.longShort} />
+            <VolatilityCard data={data.volatility} />
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MarketIndexSkeleton({ title }: { title: string }) {
+  return (
+    <article className="market-index-card loading" aria-label={`${title} loading`} role="status">
+      <div className="market-index-card-header">
+        <span className="market-index-icon skeleton-block" aria-hidden="true" />
+        <div>
+          <span className="market-index-eyebrow skeleton-line short" />
+          <h3>{title}</h3>
+        </div>
+      </div>
+      <span className="skeleton-line score" />
+      <span className="skeleton-line" />
+      <span className="skeleton-line medium" />
+    </article>
+  );
+}
+
+function FearGreedCard({ data }: { data: FearGreedIndex }) {
+  const band = getFearGreedBand(data.value);
+  const score = data.value ?? 0;
+
+  return (
+    <article className={`market-index-card fear-greed-card ${band.className}`}>
+      <MarketIndexCardHeader
+        eyebrow="Sentiment"
+        icon={<Gauge size={18} />}
+        meta="0-100 score"
+        title="Crypto Fear & Greed Index"
+      />
+
+      {data.status === "ready" && data.value !== null ? (
+        <>
+          <div className="market-index-score-row">
+            <strong>{data.value}</strong>
+            <span>/100</span>
+          </div>
+          <span className={`market-index-pill ${band.className}`}>{data.classification || band.label}</span>
+          <div
+            className="fear-greed-scale"
+            role="meter"
+            aria-label={`Fear and Greed score ${data.value} out of 100, ${data.classification || band.label}`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={data.value}
+            style={{ "--fear-score": `${score}%` } as CSSProperties}
+          >
+            <span className="fear-greed-marker" />
+          </div>
+          <div className="fear-greed-scale-labels" aria-hidden="true">
+            <span>Fear</span>
+            <span>Neutral</span>
+            <span>Greed</span>
+          </div>
+        </>
+      ) : (
+        <MarketIndexEmpty title="Fear & Greed data unavailable" note={data.error} />
+      )}
+
+      <MarketIndexFooter source={`Source: ${data.source}`} timestamp={data.timestamp} />
+    </article>
+  );
+}
+
+function LongShortCard({ data }: { data: LongShortIndex }) {
+  const longPct = data.longPct ?? 0;
+  const shortPct = data.shortPct ?? 0;
+  const isReady = data.status === "ready" && data.longPct !== null && data.shortPct !== null;
+  const coverage =
+    data.mode === "binance-only"
+      ? "Binance only"
+      : `${data.includedExchanges.length}/${data.requestedExchanges.length} exchanges`;
+  const exchangeLabel =
+    data.mode === "binance-only"
+      ? "Binance futures account ratio"
+      : `Average across ${data.requestedExchanges.join(", ")}`;
+
+  return (
+    <article className="market-index-card long-short-card">
+      <MarketIndexCardHeader
+        eyebrow="Positioning"
+        icon={<Scale size={18} />}
+        meta={coverage}
+        title="Longs vs Shorts Futures Index"
+      />
+
+      {isReady ? (
+        <>
+          <div className="market-index-score-row compact">
+            <strong>{Math.round(longPct)}% Longs</strong>
+            <span>/ {Math.round(shortPct)}% Shorts</span>
+          </div>
+          <div
+            className="long-short-split"
+            aria-label={`${Math.round(longPct)} percent longs and ${Math.round(shortPct)} percent shorts`}
+            role="img"
+            style={{ "--long-pct": `${longPct}%` } as CSSProperties}
+          >
+            <span className="long-side" />
+            <span className="short-side" />
+          </div>
+          <div className="long-short-labels">
+            <span>Longs</span>
+            <span>Shorts</span>
+          </div>
+          <p className="market-index-detail">{exchangeLabel}</p>
+        </>
+      ) : (
+        <MarketIndexEmpty
+          title="Long/short data unavailable"
+          note={data.error ?? "CoinGlass API key may be required for multi-exchange data."}
+        />
+      )}
+
+      <MarketIndexFooter
+        source={data.source ? `Source: ${data.source}` : "Source: CoinGlass or Binance"}
+        timestamp={data.timestamp}
+      />
+    </article>
+  );
+}
+
+function VolatilityCard({ data }: { data: VolatilityIndex }) {
+  const risk = classifyVolatilityRisk(data.value);
+  const gaugeValue = Math.min(100, Math.max(0, ((data.value ?? 0) / 120) * 100));
+  const trendLabel = data.changePct === null
+    ? "Trend unavailable"
+    : data.changePct > 0.15
+      ? `Up ${Math.abs(data.changePct).toFixed(2)}%`
+      : data.changePct < -0.15
+        ? `Down ${Math.abs(data.changePct).toFixed(2)}%`
+        : "Flat";
+
+  return (
+    <article className={`market-index-card volatility-card ${risk.className}`}>
+      <MarketIndexCardHeader
+        eyebrow="Volatility"
+        icon={<Activity size={18} />}
+        meta={risk.label}
+        title="Crypto Market Volatility Index"
+      />
+
+      {data.status === "ready" && data.value !== null ? (
+        <>
+          <div className="market-index-score-row">
+            <strong>{data.value.toFixed(1)}</strong>
+            <span>DVOL</span>
+          </div>
+          <span className={`market-index-pill ${risk.className}`}>{risk.label}</span>
+          <div
+            className="volatility-gauge"
+            role="meter"
+            aria-label={`Crypto volatility index ${data.value.toFixed(1)}, ${risk.label}`}
+            aria-valuemin={0}
+            aria-valuemax={120}
+            aria-valuenow={Math.round(data.value)}
+            style={{ "--volatility-score": `${gaugeValue}%` } as CSSProperties}
+          >
+            <span className="volatility-marker" />
+          </div>
+          <div className="market-index-statline">
+            <span>{data.basis}</span>
+            <strong>
+              <TrendingUp size={14} aria-hidden="true" />
+              {trendLabel}
+            </strong>
+          </div>
+        </>
+      ) : (
+        <MarketIndexEmpty title="Volatility data unavailable" note={data.error} />
+      )}
+
+      <MarketIndexFooter source={`Source: ${data.source}`} timestamp={data.timestamp} />
+    </article>
+  );
+}
+
+function MarketIndexCardHeader({
+  eyebrow,
+  icon,
+  meta,
+  title
+}: {
+  eyebrow: string;
+  icon: ReactNode;
+  meta: string;
+  title: string;
+}) {
+  return (
+    <div className="market-index-card-header">
+      <span className="market-index-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <div>
+        <span className="market-index-eyebrow">{eyebrow}</span>
+        <h3>{title}</h3>
+      </div>
+      <span className="market-index-meta">{meta}</span>
+    </div>
+  );
+}
+
+function MarketIndexEmpty({ title, note }: { title: string; note?: string }) {
+  return (
+    <div className="market-index-empty">
+      <AlertCircle size={18} aria-hidden="true" />
+      <strong>{title}</strong>
+      {note && <span>{note}</span>}
+    </div>
+  );
+}
+
+function MarketIndexFooter({ source, timestamp }: { source: string; timestamp: string | null }) {
+  return (
+    <div className="market-index-footer">
+      <span>{source}</span>
+      <span>Updated {formatIndexTimestamp(timestamp)}</span>
+    </div>
   );
 }
