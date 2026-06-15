@@ -6,6 +6,7 @@ const adminSource = await readFile(new URL("../src/pages/AdminTradingAcademy.tsx
 const dashboardSource = await readFile(new URL("../src/pages/TradingAcademyDashboard.tsx", import.meta.url), "utf8");
 const chartsSource = await readFile(new URL("../src/pages/Charts.tsx", import.meta.url), "utf8");
 const cryptoMarketsSource = await readFile(new URL("../src/lib/cryptoMarkets.ts", import.meta.url), "utf8");
+const marketIndicesSource = await readFile(new URL("../src/lib/marketIndices.ts", import.meta.url), "utf8");
 
 test("trading signal UI no longer renders Creation Price", () => {
   assert.doesNotMatch(adminSource, /Creation price/i);
@@ -103,4 +104,6 @@ test("charts page renders market sentiment and risk widgets after the chart", ()
   assert.match(chartsSource, /Longs vs Shorts Futures Index/);
   assert.match(chartsSource, /Crypto Market Volatility Index/);
   assert.match(chartsSource, /fetchMarketIndices/);
+  assert.match(marketIndicesSource, /fetchPublicMarketIndices/);
+  assert.match(marketIndicesSource, /mode:\s*"binance-only"/);
 });
