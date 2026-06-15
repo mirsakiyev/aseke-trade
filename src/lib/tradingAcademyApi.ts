@@ -1,6 +1,5 @@
 import type {
   AmlCheckRequest,
-  PremiumSupportPriority,
   PremiumSupportRequest,
   TradingAcademyLeaderboardRow,
   TradingSignal
@@ -116,19 +115,6 @@ export async function submitAmlCheck(input: {
   return (data as SubmitAmlCheckResponse).result;
 }
 
-export async function fetchUserPremiumSupportRequests(userId: string): Promise<PremiumSupportRequest[]> {
-  if (!supabase) return [];
-
-  const { data, error } = await supabase
-    .from("premium_support_requests")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error("Premium support history could not be loaded.");
-  return (data ?? []) as PremiumSupportRequest[];
-}
-
 export async function fetchAdminPremiumSupportRequests(): Promise<PremiumSupportRequest[]> {
   if (!supabase) return [];
 
@@ -139,33 +125,6 @@ export async function fetchAdminPremiumSupportRequests(): Promise<PremiumSupport
 
   if (error) throw new Error("Premium support requests could not be loaded.");
   return (data ?? []) as PremiumSupportRequest[];
-}
-
-export async function submitPremiumSupportRequest(input: {
-  userId: string;
-  subject: string;
-  message: string;
-  category: string;
-  priority: PremiumSupportPriority;
-}): Promise<PremiumSupportRequest> {
-  if (!supabase) throw new Error("Supabase is not connected.");
-
-  const payload = {
-    user_id: input.userId,
-    subject: sanitizePlainText(input.subject, 160),
-    message: sanitizePlainText(input.message, 2000),
-    category: sanitizePlainText(input.category, 80) || null,
-    priority: input.priority
-  };
-
-  const { data, error } = await supabase
-    .from("premium_support_requests")
-    .insert(payload)
-    .select("*")
-    .single();
-
-  if (error || !data) throw new Error("Premium support request could not be submitted.");
-  return data as PremiumSupportRequest;
 }
 
 async function functionErrorMessage(error: { message?: string; context?: unknown }): Promise<string> {

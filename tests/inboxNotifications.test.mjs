@@ -54,7 +54,7 @@ test("dashboard renders inbox, read handling, display name editing, and compact 
 });
 
 test("admin has a notification tab with constrained notification audiences", () => {
-  assert.match(adminSource, /type AdminTab = "guides" \| "courses" \| "inbox" \| "users"/);
+  assert.match(adminSource, /type AdminTab = "guides" \| "courses" \| "inbox" \| "support" \| "users"/);
   assert.match(adminSource, /sendAdminNotification/);
   assert.match(adminSource, /manualNotificationTypes/);
   assert.match(adminSource, /defaultAudienceForNotificationType/);

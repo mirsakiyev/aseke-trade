@@ -7,7 +7,6 @@ import {
   RefreshCw,
   RotateCcw,
   SearchCheck,
-  Send,
   ShieldCheck,
   Trash2,
   Trophy,
@@ -32,9 +31,7 @@ import {
   fetchTradingAcademyLeaderboard,
   fetchTradingSignals,
   fetchUserAmlCheckRequests,
-  fetchUserPremiumSupportRequests,
-  submitAmlCheck,
-  submitPremiumSupportRequest
+  submitAmlCheck
 } from "../lib/tradingAcademyApi";
 import { leaderboardRankTone } from "../lib/tradingAcademyAccess";
 import {
@@ -49,8 +46,6 @@ import {
 import { sanitizePlainText } from "../lib/validation";
 import type {
   AmlCheckRequest,
-  PremiumSupportPriority,
-  PremiumSupportRequest,
   TradingAcademyLeaderboardRow,
   TradingSignal
 } from "../types/content";
@@ -59,13 +54,6 @@ const blankAmlForm = {
   address: "",
   network: "",
   notes: ""
-};
-
-const blankSupportForm = {
-  subject: "",
-  message: "",
-  category: "strategy",
-  priority: "normal" as PremiumSupportPriority
 };
 
 type RiskCalculatorFormState = {
@@ -120,16 +108,12 @@ export function TradingAcademyDashboard() {
   const [leaderboard, setLeaderboard] = useState<TradingAcademyLeaderboardRow[]>([]);
   const [signals, setSignals] = useState<TradingSignal[]>([]);
   const [amlRequests, setAmlRequests] = useState<AmlCheckRequest[]>([]);
-  const [supportRequests, setSupportRequests] = useState<PremiumSupportRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [amlForm, setAmlForm] = useState(blankAmlForm);
   const [amlIdempotencyKey, setAmlIdempotencyKey] = useState(() => crypto.randomUUID());
   const [amlMessage, setAmlMessage] = useState<string | null>(null);
   const [isAmlSubmitting, setIsAmlSubmitting] = useState(false);
-  const [supportForm, setSupportForm] = useState(blankSupportForm);
-  const [supportMessage, setSupportMessage] = useState<string | null>(null);
-  const [isSupportSubmitting, setIsSupportSubmitting] = useState(false);
   const [isLeaderboardExpanded, setIsLeaderboardExpanded] = useState(false);
   const [riskForm, setRiskForm] = useState<RiskCalculatorFormState>(() => createBlankRiskForm());
   const [riskResult, setRiskResult] = useState<RiskCalculatorResult | null>(null);
@@ -143,17 +127,15 @@ export function TradingAcademyDashboard() {
     setError(null);
 
     try {
-      const [nextLeaderboard, nextSignals, nextAmlRequests, nextSupportRequests] = await Promise.all([
+      const [nextLeaderboard, nextSignals, nextAmlRequests] = await Promise.all([
         fetchTradingAcademyLeaderboard(),
         fetchTradingSignals(),
-        fetchUserAmlCheckRequests(user.id),
-        fetchUserPremiumSupportRequests(user.id)
+        fetchUserAmlCheckRequests(user.id)
       ]);
 
       setLeaderboard(nextLeaderboard);
       setSignals(nextSignals);
       setAmlRequests(nextAmlRequests);
-      setSupportRequests(nextSupportRequests);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Trading Academy dashboard could not be loaded.");
     } finally {
@@ -219,44 +201,6 @@ export function TradingAcademyDashboard() {
       setAmlMessage(submitError instanceof Error ? submitError.message : "AML check could not be submitted.");
     } finally {
       setIsAmlSubmitting(false);
-    }
-  };
-
-  const submitSupport = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!user || isSupportSubmitting) return;
-
-    const subject = sanitizePlainText(supportForm.subject, 160);
-    const message = sanitizePlainText(supportForm.message, 2000);
-
-    if (!subject) {
-      setSupportMessage("Subject is required.");
-      return;
-    }
-
-    if (!message) {
-      setSupportMessage("Message is required.");
-      return;
-    }
-
-    setIsSupportSubmitting(true);
-    setSupportMessage(null);
-
-    try {
-      await submitPremiumSupportRequest({
-        userId: user.id,
-        subject,
-        message,
-        category: supportForm.category,
-        priority: supportForm.priority
-      });
-      setSupportForm(blankSupportForm);
-      setSupportMessage("Premium support request submitted.");
-      setSupportRequests(await fetchUserPremiumSupportRequests(user.id));
-    } catch (submitError) {
-      setSupportMessage(submitError instanceof Error ? submitError.message : "Support request could not be submitted.");
-    } finally {
-      setIsSupportSubmitting(false);
     }
   };
 
@@ -531,10 +475,13 @@ export function TradingAcademyDashboard() {
                 </span>
                 <div>
                   <h2>Premium Support</h2>
-                  <p className="muted">Need help? Premium members can reach support directly on Telegram.</p>
+                  <p className="muted">Premium members get direct Telegram support for faster help.</p>
                 </div>
               </div>
-              <div className="telegram-contact-grid" aria-label="Telegram support links">
+              <p className="muted helper-copy">
+                For fastest assistance, message @don_chrome directly on Telegram.
+              </p>
+              <div className="premium-support-direct">
                 <a
                   className="telegram-contact-link"
                   href="https://t.me/don_chrome"
@@ -546,81 +493,11 @@ export function TradingAcademyDashboard() {
                     <TelegramIcon />
                   </span>
                   <span>
-                    <strong>Message Support</strong>
+                    <strong>Message Premium Support</strong>
                     <small>@don_chrome</small>
                   </span>
                 </a>
-                <a
-                  className="telegram-contact-link"
-                  href="https://t.me/aseketrade"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Join the ASEKE TRADE Telegram group"
-                >
-                  <span className="telegram-icon-frame">
-                    <TelegramIcon />
-                  </span>
-                  <span>
-                    <strong>Join Community</strong>
-                    <small>t.me/aseketrade</small>
-                  </span>
-                </a>
               </div>
-              {supportMessage && <p className="soft-notice">{supportMessage}</p>}
-              <form className="stack-form" onSubmit={submitSupport}>
-                <label>
-                  Subject
-                  <input
-                    value={supportForm.subject}
-                    onChange={(event) => setSupportForm((form) => ({ ...form, subject: event.target.value }))}
-                    maxLength={160}
-                    required
-                  />
-                </label>
-                <div className="form-row">
-                  <label>
-                    Category
-                    <select
-                      value={supportForm.category}
-                      onChange={(event) => setSupportForm((form) => ({ ...form, category: event.target.value }))}
-                    >
-                      <option value="strategy">Strategy</option>
-                      <option value="risk">Risk</option>
-                      <option value="technical">Technical</option>
-                      <option value="account">Account</option>
-                    </select>
-                  </label>
-                  <label>
-                    Priority
-                    <select
-                      value={supportForm.priority}
-                      onChange={(event) =>
-                        setSupportForm((form) => ({ ...form, priority: event.target.value as PremiumSupportPriority }))
-                      }
-                    >
-                      <option value="low">Low</option>
-                      <option value="normal">Normal</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                  </label>
-                </div>
-                <label>
-                  Message
-                  <textarea
-                    value={supportForm.message}
-                    onChange={(event) => setSupportForm((form) => ({ ...form, message: event.target.value }))}
-                    maxLength={2000}
-                    rows={5}
-                    required
-                  />
-                </label>
-                <button className="primary-button" type="submit" disabled={isSupportSubmitting}>
-                  <Send size={17} />
-                  {isSupportSubmitting ? "Sending" : "Send Support Request"}
-                </button>
-              </form>
-              <CompactSupportHistory requests={supportRequests} />
             </article>
           </section>
         </>
@@ -1127,56 +1004,6 @@ function CompactAmlHistoryList({ requests }: { requests: AmlCheckRequest[] }) {
             )}
           </div>
           <span className="status-pill free">{request.status.replace("_", " ")}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function CompactSupportHistory({ requests }: { requests: PremiumSupportRequest[] }) {
-  const recentRequests = requests.slice(0, 3);
-  const olderRequests = requests.slice(3);
-
-  return (
-    <div className="compact-history-panel">
-      <div className="compact-history-heading">
-        <div>
-          <p className="eyebrow">Recent support</p>
-          <h3>Support history</h3>
-        </div>
-        <span>{requests.length} total</span>
-      </div>
-
-      {requests.length ? (
-        <>
-          <CompactSupportHistoryList requests={recentRequests} />
-          {olderRequests.length > 0 && (
-            <details className="compact-history-details">
-              <summary>View all {requests.length} support requests</summary>
-              <CompactSupportHistoryList requests={olderRequests} />
-            </details>
-          )}
-        </>
-      ) : (
-        <p className="compact-history-empty">No premium support requests yet.</p>
-      )}
-    </div>
-  );
-}
-
-function CompactSupportHistoryList({ requests }: { requests: PremiumSupportRequest[] }) {
-  return (
-    <ul className="compact-history-list">
-      {requests.map((request) => (
-        <li className="compact-history-row" key={request.id}>
-          <div>
-            <strong>{request.subject}</strong>
-            <span>
-              {request.status.replace("_", " ")} - {request.priority} - {formatDateTime(request.created_at)}
-            </span>
-            {request.admin_response && <small>{request.admin_response}</small>}
-          </div>
-          <span className="status-pill premium">{request.priority}</span>
         </li>
       ))}
     </ul>

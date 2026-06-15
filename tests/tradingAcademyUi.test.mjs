@@ -14,11 +14,15 @@ test("trading signal UI no longer renders Creation Price", () => {
   assert.match(adminSource, /price_at_creation:\s*entryPrice/);
 });
 
-test("academy dashboard uses compact AML and support history previews", () => {
+test("academy dashboard uses compact AML history and direct premium support", () => {
   assert.match(dashboardSource, /function CompactAmlHistory/);
-  assert.match(dashboardSource, /function CompactSupportHistory/);
   assert.match(dashboardSource, /requests\.slice\(0,\s*3\)/);
   assert.match(dashboardSource, /<details className="compact-history-details">/);
+  assert.match(dashboardSource, /Message Premium Support/);
+  assert.match(dashboardSource, /https:\/\/t\.me\/don_chrome/);
+  assert.doesNotMatch(dashboardSource, /function CompactSupportHistory/);
+  assert.doesNotMatch(dashboardSource, /fetchUserPremiumSupportRequests|submitPremiumSupportRequest/);
+  assert.doesNotMatch(dashboardSource, /supportForm|isSupportSubmitting|Send Support Request|Join Community/);
 });
 
 test("trading signal card renders live title and updated stop loss state", () => {

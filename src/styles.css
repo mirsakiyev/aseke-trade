@@ -3352,6 +3352,69 @@ select:focus {
   margin-bottom: 0;
 }
 
+.support-overview-grid,
+.support-content-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.support-overview-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.support-content-grid {
+  grid-template-columns: minmax(320px, 0.92fr) minmax(300px, 0.78fr);
+  align-items: start;
+}
+
+.support-info-panel,
+.support-form-panel,
+.support-faq-panel {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  padding: 1rem;
+}
+
+.support-info-panel {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.support-info-panel .ghost-button {
+  margin-top: 0.85rem;
+}
+
+.faq-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.faq-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.045);
+}
+
+.faq-item summary {
+  min-height: 48px;
+  padding: 0.85rem;
+  color: var(--platinum);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.faq-item summary:hover,
+.faq-item[open] summary {
+  color: #f8fbfc;
+}
+
+.faq-item p {
+  margin: 0;
+  padding: 0 0.85rem 0.85rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .form-error,
 .form-success {
   margin: 0;
@@ -4458,6 +4521,14 @@ select:focus {
   gap: 0.55rem;
 }
 
+.premium-support-direct {
+  display: grid;
+}
+
+.premium-support-direct .telegram-contact-link {
+  min-height: 74px;
+}
+
 .telegram-contact-link {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -4655,6 +4726,10 @@ select:focus {
 
 .signal-close-form {
   grid-template-columns: minmax(96px, 0.5fr) minmax(0, 1fr) auto auto;
+}
+
+.support-admin-form {
+  grid-template-columns: minmax(140px, 1fr) auto;
 }
 
 .signal-level-grid {
@@ -4998,7 +5073,9 @@ select:focus {
   .guide-visual-grid,
   .course-hero,
   .market-showcase,
-  .glossary-grid {
+  .glossary-grid,
+  .support-overview-grid,
+  .support-content-grid {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -5136,7 +5213,10 @@ select:focus {
   .signal-level-grid,
   .site-footer,
   .glossary-grid,
-  .coin-search-results {
+  .coin-search-results,
+  .support-overview-grid,
+  .support-content-grid,
+  .support-info-panel {
     grid-template-columns: 1fr;
   }
 

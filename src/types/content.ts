@@ -390,6 +390,14 @@ export interface AmlCheckRequest {
 
 export type PremiumSupportPriority = "low" | "normal" | "high" | "urgent";
 export type PremiumSupportStatus = "open" | "in_review" | "answered" | "closed";
+export type SupportRequestStatus = "open" | "in_progress" | "resolved" | "closed";
+export type SupportRequestCategory =
+  | "Account"
+  | "Billing"
+  | "Trading Academy"
+  | "Technical Issue"
+  | "General Question"
+  | "Other";
 
 export interface PremiumSupportRequest {
   id: string;
@@ -402,6 +410,19 @@ export interface PremiumSupportRequest {
   admin_response: string | null;
   admin_notes: string | null;
   reviewed_by_admin_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupportRequest {
+  id: string;
+  user_id: string | null;
+  name: string;
+  email: string;
+  subject: string;
+  category: SupportRequestCategory;
+  message: string;
+  status: SupportRequestStatus;
   created_at: string;
   updated_at: string;
 }

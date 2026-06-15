@@ -158,6 +158,7 @@ export function Layout() {
             <Link to="/charts">Charts</Link>
             <Link to="/crypto-glossary">Crypto Glossary</Link>
             <Link to="/trading-academy">Trading Academy</Link>
+            <Link to="/support">Support</Link>
           </nav>
         </div>
         <p>

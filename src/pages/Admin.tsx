@@ -1,10 +1,24 @@
-import { Bell, CalendarClock, Crown, Edit3, LineChart, Plus, RefreshCw, Send, ShieldCheck, Trash2, WalletCards } from "lucide-react";
+import {
+  Bell,
+  CalendarClock,
+  Crown,
+  Edit3,
+  Headphones,
+  LineChart,
+  Plus,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  Trash2,
+  WalletCards
+} from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { inboxAudienceLabels, inboxTypeLabels, sendAdminNotification } from "../lib/notificationsApi";
 import { supabase } from "../lib/supabase";
+import { fetchAdminSupportRequests, SUPPORT_STATUSES, updateSupportRequestStatus } from "../lib/supportApi";
 import { sanitizePlainText, slugify, validateSlug } from "../lib/validation";
 import {
   COURSE_DIFFICULTIES,
@@ -19,10 +33,12 @@ import {
   type InboxTargetAudience,
   type PremiumSubscription,
   type Profile,
-  type Purchase
+  type Purchase,
+  type SupportRequest,
+  type SupportRequestStatus
 } from "../types/content";
 
-type AdminTab = "guides" | "courses" | "inbox" | "users";
+type AdminTab = "guides" | "courses" | "inbox" | "support" | "users";
 
 type FlatCourse = Omit<Course, "modules" | "guides">;
 
@@ -85,6 +101,7 @@ export function Admin() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [premiumSubscriptions, setPremiumSubscriptions] = useState<PremiumSubscription[]>([]);
+  const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [message, setMessage] = useState<string | null>(null);
 
@@ -131,20 +148,25 @@ export function Admin() {
     setIsLoading(true);
     setMessage(null);
 
-    const [guideResult, courseResult, profileResult, purchaseResult, subscriptionResult] = await Promise.all([
-      supabase.from("guides").select("*").order("created_at", { ascending: false }),
-      supabase.from("courses").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-      supabase.from("purchases").select("*").order("created_at", { ascending: false }),
-      supabase.from("premium_subscriptions").select("*").order("created_at", { ascending: false })
-    ]);
+    const [guideResult, courseResult, profileResult, purchaseResult, subscriptionResult, supportResult] =
+      await Promise.all([
+        supabase.from("guides").select("*").order("created_at", { ascending: false }),
+        supabase.from("courses").select("*").order("created_at", { ascending: false }),
+        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.from("purchases").select("*").order("created_at", { ascending: false }),
+        supabase.from("premium_subscriptions").select("*").order("created_at", { ascending: false }),
+        fetchAdminSupportRequests()
+          .then((data) => ({ data, error: null }))
+          .catch((error) => ({ data: [] as SupportRequest[], error }))
+      ]);
 
     if (
       guideResult.error ||
       courseResult.error ||
       profileResult.error ||
       purchaseResult.error ||
-      subscriptionResult.error
+      subscriptionResult.error ||
+      supportResult.error
     ) {
       setMessage("Some admin data could not be loaded. Check your admin role and RLS policies.");
     }
@@ -162,6 +184,7 @@ export function Admin() {
     setProfiles((profileResult.data ?? []) as Profile[]);
     setPurchases((purchaseResult.data ?? []) as Purchase[]);
     setPremiumSubscriptions((subscriptionResult.data ?? []) as PremiumSubscription[]);
+    setSupportRequests(supportResult.data);
     setIsLoading(false);
   }, []);
 
@@ -421,7 +444,7 @@ export function Admin() {
       {message && <p className="soft-notice">{message}</p>}
 
       <section className="tab-bar" aria-label="Admin sections">
-        {(["guides", "courses", "inbox", "users"] as AdminTab[]).map((tab) => (
+        {(["guides", "courses", "inbox", "support", "users"] as AdminTab[]).map((tab) => (
           <button
             className={activeTab === tab ? "filter-pill active" : "filter-pill"}
             type="button"
@@ -936,6 +959,26 @@ export function Admin() {
             </section>
           )}
 
+          {activeTab === "support" && (
+            <section className="admin-grid">
+              <AdminList title="Support Requests">
+                {supportRequests.length ? (
+                  supportRequests.map((request) => (
+                    <SupportRequestAdminRow request={request} onUpdated={refreshAdminData} key={request.id} />
+                  ))
+                ) : (
+                  <li>
+                    <div>
+                      <strong>No support requests</strong>
+                      <span>General support form submissions will appear here.</span>
+                    </div>
+                    <Headphones size={18} />
+                  </li>
+                )}
+              </AdminList>
+            </section>
+          )}
+
           {activeTab === "users" && (
             <section className="admin-grid">
               <form className="section-panel stack-form" onSubmit={saveSubscription}>
@@ -1117,6 +1160,57 @@ export function Admin() {
   );
 }
 
+function SupportRequestAdminRow({
+  request,
+  onUpdated
+}: {
+  request: SupportRequest;
+  onUpdated: () => Promise<void>;
+}) {
+  const [status, setStatus] = useState<SupportRequestStatus>(request.status);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const updateStatus = async () => {
+    if (isSaving) return;
+
+    setIsSaving(true);
+    try {
+      await updateSupportRequestStatus(request.id, status);
+      await onUpdated();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <li className="admin-review-row">
+      <div>
+        <strong>{request.subject}</strong>
+        <span>
+          {formatAdminDateTime(request.created_at)} - {request.name} - {request.email}
+        </span>
+        <span>
+          {request.category} - {formatSupportStatus(request.status)}
+          {request.user_id ? ` - User ${request.user_id.slice(0, 8)}` : " - Visitor"}
+        </span>
+        <span>{request.message}</span>
+      </div>
+      <div className="admin-inline-form support-admin-form">
+        <select value={status} onChange={(event) => setStatus(event.target.value as SupportRequestStatus)}>
+          {SUPPORT_STATUSES.map((item) => (
+            <option value={item} key={item}>
+              {formatSupportStatus(item)}
+            </option>
+          ))}
+        </select>
+        <button className="ghost-button compact" type="button" onClick={() => void updateStatus()} disabled={isSaving}>
+          {isSaving ? "Saving" : "Update"}
+        </button>
+      </div>
+    </li>
+  );
+}
+
 function AdminList({ title, children }: { title: string; children: ReactNode }) {
   return (
     <article className="section-panel">
@@ -1159,4 +1253,15 @@ function formatAdminDate(value: string): string {
   if (Number.isNaN(date.getTime())) return "Invalid date";
 
   return date.toLocaleDateString();
+}
+
+function formatAdminDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Invalid date";
+
+  return date.toLocaleString();
+}
+
+function formatSupportStatus(status: SupportRequestStatus): string {
+  return status.replace("_", " ");
 }
