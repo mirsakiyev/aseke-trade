@@ -136,6 +136,8 @@ test("charts page renders market sentiment and risk widgets after the chart", ()
   assert.doesNotMatch(marketIndicesSource, /clientMarketIndicesCache|clientCacheMs|cacheMarketIndices/);
   assert.match(marketIndicesSource, /serverMarketIndicesEndpoint = "\/api\/market-indices"/);
   assert.match(marketIndicesSource, /fetchServerMarketIndices/);
+  assert.match(marketIndicesSource, /withBinanceLongShortFallback/);
+  assert.match(marketIndicesSource, /longShort: await fetchPublicBinanceLongShort\(\)/);
   assert.match(marketIndicesSource, /coinMarketCapFearGreedEndpoint/);
   assert.doesNotMatch(marketIndicesSource, /fetchAlternativeFearGreed|alternativeFearGreedEndpoint|Alternative\.me/);
   assert.match(netlifyMarketIndicesSource, /coinMarketCapFearGreedEndpoint/);

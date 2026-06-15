@@ -19,7 +19,7 @@ const deribitVolatilityEndpoint = "https://www.deribit.com/api/v2/public/get_vol
 
 export async function fetchMarketIndices(): Promise<MarketIndicesResponse> {
   try {
-    return await fetchServerMarketIndices();
+    return await withBinanceLongShortFallback(await fetchServerMarketIndices());
   } catch {
     // Same-origin server route is preferred because CoinMarketCap does not allow browser CORS.
   }
@@ -29,7 +29,7 @@ export async function fetchMarketIndices(): Promise<MarketIndicesResponse> {
       const { data, error } = await supabase.functions.invoke("market-indices");
 
       if (!error) {
-        return normalizeMarketIndicesResponse(data);
+        return await withBinanceLongShortFallback(normalizeMarketIndicesResponse(data));
       }
     } catch {
       // Public fallback below keeps the charts page useful when the function is not deployed yet.
@@ -37,6 +37,21 @@ export async function fetchMarketIndices(): Promise<MarketIndicesResponse> {
   }
 
   return fetchPublicMarketIndices();
+}
+
+async function withBinanceLongShortFallback(response: MarketIndicesResponse): Promise<MarketIndicesResponse> {
+  if (response.longShort.status === "ready" && response.longShort.longPct !== null && response.longShort.shortPct !== null) {
+    return response;
+  }
+
+  try {
+    return {
+      ...response,
+      longShort: await fetchPublicBinanceLongShort()
+    };
+  } catch {
+    return response;
+  }
 }
 
 async function fetchServerMarketIndices(): Promise<MarketIndicesResponse> {
