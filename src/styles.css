@@ -128,17 +128,32 @@ p {
   position: sticky;
   top: 0;
   z-index: 20;
-  display: grid;
-  grid-template-columns: minmax(205px, auto) auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: clamp(0.55rem, 1.4vw, 1.2rem);
   min-height: 76px;
-  padding: 0 clamp(18px, 3vw, 34px);
   background:
     linear-gradient(90deg, rgba(5, 6, 7, 0.96), rgba(10, 13, 16, 0.9)),
     rgba(5, 6, 7, 0.86);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(18px);
+}
+
+.site-header-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "left nav actions";
+  align-items: center;
+  gap: clamp(0.55rem, 1.4vw, 1.2rem);
+  min-height: 76px;
+  width: min(1160px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.header-left {
+  grid-area: left;
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: clamp(0.75rem, 2vw, 1.35rem);
+  min-width: 0;
 }
 
 .brand {
@@ -269,6 +284,7 @@ p {
 }
 
 .primary-nav {
+  grid-area: nav;
   justify-self: center;
   justify-content: center;
   gap: 0.35rem;
@@ -300,6 +316,7 @@ p {
 }
 
 .account-actions {
+  grid-area: actions;
   justify-self: end;
   justify-content: end;
   gap: 0.42rem;
@@ -2352,9 +2369,10 @@ button.leaderboard-badge-more:hover {
       90deg,
       rgba(126, 224, 167, 0.52) 0%,
       rgba(132, 218, 181, 0.72) calc(var(--long-pct) - 18%),
-      rgba(187, 218, 214, 0.94) calc(var(--long-pct) - 4%),
-      rgba(236, 168, 99, 0.96) calc(var(--long-pct) + 4%),
-      rgba(222, 115, 94, 0.72) calc(var(--long-pct) + 18%),
+      rgba(205, 230, 224, 0.88) calc(var(--long-pct) - 7%),
+      rgba(238, 244, 242, 0.96) var(--long-pct),
+      rgba(226, 210, 207, 0.88) calc(var(--long-pct) + 7%),
+      rgba(218, 106, 103, 0.72) calc(var(--long-pct) + 18%),
       rgba(255, 107, 107, 0.52) 100%
     );
 }
@@ -5488,30 +5506,71 @@ select:focus {
   }
 }
 
+@media (min-width: 981px) and (max-width: 1180px) {
+  .site-header {
+    min-height: 96px;
+  }
+
+  .site-header-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "left actions"
+      "nav nav";
+    row-gap: 0.28rem;
+    min-height: 96px;
+  }
+
+  .header-left {
+    grid-area: left;
+  }
+
+  .primary-nav {
+    grid-area: nav;
+    justify-self: center;
+    flex-wrap: wrap;
+    row-gap: 0.2rem;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .primary-nav a {
+    min-height: 34px;
+    padding-inline: 0.58rem;
+    font-size: 0.84rem;
+  }
+
+  .account-actions {
+    grid-area: actions;
+  }
+}
+
 @media (max-width: 980px) {
   .site-header {
+    min-height: 68px;
+  }
+
+  .site-header-inner {
     grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "left menu";
     min-height: 68px;
     padding-top: 0.65rem;
     padding-bottom: 0.65rem;
   }
 
-  .brand {
-    grid-column: 1;
-    grid-row: 1;
+  .header-left {
+    display: grid;
+    grid-area: left;
+    gap: 0.35rem;
   }
 
   .btc-ticker {
-    grid-column: 1 / -1;
-    grid-row: 2;
     width: fit-content;
     min-width: 0;
   }
 
   .icon-button.menu-button {
     display: inline-flex;
-    grid-column: 2;
-    grid-row: 1;
+    grid-area: menu;
     justify-self: end;
   }
 
@@ -5653,8 +5712,8 @@ select:focus {
 }
 
 @media (max-width: 680px) {
-  .site-header {
-    padding: 0.65rem 16px;
+  .site-header-inner {
+    width: min(1160px, calc(100% - 24px));
   }
 
   .brand {
