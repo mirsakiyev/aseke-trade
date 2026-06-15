@@ -115,10 +115,10 @@ implemented with Supabase Edge Functions. Keep blockchain API keys, receiving ad
 ## Market Index Data
 
 The `/charts` page loads its Market Sentiment & Risk widgets through the `market-indices` Supabase
-Edge Function. The function reads public Alternative.me, Binance, and Deribit endpoints without
-browser secrets. The Longs vs Shorts Futures card uses Binance public futures account-ratio data
-from `https://fapi.binance.com/futures/data/globalLongShortAccountRatio` and does not require an API
-key.
+Edge Function. The function reads public CoinMarketCap, Binance, Deribit, and fallback Alternative.me
+endpoints without browser secrets. The Longs vs Shorts Futures card uses Binance public futures
+account-ratio data from `https://fapi.binance.com/futures/data/globalLongShortAccountRatio` and does
+not require an API key.
 
 ## Netlify Deployment
 

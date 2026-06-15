@@ -229,7 +229,6 @@ function MarketSentimentSection({
   isLoading: boolean;
 }) {
   const data = indices ?? createUnavailableMarketIndices();
-  const checkedAt = data.generatedAt;
 
   return (
     <section className="market-indices-section" aria-labelledby="market-indices-title">
@@ -250,9 +249,9 @@ function MarketSentimentSection({
           </>
         ) : (
           <>
-            <FearGreedCard checkedAt={checkedAt} data={data.fearGreed} />
-            <LongShortCard checkedAt={checkedAt} data={data.longShort} />
-            <VolatilityCard checkedAt={checkedAt} data={data.volatility} />
+            <FearGreedCard data={data.fearGreed} />
+            <LongShortCard data={data.longShort} />
+            <VolatilityCard data={data.volatility} />
           </>
         )}
       </div>
@@ -277,10 +276,9 @@ function MarketIndexSkeleton({ title }: { title: string }) {
   );
 }
 
-function FearGreedCard({ checkedAt, data }: { checkedAt: string; data: FearGreedIndex }) {
+function FearGreedCard({ data }: { data: FearGreedIndex }) {
   const band = getFearGreedBand(data.value);
   const score = data.value ?? 0;
-  const nextUpdateLine = formatDurationUntilUpdate(data.timeUntilUpdate);
 
   return (
     <article className={`market-index-card fear-greed-card ${band.className}`}>
@@ -314,18 +312,17 @@ function FearGreedCard({ checkedAt, data }: { checkedAt: string; data: FearGreed
             <span>Neutral</span>
             <span>Greed</span>
           </div>
-          {nextUpdateLine && <p className="market-index-detail">Next source update in {nextUpdateLine}</p>}
         </>
       ) : (
         <MarketIndexEmpty title="Fear & Greed data unavailable" note={data.error} />
       )}
 
-      <MarketIndexFooter checkedAt={checkedAt} source={`Source: ${data.source}`} sourceTimestamp={data.timestamp} />
+      <MarketIndexFooter source={`Source: ${data.source}`} timestamp={data.timestamp} />
     </article>
   );
 }
 
-function LongShortCard({ checkedAt, data }: { checkedAt: string; data: LongShortIndex }) {
+function LongShortCard({ data }: { data: LongShortIndex }) {
   const longPct = data.longPct ?? 0;
   const shortPct = data.shortPct ?? 0;
   const isReady = data.status === "ready" && data.longPct !== null && data.shortPct !== null;
@@ -371,15 +368,14 @@ function LongShortCard({ checkedAt, data }: { checkedAt: string; data: LongShort
       )}
 
       <MarketIndexFooter
-        checkedAt={checkedAt}
         source="Source: Binance public futures data"
-        sourceTimestamp={data.timestamp}
+        timestamp={data.timestamp}
       />
     </article>
   );
 }
 
-function VolatilityCard({ checkedAt, data }: { checkedAt: string; data: VolatilityIndex }) {
+function VolatilityCard({ data }: { data: VolatilityIndex }) {
   const risk = classifyVolatilityRisk(data.value);
   const gaugeValue = Math.min(100, Math.max(0, ((data.value ?? 0) / 120) * 100));
   const trendLabel = data.changePct === null
@@ -429,7 +425,7 @@ function VolatilityCard({ checkedAt, data }: { checkedAt: string; data: Volatili
         <MarketIndexEmpty title="Volatility data unavailable" note={data.error} />
       )}
 
-      <MarketIndexFooter checkedAt={checkedAt} source={`Source: ${data.source}`} sourceTimestamp={data.timestamp} />
+      <MarketIndexFooter source={`Source: ${data.source}`} timestamp={data.timestamp} />
     </article>
   );
 }
@@ -469,34 +465,11 @@ function MarketIndexEmpty({ title, note }: { title: string; note?: string }) {
   );
 }
 
-function MarketIndexFooter({
-  checkedAt,
-  source,
-  sourceTimestamp
-}: {
-  checkedAt: string;
-  source: string;
-  sourceTimestamp: string | null;
-}) {
+function MarketIndexFooter({ source, timestamp }: { source: string; timestamp: string | null }) {
   return (
     <div className="market-index-footer">
       <span>{source}</span>
-      <span className="market-index-footer-times">
-        {sourceTimestamp && <small>Source {formatIndexTimestamp(sourceTimestamp)}</small>}
-        <span>Checked {formatIndexTimestamp(checkedAt)}</span>
-      </span>
+      <span>Updated {formatIndexTimestamp(timestamp)}</span>
     </div>
   );
-}
-
-function formatDurationUntilUpdate(value: number | null): string | null {
-  if (value === null || !Number.isFinite(value) || value <= 0) return null;
-
-  const totalMinutes = Math.max(1, Math.round(value / 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (!hours) return `${minutes}m`;
-  if (!minutes) return `${hours}h`;
-  return `${hours}h ${minutes}m`;
 }

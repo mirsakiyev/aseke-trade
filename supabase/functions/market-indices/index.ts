@@ -20,7 +20,8 @@ const requestTimeoutMs = 8000;
 const longShortSymbol = "BTCUSDT";
 const longShortPeriod = "5m";
 const binanceLongShortEndpoint = "https://fapi.binance.com/futures/data/globalLongShortAccountRatio";
-const fearGreedEndpoint = "https://api.alternative.me/fng/?limit=1&format=json";
+const coinMarketCapFearGreedEndpoint = "https://api.coinmarketcap.com/data-api/v3/fear-greed/chart";
+const alternativeFearGreedEndpoint = "https://api.alternative.me/fng/?limit=1&format=json";
 const deribitVolatilityEndpoint = "https://www.deribit.com/api/v2/public/get_volatility_index_data";
 
 Deno.serve(async (request) => {
@@ -49,7 +50,42 @@ Deno.serve(async (request) => {
 });
 
 async function fetchFearGreedIndex(): Promise<FearGreedIndex> {
-  const payload = await fetchJson(fearGreedEndpoint);
+  return fetchCoinMarketCapFearGreed().catch(() => fetchAlternativeFearGreed());
+}
+
+async function fetchCoinMarketCapFearGreed(): Promise<FearGreedIndex> {
+  const payload = await fetchJson(coinMarketCapFearGreedUrl());
+  const data = isRecord(payload) && isRecord(payload.data) ? payload.data : null;
+  const historicalNow = isRecord(data?.historicalValues) && isRecord(data.historicalValues.now)
+    ? data.historicalValues.now
+    : null;
+  const rows = Array.isArray(data?.dataList) ? data.dataList.filter(isRecord) : [];
+  const latestRow = historicalNow ?? newestTimestampedRecord(rows);
+  const value = latestRow ? firstNumber(latestRow, ["score", "value"]) : null;
+
+  if (value === null) {
+    throw new Error("CoinMarketCap Fear & Greed data unavailable.");
+  }
+
+  const score = Math.round(Math.min(100, Math.max(0, value)));
+  const classification = typeof latestRow?.name === "string"
+    ? latestRow.name
+    : typeof latestRow?.value_classification === "string"
+      ? latestRow.value_classification
+      : getFearGreedBand(score).label;
+
+  return {
+    status: "ready",
+    value: score,
+    classification,
+    timestamp: latestRow ? firstTimestamp(latestRow) : null,
+    timeUntilUpdate: null,
+    source: "CoinMarketCap"
+  };
+}
+
+async function fetchAlternativeFearGreed(): Promise<FearGreedIndex> {
+  const payload = await fetchJson(alternativeFearGreedEndpoint);
   const rows = isRecord(payload) && Array.isArray(payload.data) ? payload.data : [];
   const row = rows.find(isRecord);
   const value = parseNumberish(row?.value);
@@ -71,6 +107,17 @@ async function fetchFearGreedIndex(): Promise<FearGreedIndex> {
     timeUntilUpdate: parseNumberish(row?.time_until_update),
     source: "Alternative.me"
   };
+}
+
+function coinMarketCapFearGreedUrl(): string {
+  const end = Math.floor(Date.now() / 1000);
+  const start = end - 7 * 24 * 60 * 60;
+  const params = new URLSearchParams({
+    start: String(start),
+    end: String(end)
+  });
+
+  return `${coinMarketCapFearGreedEndpoint}?${params.toString()}`;
 }
 
 async function fetchBinanceLongShortIndex(): Promise<LongShortIndex> {
@@ -289,6 +336,17 @@ function newestIso(values: Array<string | null>): string | null {
     if (!value) return newest;
     if (!newest) return value;
     return Date.parse(value) > Date.parse(newest) ? value : newest;
+  }, null);
+}
+
+function newestTimestampedRecord(rows: Array<Record<string, unknown>>): Record<string, unknown> | null {
+  return rows.reduce<Record<string, unknown> | null>((newest, row) => {
+    const timestamp = firstTimestamp(row);
+    if (!timestamp) return newest;
+    if (!newest) return row;
+
+    const newestTimestamp = firstTimestamp(newest);
+    return !newestTimestamp || Date.parse(timestamp) > Date.parse(newestTimestamp) ? row : newest;
   }, null);
 }
 

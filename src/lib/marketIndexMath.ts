@@ -10,7 +10,7 @@ export interface FearGreedIndex {
   classification: string;
   timestamp: string | null;
   timeUntilUpdate: number | null;
-  source: "Alternative.me";
+  source: "CoinMarketCap" | "Alternative.me";
   error?: string;
 }
 
@@ -174,7 +174,7 @@ export function createUnavailableMarketIndices(message = "Market index data unav
       classification: "Unavailable",
       timestamp: null,
       timeUntilUpdate: null,
-      source: "Alternative.me",
+      source: "CoinMarketCap",
       error: message
     },
     longShort: {
