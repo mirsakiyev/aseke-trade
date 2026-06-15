@@ -10,7 +10,7 @@ export interface FearGreedIndex {
   classification: string;
   timestamp: string | null;
   timeUntilUpdate: number | null;
-  source: "CoinMarketCap" | "Alternative.me";
+  source: "CoinMarketCap";
   error?: string;
 }
 

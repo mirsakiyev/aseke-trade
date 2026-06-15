@@ -7,6 +7,8 @@ const dashboardSource = await readFile(new URL("../src/pages/TradingAcademyDashb
 const chartsSource = await readFile(new URL("../src/pages/Charts.tsx", import.meta.url), "utf8");
 const cryptoMarketsSource = await readFile(new URL("../src/lib/cryptoMarkets.ts", import.meta.url), "utf8");
 const marketIndicesSource = await readFile(new URL("../src/lib/marketIndices.ts", import.meta.url), "utf8");
+const netlifyMarketIndicesSource = await readFile(new URL("../netlify/functions/market-indices.ts", import.meta.url), "utf8");
+const viteConfigSource = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
 
 test("trading signal UI no longer renders Creation Price", () => {
   assert.doesNotMatch(adminSource, /Creation price/i);
@@ -132,8 +134,13 @@ test("charts page renders market sentiment and risk widgets after the chart", ()
   assert.doesNotMatch(chartsSource, /Major CEX Average/);
   assert.match(marketIndicesSource, /fetchPublicMarketIndices/);
   assert.doesNotMatch(marketIndicesSource, /clientMarketIndicesCache|clientCacheMs|cacheMarketIndices/);
+  assert.match(marketIndicesSource, /serverMarketIndicesEndpoint = "\/api\/market-indices"/);
+  assert.match(marketIndicesSource, /fetchServerMarketIndices/);
   assert.match(marketIndicesSource, /coinMarketCapFearGreedEndpoint/);
-  assert.match(marketIndicesSource, /fetchCoinMarketCapFearGreed\(\)\.catch\(\(\) => fetchAlternativeFearGreed\(\)\)/);
+  assert.doesNotMatch(marketIndicesSource, /fetchAlternativeFearGreed|alternativeFearGreedEndpoint|Alternative\.me/);
+  assert.match(netlifyMarketIndicesSource, /coinMarketCapFearGreedEndpoint/);
+  assert.doesNotMatch(netlifyMarketIndicesSource, /fetchAlternativeFearGreed|alternativeFearGreedEndpoint|Alternative\.me/);
+  assert.match(viteConfigSource, /marketIndicesDevApiPlugin/);
   assert.match(marketIndicesSource, /buildBinanceLongShortIndex/);
   for (const removedProviderTerm of ["COIN" + "GLASS_API_KEY", "open-api-v4." + "coin" + "glass.com", "CG-" + "API-KEY"]) {
     assert.equal(marketIndicesSource.includes(removedProviderTerm), false);

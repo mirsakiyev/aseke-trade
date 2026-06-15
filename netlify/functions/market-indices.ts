@@ -1,39 +1,103 @@
-import {
-  binanceLongShortUnavailableMessage,
-  buildBinanceLongShortIndex,
-  createUnavailableMarketIndices,
-  getFearGreedBand,
-  roundTo,
-  type FearGreedIndex,
-  type LongShortIndex,
-  type MarketIndicesResponse,
-  type VolatilityIndex
-} from "../../../src/lib/marketIndexMath.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
 };
 
+type MarketIndexStatus = "ready" | "unavailable";
+type LongShortExchangeName = "Binance";
+type LongShortMode = "binance-only" | "unavailable";
+type LongShortSource = "Binance" | null;
+type VolatilityBasis = "BTC/ETH DVOL average" | "BTC DVOL" | "ETH DVOL" | "unavailable";
+
+interface FearGreedIndex {
+  status: MarketIndexStatus;
+  value: number | null;
+  classification: string;
+  timestamp: string | null;
+  timeUntilUpdate: number | null;
+  source: "CoinMarketCap";
+  error?: string;
+}
+
+interface LongShortIndex {
+  status: MarketIndexStatus;
+  longPct: number | null;
+  shortPct: number | null;
+  selectedExchange: LongShortExchangeName;
+  mode: LongShortMode;
+  includedExchanges: LongShortExchangeName[];
+  failedExchanges: string[];
+  availableExchanges: LongShortExchangeName[];
+  requestedExchanges: LongShortExchangeName[];
+  timestamp: string | null;
+  source: LongShortSource;
+  error?: string;
+}
+
+interface VolatilityIndex {
+  status: MarketIndexStatus;
+  value: number | null;
+  btc: number | null;
+  eth: number | null;
+  basis: VolatilityBasis;
+  changePct: number | null;
+  timestamp: string | null;
+  source: "Deribit";
+  error?: string;
+}
+
+interface MarketIndicesResponse {
+  fearGreed: FearGreedIndex;
+  longShort: LongShortIndex;
+  volatility: VolatilityIndex;
+  generatedAt: string;
+}
+
+interface FearGreedBand {
+  label: string;
+  className: string;
+  min: number;
+  max: number;
+}
+
 const requestTimeoutMs = 8000;
+const binanceLongShortExchange = "Binance";
+const binanceLongShortUnavailableMessage = "Binance long/short data temporarily unavailable.";
 const longShortSymbol = "BTCUSDT";
 const longShortPeriod = "5m";
 const binanceLongShortEndpoint = "https://fapi.binance.com/futures/data/globalLongShortAccountRatio";
 const coinMarketCapFearGreedEndpoint = "https://api.coinmarketcap.com/data-api/v3/fear-greed/chart";
 const deribitVolatilityEndpoint = "https://www.deribit.com/api/v2/public/get_volatility_index_data";
+const fearGreedBands: FearGreedBand[] = [
+  { min: 0, max: 24, label: "Extreme Fear", className: "extreme-fear" },
+  { min: 25, max: 44, label: "Fear", className: "fear" },
+  { min: 45, max: 55, label: "Neutral", className: "neutral" },
+  { min: 56, max: 74, label: "Greed", className: "greed" },
+  { min: 75, max: 100, label: "Extreme Greed", className: "extreme-greed" }
+];
 
-Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+interface NetlifyEventLike {
+  httpMethod?: string;
+}
+
+export async function handler(event: NetlifyEventLike = {}) {
+  const method = event.httpMethod ?? "GET";
+
+  if (method === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: "ok"
+    };
   }
 
-  if (request.method !== "POST" && request.method !== "GET") {
+  if (method !== "POST" && method !== "GET") {
     return jsonResponse({ error: "Method not allowed.", code: "method_not_allowed" }, 405);
   }
 
   const [fearGreed, longShort, volatility] = await Promise.all([
-    fetchFearGreedIndex().catch((error) => unavailableFearGreed(error)),
+    fetchCoinMarketCapFearGreed().catch((error) => unavailableFearGreed(error)),
     fetchBinanceLongShortIndex().catch((error) => unavailableLongShort(error)),
     fetchVolatilityIndex().catch((error) => unavailableVolatility(error))
   ]);
@@ -46,10 +110,6 @@ Deno.serve(async (request) => {
   };
 
   return jsonResponse(payload);
-});
-
-async function fetchFearGreedIndex(): Promise<FearGreedIndex> {
-  return fetchCoinMarketCapFearGreed();
 }
 
 async function fetchCoinMarketCapFearGreed(): Promise<FearGreedIndex> {
@@ -67,11 +127,12 @@ async function fetchCoinMarketCapFearGreed(): Promise<FearGreedIndex> {
   }
 
   const score = Math.round(Math.min(100, Math.max(0, value)));
-  const classification = typeof latestRow?.name === "string"
-    ? latestRow.name
-    : typeof latestRow?.value_classification === "string"
-      ? latestRow.value_classification
-      : getFearGreedBand(score).label;
+  const classification =
+    typeof latestRow?.name === "string"
+      ? latestRow.name
+      : typeof latestRow?.value_classification === "string"
+        ? latestRow.value_classification
+        : getFearGreedBand(score).label;
 
   return {
     status: "ready",
@@ -110,7 +171,6 @@ async function fetchBinanceLongShortIndex(): Promise<LongShortIndex> {
   const longShort = buildBinanceLongShortIndex({
     longAccount: firstNumber(row, ["longAccount"]),
     shortAccount: firstNumber(row, ["shortAccount"]),
-    longShortRatio: firstNumber(row, ["longShortRatio"]),
     timestamp: firstTimestamp(row)
   });
 
@@ -235,6 +295,18 @@ async function fetchJson(url: string, init: RequestInit = {}): Promise<unknown> 
   }
 }
 
+function jsonResponse(body: unknown, statusCode = 200) {
+  return {
+    statusCode,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store"
+    },
+    body: JSON.stringify(body)
+  };
+}
+
 function unavailableFearGreed(error: unknown): FearGreedIndex {
   const fallback = createUnavailableMarketIndices(readError(error));
   return fallback.fearGreed;
@@ -250,15 +322,99 @@ function unavailableVolatility(error: unknown): VolatilityIndex {
   return fallback.volatility;
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-      "Cache-Control": "no-store"
+function createUnavailableMarketIndices(message = "Market index data unavailable."): MarketIndicesResponse {
+  const generatedAt = new Date().toISOString();
+
+  return {
+    generatedAt,
+    fearGreed: {
+      status: "unavailable",
+      value: null,
+      classification: "Unavailable",
+      timestamp: null,
+      timeUntilUpdate: null,
+      source: "CoinMarketCap",
+      error: message
+    },
+    longShort: {
+      status: "unavailable",
+      longPct: null,
+      shortPct: null,
+      selectedExchange: binanceLongShortExchange,
+      mode: "unavailable",
+      includedExchanges: [],
+      failedExchanges: [binanceLongShortExchange],
+      availableExchanges: [binanceLongShortExchange],
+      requestedExchanges: [binanceLongShortExchange],
+      timestamp: null,
+      source: null,
+      error: binanceLongShortUnavailableMessage
+    },
+    volatility: {
+      status: "unavailable",
+      value: null,
+      btc: null,
+      eth: null,
+      basis: "unavailable",
+      changePct: null,
+      timestamp: null,
+      source: "Deribit",
+      error: message
     }
-  });
+  };
+}
+
+function getFearGreedBand(value: number | null | undefined): FearGreedBand {
+  const normalizedValue = finiteNumber(value);
+  if (normalizedValue === null) {
+    return { min: 0, max: 0, label: "Unavailable", className: "unavailable" };
+  }
+
+  const clampedValue = Math.min(100, Math.max(0, normalizedValue));
+  return fearGreedBands.find((band) => clampedValue >= band.min && clampedValue <= band.max) ?? fearGreedBands[2];
+}
+
+function buildBinanceLongShortIndex(input: {
+  longAccount?: number | null;
+  shortAccount?: number | null;
+  timestamp?: string | null;
+}): LongShortIndex | null {
+  const normalizedLong = normalizePercentInput(input.longAccount);
+  const normalizedShort = normalizePercentInput(input.shortAccount);
+  if (normalizedLong === null || normalizedShort === null) return null;
+
+  const total = normalizedLong + normalizedShort;
+  if (total <= 0) return null;
+
+  return {
+    status: "ready",
+    longPct: roundTo((normalizedLong / total) * 100, 2),
+    shortPct: roundTo((normalizedShort / total) * 100, 2),
+    selectedExchange: binanceLongShortExchange,
+    mode: "binance-only",
+    includedExchanges: [binanceLongShortExchange],
+    failedExchanges: [],
+    availableExchanges: [binanceLongShortExchange],
+    requestedExchanges: [binanceLongShortExchange],
+    timestamp: input.timestamp ?? null,
+    source: "Binance"
+  };
+}
+
+function roundTo(value: number, digits = 1): number {
+  const multiplier = 10 ** digits;
+  return Math.round(value * multiplier) / multiplier;
+}
+
+function normalizePercentInput(value: number | null | undefined): number | null {
+  const numericValue = finiteNumber(value);
+  if (numericValue === null || numericValue < 0) return null;
+
+  return numericValue <= 1 ? numericValue * 100 : numericValue;
+}
+
+function finiteNumber(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function firstNumber(record: Record<string, unknown>, keys: string[]): number | null {

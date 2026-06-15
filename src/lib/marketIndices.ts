@@ -11,13 +11,19 @@ import {
 } from "./marketIndexMath";
 import { supabase } from "./supabase";
 
+const serverMarketIndicesEndpoint = "/api/market-indices";
 const coinMarketCapFearGreedEndpoint = "https://api.coinmarketcap.com/data-api/v3/fear-greed/chart";
-const alternativeFearGreedEndpoint = "https://api.alternative.me/fng/?limit=1&format=json";
 const binanceLongShortEndpoint =
   "https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=5m&limit=1";
 const deribitVolatilityEndpoint = "https://www.deribit.com/api/v2/public/get_volatility_index_data";
 
 export async function fetchMarketIndices(): Promise<MarketIndicesResponse> {
+  try {
+    return await fetchServerMarketIndices();
+  } catch {
+    // Same-origin server route is preferred because CoinMarketCap does not allow browser CORS.
+  }
+
   if (supabase) {
     try {
       const { data, error } = await supabase.functions.invoke("market-indices");
@@ -33,6 +39,11 @@ export async function fetchMarketIndices(): Promise<MarketIndicesResponse> {
   return fetchPublicMarketIndices();
 }
 
+async function fetchServerMarketIndices(): Promise<MarketIndicesResponse> {
+  const data = await fetchJson(serverMarketIndicesEndpoint, { cache: "no-store" });
+  return normalizeMarketIndicesResponse(data);
+}
+
 function normalizeMarketIndicesResponse(data: unknown): MarketIndicesResponse {
   if (!isRecord(data)) {
     return createUnavailableMarketIndices("Market index response was malformed.");
@@ -45,11 +56,14 @@ function normalizeMarketIndicesResponse(data: unknown): MarketIndicesResponse {
 
   return {
     generatedAt: typeof data.generatedAt === "string" ? data.generatedAt : fallback.generatedAt,
-    fearGreed: {
-      ...fallback.fearGreed,
-      ...fearGreed,
-      source: fearGreed.source === "Alternative.me" ? "Alternative.me" : "CoinMarketCap"
-    },
+    fearGreed:
+      fearGreed.source === "CoinMarketCap"
+        ? {
+            ...fallback.fearGreed,
+            ...fearGreed,
+            source: "CoinMarketCap"
+          }
+        : fallback.fearGreed,
     longShort: {
       ...fallback.longShort,
       ...longShort,
@@ -87,7 +101,7 @@ async function fetchPublicMarketIndices(): Promise<MarketIndicesResponse> {
 }
 
 async function fetchPublicFearGreed(): Promise<FearGreedIndex> {
-  return fetchCoinMarketCapFearGreed().catch(() => fetchAlternativeFearGreed());
+  return fetchCoinMarketCapFearGreed();
 }
 
 async function fetchCoinMarketCapFearGreed(): Promise<FearGreedIndex> {
@@ -119,29 +133,6 @@ async function fetchCoinMarketCapFearGreed(): Promise<FearGreedIndex> {
     timestamp: latestRow ? firstTimestamp(latestRow) : null,
     timeUntilUpdate: null,
     source: "CoinMarketCap"
-  };
-}
-
-async function fetchAlternativeFearGreed(): Promise<FearGreedIndex> {
-  const payload = await fetchJson(alternativeFearGreedEndpoint);
-  const row = isRecord(payload) && Array.isArray(payload.data) ? payload.data.find(isRecord) : null;
-  const value = parseNumberish(row?.value);
-
-  if (value === null) {
-    throw new Error("Fear & Greed data unavailable.");
-  }
-
-  const score = Math.round(Math.min(100, Math.max(0, value)));
-  const classification =
-    typeof row?.value_classification === "string" ? row.value_classification : getFearGreedBand(score).label;
-
-  return {
-    status: "ready",
-    value: score,
-    classification,
-    timestamp: toIsoTimestamp(row?.timestamp),
-    timeUntilUpdate: parseNumberish(row?.time_until_update),
-    source: "Alternative.me"
   };
 }
 
@@ -264,10 +255,12 @@ function parseDeribitVolatilityRow(row: unknown): DeribitVolatilityPoint | null 
   return null;
 }
 
-async function fetchJson(url: string): Promise<unknown> {
+async function fetchJson(url: string, init: RequestInit = {}): Promise<unknown> {
   const response = await fetch(url, {
+    ...init,
     headers: {
-      accept: "application/json"
+      accept: "application/json",
+      ...(init.headers ?? {})
     }
   });
 
