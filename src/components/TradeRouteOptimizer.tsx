@@ -11,17 +11,27 @@ import {
   WalletCards
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { LoadingState } from "./LoadingState";
+import { submitTradeRouteOptimizerCompletion, type RouteOptimizerCompletionResult } from "../lib/gamificationApi";
 import {
+  getRouteOptimizerReferencePrices,
+  type RouteOptimizerReferencePriceBundle
+} from "../lib/routeOptimizerReferencePrices";
+import {
+  BASE_ROUTE_OPTIMIZER_XP,
+  calculateRouteOptimizerXp,
   calculateRouteResult,
   createFallbackTradeRoutePuzzle,
   generateTradeRoutePuzzle,
   isSameSelection,
+  MAX_ROUTE_OPTIMIZER_XP_MULTIPLIER,
   scoreTradeRoute,
   tradeRouteAssets,
   type Asset,
   type Market,
   type OptimalRoute,
   type RouteResult,
+  type RouteOptimizerXpReward,
   type TradeRoutePuzzle,
   type TransferRoute,
   type UserSelection
@@ -29,9 +39,23 @@ import {
 
 type TradeRouteOptimizerProps = {
   userId?: string | null;
+  onXpAwarded?: () => Promise<void>;
 };
 
 type PartialSelection = Partial<UserSelection>;
+
+type CompletionXpStatus = "not_authenticated" | "awarded" | "already_completed" | "error";
+
+type CompletionXpGrant = {
+  status: CompletionXpStatus;
+  xpAwarded: number;
+  outcome: RouteOptimizerXpReward["outcome"];
+  roundedProfit: number;
+  multiplier: number;
+  totalXP?: number;
+  level?: number;
+  message?: string;
+};
 
 type CompletedRoute = {
   puzzleId: string;
@@ -40,31 +64,31 @@ type CompletedRoute = {
   result: RouteResult;
   optimalRoute: OptimalRoute;
   score: number;
+  xpReward: RouteOptimizerXpReward;
+  xpGrant: CompletionXpGrant;
+  referencePricesUsed: TradeRoutePuzzle["referencePrices"];
   completedAt: string;
 };
 
 const storagePrefix = "aseke-trade-route-optimizer";
 
-export function TradeRouteOptimizer({ userId }: TradeRouteOptimizerProps) {
+export function TradeRouteOptimizer({ userId, onXpAwarded }: TradeRouteOptimizerProps) {
+  const puzzleDate = useMemo(() => new Date(), []);
   const [selection, setSelection] = useState<PartialSelection>({});
   const [completion, setCompletion] = useState<CompletedRoute | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [puzzleState, setPuzzleState] = useState<{
+    puzzle: TradeRoutePuzzle;
+    referenceBundle: RouteOptimizerReferencePriceBundle | null;
+    isLoading: boolean;
+  }>(() => ({
+    puzzle: createFallbackTradeRoutePuzzle(puzzleDate, userId),
+    referenceBundle: null,
+    isLoading: true
+  }));
 
-  const puzzleState = useMemo(() => {
-    try {
-      return {
-        puzzle: generateTradeRoutePuzzle(new Date(), userId),
-        usingFallback: false
-      };
-    } catch {
-      return {
-        puzzle: createFallbackTradeRoutePuzzle(new Date(), userId),
-        usingFallback: true
-      };
-    }
-  }, [userId]);
-
-  const { puzzle, usingFallback } = puzzleState;
+  const { puzzle, referenceBundle, isLoading } = puzzleState;
   const storageKey = `${storagePrefix}-${puzzle.seed}`;
   const completeSelection = getCompleteSelection(selection);
   const previewResult = useMemo(
@@ -73,11 +97,43 @@ export function TradeRouteOptimizer({ userId }: TradeRouteOptimizerProps) {
   );
 
   useEffect(() => {
+    let mounted = true;
+
+    setPuzzleState((current) => ({ ...current, isLoading: true }));
+
+    getRouteOptimizerReferencePrices(puzzleDate)
+      .then((bundle) => {
+        if (!mounted) return;
+
+        setPuzzleState({
+          puzzle: generateTradeRoutePuzzle(puzzleDate, userId, bundle.prices),
+          referenceBundle: bundle,
+          isLoading: false
+        });
+      })
+      .catch(() => {
+        if (!mounted) return;
+
+        setPuzzleState({
+          puzzle: createFallbackTradeRoutePuzzle(puzzleDate, userId),
+          referenceBundle: null,
+          isLoading: false
+        });
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [puzzleDate, userId]);
+
+  useEffect(() => {
+    if (isLoading) return;
+
     const storedCompletion = readStoredCompletion(storageKey, puzzle);
     setCompletion(storedCompletion);
     setSelection(storedCompletion?.selection ?? {});
-    setNotice(usingFallback ? "Using safe simulated fallback values for today's puzzle." : null);
-  }, [puzzle, storageKey, usingFallback]);
+    setNotice(referenceBundle?.status === "fallback" ? "Using fallback simulated reference prices." : null);
+  }, [isLoading, puzzle, referenceBundle, storageKey]);
 
   const chooseAsset = (asset: Asset) => {
     if (completion) return;
@@ -107,10 +163,25 @@ export function TradeRouteOptimizer({ userId }: TradeRouteOptimizerProps) {
     setSelection((current) => ({ ...current, routeId }));
   };
 
-  const submitRoute = () => {
-    if (!completeSelection || !previewResult || completion) return;
+  const submitRoute = async () => {
+    if (!completeSelection || !previewResult || completion || isSubmitting) return;
 
     const score = scoreTradeRoute(completeSelection, previewResult, puzzle.optimalRoute);
+    const xpReward = calculateRouteOptimizerXp({
+      finalUSDT: previewResult.finalUSDT,
+      startingBalance: puzzle.startingBalance
+    });
+    const xpGrant = await submitXpGrant({
+      puzzle,
+      selection: completeSelection,
+      result: previewResult,
+      score,
+      xpReward,
+      userId,
+      onXpAwarded,
+      setNotice,
+      setIsSubmitting
+    });
     const nextCompletion: CompletedRoute = {
       puzzleId: puzzle.puzzleId,
       seed: puzzle.seed,
@@ -118,11 +189,16 @@ export function TradeRouteOptimizer({ userId }: TradeRouteOptimizerProps) {
       result: previewResult,
       optimalRoute: puzzle.optimalRoute,
       score,
+      xpReward,
+      xpGrant,
+      referencePricesUsed: puzzle.referencePrices,
       completedAt: new Date().toISOString()
     };
 
     setCompletion(nextCompletion);
-    setNotice(null);
+    if (xpGrant.status !== "error") {
+      setNotice(null);
+    }
 
     try {
       window.localStorage.setItem(storageKey, JSON.stringify(nextCompletion));
@@ -155,6 +231,10 @@ export function TradeRouteOptimizer({ userId }: TradeRouteOptimizerProps) {
 
       {notice && <p className="soft-notice">{notice}</p>}
 
+      {isLoading ? (
+        <LoadingState label="Loading daily route puzzle" />
+      ) : (
+        <>
       <section className="trade-optimizer-grid">
         <article className="section-panel trade-balance-panel">
           <span className="feature-icon">
@@ -168,6 +248,7 @@ export function TradeRouteOptimizer({ userId }: TradeRouteOptimizerProps) {
           <div className="trade-daily-meta">
             <span>Daily setup</span>
             <strong>{formatDateKey(puzzle.dateKey)}</strong>
+            <span>{referenceBundle?.message ?? "Reference prices updated today."}</span>
           </div>
         </article>
 
@@ -257,6 +338,7 @@ export function TradeRouteOptimizer({ userId }: TradeRouteOptimizerProps) {
             selection={selection}
             result={previewResult}
             completion={completion}
+            isSubmitting={isSubmitting}
             onSubmit={submitRoute}
           />
         </aside>
@@ -292,6 +374,8 @@ export function TradeRouteOptimizer({ userId }: TradeRouteOptimizerProps) {
       </section>
 
       {completion && <ResultPanel puzzle={puzzle} completion={completion} />}
+        </>
+      )}
     </>
   );
 }
@@ -366,12 +450,14 @@ function PreviewPanel({
   selection,
   result,
   completion,
+  isSubmitting,
   onSubmit
 }: {
   puzzle: TradeRoutePuzzle;
   selection: PartialSelection;
   result: RouteResult | null;
   completion: CompletedRoute | null;
+  isSubmitting: boolean;
   onSubmit: () => void;
 }) {
   const completeSelection = getCompleteSelection(selection);
@@ -417,10 +503,10 @@ function PreviewPanel({
       <button
         className="primary-button full-width"
         type="button"
-        disabled={!completeSelection || !result || Boolean(completion)}
-        onClick={onSubmit}
+        disabled={!completeSelection || !result || Boolean(completion) || isSubmitting}
+        onClick={() => void onSubmit()}
       >
-        {completion ? "Route locked" : "Lock In Route"}
+        {completion ? "Route locked" : isSubmitting ? "Locking route" : "Lock In Route"}
         <CheckCircle2 size={18} />
       </button>
     </>
@@ -461,6 +547,8 @@ function ResultPanel({ puzzle, completion }: { puzzle: TradeRoutePuzzle; complet
         />
       </div>
 
+      <RewardPanel completion={completion} />
+
       <div className={isOptimal ? "quiz-explanation correct" : "quiz-explanation"}>
         <strong>
           {isOptimal ? <CheckCircle2 size={18} /> : <ShieldAlert size={18} />}
@@ -469,6 +557,59 @@ function ResultPanel({ puzzle, completion }: { puzzle: TradeRoutePuzzle; complet
         <p>{explanation}</p>
       </div>
     </section>
+  );
+}
+
+function RewardPanel({ completion }: { completion: CompletedRoute }) {
+  const { xpGrant, xpReward } = completion;
+  const isAuthenticatedReward = xpGrant.status === "awarded" || xpGrant.status === "already_completed";
+  const title =
+    xpGrant.status === "not_authenticated"
+      ? "Sign in to earn XP"
+      : xpGrant.status === "error"
+        ? "XP award pending"
+        : xpGrant.outcome === "profit"
+          ? "Profit achieved"
+          : xpGrant.outcome === "breakeven"
+            ? "Break-even route"
+            : "No XP earned";
+  const description =
+    xpGrant.status === "not_authenticated"
+      ? "Sign in to earn XP from daily puzzles."
+      : xpGrant.status === "error"
+        ? xpGrant.message ?? "XP could not be awarded. Your route result is still locked for today."
+        : xpGrant.outcome === "profit"
+          ? `Your route finished in profit, so the ${BASE_ROUTE_OPTIMIZER_XP} base XP was multiplied by your result.`
+          : xpGrant.outcome === "breakeven"
+            ? "You finished exactly at your starting balance, so you earned the base XP."
+            : "Your route ended in a loss, so no XP was awarded for today's puzzle.";
+
+  return (
+    <article className="trade-reward-panel">
+      <header>
+        <span className={xpGrant.outcome === "loss" ? "status-pill danger" : "status-pill free"}>
+          <Trophy size={15} />
+          {title}
+        </span>
+        {xpGrant.status === "already_completed" && <span className="status-pill">Already completed</span>}
+      </header>
+      <div className="trade-reward-grid">
+        <Metric
+          label={isAuthenticatedReward ? "XP Reward" : "Potential XP"}
+          value={isAuthenticatedReward ? `${xpGrant.xpAwarded} XP` : `${xpReward.xpAwarded} XP`}
+          strong
+        />
+        <Metric label="Profit Multiplier" value={`${formatMultiplier(xpGrant.multiplier || xpReward.multiplier)}x`} />
+        <Metric label="Base XP" value={`${BASE_ROUTE_OPTIMIZER_XP} XP`} />
+        <Metric label="Max XP" value={`${BASE_ROUTE_OPTIMIZER_XP * MAX_ROUTE_OPTIMIZER_XP_MULTIPLIER} XP`} />
+      </div>
+      <p>{description}</p>
+      {isAuthenticatedReward && xpGrant.totalXP !== undefined && xpGrant.level !== undefined && (
+        <p className="trade-reward-account">
+          Account total: {xpGrant.totalXP} XP - Level {xpGrant.level}
+        </p>
+      )}
+    </article>
   );
 }
 
@@ -558,6 +699,82 @@ function SelectionState() {
   );
 }
 
+async function submitXpGrant({
+  puzzle,
+  selection,
+  result,
+  score,
+  xpReward,
+  userId,
+  onXpAwarded,
+  setNotice,
+  setIsSubmitting
+}: {
+  puzzle: TradeRoutePuzzle;
+  selection: UserSelection;
+  result: RouteResult;
+  score: number;
+  xpReward: RouteOptimizerXpReward;
+  userId?: string | null;
+  onXpAwarded?: () => Promise<void>;
+  setNotice: (notice: string | null) => void;
+  setIsSubmitting: (isSubmitting: boolean) => void;
+}): Promise<CompletionXpGrant> {
+  if (!userId) {
+    return {
+      status: "not_authenticated",
+      xpAwarded: 0,
+      outcome: xpReward.outcome,
+      roundedProfit: xpReward.roundedProfit,
+      multiplier: xpReward.multiplier,
+      message: "Sign in to earn XP from daily puzzles."
+    };
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    const response = await submitTradeRouteOptimizerCompletion({
+      puzzleDate: puzzle.dateKey,
+      puzzleSeed: puzzle.seed,
+      selectedRoute: selection,
+      userResult: result,
+      optimalRoute: puzzle.optimalRoute,
+      score,
+      startingBalance: puzzle.startingBalance,
+      referencePricesUsed: puzzle.referencePrices
+    });
+
+    await onXpAwarded?.();
+
+    return xpGrantFromServerResponse(response);
+  } catch {
+    setNotice("Your route is locked, but XP could not be awarded right now.");
+    return {
+      status: "error",
+      xpAwarded: 0,
+      outcome: xpReward.outcome,
+      roundedProfit: xpReward.roundedProfit,
+      multiplier: xpReward.multiplier,
+      message: "XP could not be awarded. Your route result is still locked for today."
+    };
+  } finally {
+    setIsSubmitting(false);
+  }
+}
+
+function xpGrantFromServerResponse(response: RouteOptimizerCompletionResult): CompletionXpGrant {
+  return {
+    status: response.already_completed ? "already_completed" : "awarded",
+    xpAwarded: response.xp_awarded,
+    outcome: response.xp_outcome,
+    roundedProfit: response.rounded_profit,
+    multiplier: response.xp_multiplier,
+    totalXP: response.total_xp,
+    level: response.level
+  };
+}
+
 function getCompleteSelection(selection: PartialSelection): UserSelection | null {
   if (!selection.asset || !selection.buyMarketId || !selection.sellMarketId || !selection.routeId) {
     return null;
@@ -588,6 +805,12 @@ function readStoredCompletion(storageKey: string, puzzle: TradeRoutePuzzle): Com
     const result = calculateRouteResult(puzzle, parsed.selection);
     if (!result) return null;
 
+    const xpReward = calculateRouteOptimizerXp({
+      finalUSDT: result.finalUSDT,
+      startingBalance: puzzle.startingBalance
+    });
+    const xpGrant = normalizeStoredXpGrant(parsed.xpGrant, xpReward);
+
     return {
       puzzleId: puzzle.puzzleId,
       seed: puzzle.seed,
@@ -595,11 +818,56 @@ function readStoredCompletion(storageKey: string, puzzle: TradeRoutePuzzle): Com
       result,
       optimalRoute: puzzle.optimalRoute,
       score: scoreTradeRoute(parsed.selection, result, puzzle.optimalRoute),
+      xpReward,
+      xpGrant,
+      referencePricesUsed: puzzle.referencePrices,
       completedAt: typeof parsed.completedAt === "string" ? parsed.completedAt : new Date().toISOString()
     };
   } catch {
     return null;
   }
+}
+
+function normalizeStoredXpGrant(value: unknown, xpReward: RouteOptimizerXpReward): CompletionXpGrant {
+  if (!value || typeof value !== "object") {
+    return {
+      status: "not_authenticated",
+      xpAwarded: 0,
+      outcome: xpReward.outcome,
+      roundedProfit: xpReward.roundedProfit,
+      multiplier: xpReward.multiplier,
+      message: "Sign in to earn XP from daily puzzles."
+    };
+  }
+
+  const stored = value as Partial<CompletionXpGrant>;
+  const status = normalizeXpStatus(stored.status);
+  const outcome = normalizeXpOutcome(stored.outcome) ?? xpReward.outcome;
+
+  return {
+    status,
+    xpAwarded: isFiniteNumber(stored.xpAwarded) ? stored.xpAwarded : status === "not_authenticated" ? 0 : xpReward.xpAwarded,
+    outcome,
+    roundedProfit: isFiniteNumber(stored.roundedProfit) ? stored.roundedProfit : xpReward.roundedProfit,
+    multiplier: isFiniteNumber(stored.multiplier) ? stored.multiplier : xpReward.multiplier,
+    totalXP: isFiniteNumber(stored.totalXP) ? stored.totalXP : undefined,
+    level: isFiniteNumber(stored.level) ? stored.level : undefined,
+    message: typeof stored.message === "string" ? stored.message : undefined
+  };
+}
+
+function normalizeXpStatus(value: unknown): CompletionXpStatus {
+  return value === "awarded" || value === "already_completed" || value === "error" || value === "not_authenticated"
+    ? value
+    : "not_authenticated";
+}
+
+function normalizeXpOutcome(value: unknown): RouteOptimizerXpReward["outcome"] | null {
+  return value === "profit" || value === "loss" || value === "breakeven" ? value : null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function isStoredSelection(value: unknown, puzzle: TradeRoutePuzzle): value is UserSelection {
@@ -713,6 +981,13 @@ function formatQuantity(asset: Asset, value: number): string {
 
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
+}
+
+function formatMultiplier(value: number): string {
+  return new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: value % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 2
+  }).format(value);
 }
 
 const assetDescriptions: Record<Asset, string> = {

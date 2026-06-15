@@ -1958,7 +1958,8 @@ button.leaderboard-badge-more:hover {
 }
 
 .trade-market-tile,
-.trade-route-summary {
+.trade-route-summary,
+.trade-reward-panel {
   display: grid;
   gap: 0.85rem;
   padding: 0.95rem;
@@ -1968,11 +1969,47 @@ button.leaderboard-badge-more:hover {
 }
 
 .trade-market-tile header,
-.trade-route-summary header {
+.trade-route-summary header,
+.trade-reward-panel header {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
   align-items: start;
+}
+
+.trade-reward-panel {
+  border-color: rgba(229, 228, 226, 0.2);
+  background:
+    linear-gradient(135deg, rgba(126, 224, 167, 0.08), rgba(229, 228, 226, 0.035)),
+    rgba(229, 228, 226, 0.04);
+}
+
+.trade-reward-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.trade-reward-grid .trade-metric-row {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(229, 228, 226, 0.12);
+  border-radius: 8px;
+  background: rgba(5, 6, 7, 0.32);
+}
+
+.trade-reward-grid .trade-metric-row dd {
+  text-align: left;
+}
+
+.trade-reward-panel p {
+  margin: 0;
+}
+
+.trade-reward-account {
+  color: var(--platinum);
+  font-weight: 800;
 }
 
 .trade-price-grid {
@@ -2119,23 +2156,24 @@ button.leaderboard-badge-more:hover {
 }
 
 .charts-page {
-  gap: 0.95rem;
-  padding-top: 2rem;
+  gap: 0.65rem;
+  padding-top: 1.35rem;
 }
 
 .charts-title-row {
   align-items: center;
-  padding: 0.9rem 1rem;
+  padding: 0.7rem 1rem 0.65rem;
 }
 
 .charts-title-row h1 {
   max-width: 860px;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.22rem;
   font-size: clamp(1.9rem, 4vw, 3.25rem);
 }
 
 .charts-title-row p {
   margin-bottom: 0;
+  line-height: 1.45;
 }
 
 .charts-title-mark {
@@ -2172,8 +2210,8 @@ button.leaderboard-badge-more:hover {
   align-items: center;
   justify-content: space-between;
   gap: 0.55rem;
-  min-height: 46px;
-  padding: 0.42rem 0.55rem;
+  min-height: 40px;
+  padding: 0.32rem 0.55rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   background:
@@ -2440,7 +2478,7 @@ button.leaderboard-badge-more:hover {
 
 .chart-card {
   display: grid;
-  gap: 1rem;
+  gap: 0.55rem;
   min-width: 0;
 }
 
@@ -2452,7 +2490,7 @@ button.leaderboard-badge-more:hover {
 }
 
 .chart-card-heading h2 {
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.15rem;
   font-size: 1.2rem;
 }
 
@@ -2734,11 +2772,11 @@ button.leaderboard-badge-more:hover {
     linear-gradient(
       90deg,
       rgba(126, 224, 167, 0.52) 0%,
-      rgba(132, 218, 181, 0.72) calc(var(--long-pct) - 18%),
-      rgba(205, 230, 224, 0.88) calc(var(--long-pct) - 7%),
-      rgba(238, 244, 242, 0.96) var(--long-pct),
-      rgba(226, 210, 207, 0.88) calc(var(--long-pct) + 7%),
-      rgba(218, 106, 103, 0.72) calc(var(--long-pct) + 18%),
+      rgba(132, 218, 181, 0.74) calc(var(--long-pct) - 4%),
+      rgba(196, 224, 215, 0.48) calc(var(--long-pct) - 1%),
+      rgba(226, 233, 229, 0.56) var(--long-pct),
+      rgba(222, 198, 199, 0.46) calc(var(--long-pct) + 1%),
+      rgba(218, 106, 103, 0.74) calc(var(--long-pct) + 4%),
       rgba(255, 107, 107, 0.52) 100%
     );
 }
@@ -6231,6 +6269,7 @@ select:focus {
 
   .trade-market-tile header,
   .trade-route-summary header,
+  .trade-reward-panel header,
   .trade-metric-row {
     align-items: flex-start;
     flex-direction: column;
@@ -6245,6 +6284,10 @@ select:focus {
   }
 
   .trade-price-row {
+    grid-template-columns: 1fr;
+  }
+
+  .trade-reward-grid {
     grid-template-columns: 1fr;
   }
 

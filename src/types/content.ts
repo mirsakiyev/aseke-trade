@@ -107,7 +107,13 @@ export interface XPTransaction {
   id: string;
   user_id: string;
   amount: number;
-  source_type: "guide" | "puzzle_of_day" | "admin_adjustment" | "course_badge" | "loyalty_badge";
+  source_type:
+    | "guide"
+    | "puzzle_of_day"
+    | "admin_adjustment"
+    | "course_badge"
+    | "loyalty_badge"
+    | "trade_route_optimizer";
   source_id: string;
   description: string | null;
   created_at: string;

@@ -63,7 +63,8 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="puzzle-of-the-day" element={<PuzzleOfTheDay />} />
+        <Route path="puzzle" element={<PuzzleOfTheDay />} />
+        <Route path="puzzle-of-the-day" element={<Navigate to="/puzzle" replace />} />
         <Route path="premium" element={<Navigate to="/trading-academy" replace />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />

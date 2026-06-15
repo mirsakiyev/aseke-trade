@@ -1,9 +1,24 @@
 export const TRADE_ROUTE_STARTING_BALANCE = 1000;
+export const BASE_ROUTE_OPTIMIZER_XP = 100;
+export const MAX_ROUTE_OPTIMIZER_XP_MULTIPLIER = 2;
+export const PROFIT_MULTIPLIER_FACTOR = 10;
 
 export const tradeRouteAssets = ["BTC", "ETH", "SOL"] as const;
 
 export type Asset = (typeof tradeRouteAssets)[number];
 export type RiskLabel = "Low" | "Medium" | "High";
+export type RouteOptimizerXpOutcome = "profit" | "loss" | "breakeven";
+
+export type ReferencePriceSource = "CoinGecko" | "CoinPaprika" | "CoinCap" | "fallback" | "last_known_good";
+
+export type ReferenceAssetPrices = Record<
+  Asset,
+  {
+    priceUSDT: number;
+    source: ReferencePriceSource;
+    lastUpdatedAt?: string;
+  }
+>;
 
 export type Market = {
   id: string;
@@ -55,19 +70,33 @@ export type TradeRoutePuzzle = {
   seed: string;
   dateKey: string;
   startingBalance: number;
+  referencePrices: ReferenceAssetPrices;
   markets: Market[];
   routes: TransferRoute[];
   optimalRoute: OptimalRoute;
+};
+
+export type RouteOptimizerXpReward = {
+  xpAwarded: number;
+  outcome: RouteOptimizerXpOutcome;
+  roundedProfit: number;
+  multiplier: number;
 };
 
 type PuzzleCalculationInput = Pick<TradeRoutePuzzle, "markets" | "routes" | "startingBalance">;
 
 const marketNames = ["NovaX", "Atlas Exchange", "OrbitSwap", "TradePort"] as const;
 
-const basePriceRanges: Record<Asset, { min: number; max: number; variation: number }> = {
-  BTC: { min: 60000, max: 70000, variation: 0.025 },
-  ETH: { min: 2800, max: 4000, variation: 0.025 },
-  SOL: { min: 100, max: 220, variation: 0.03 }
+export const FALLBACK_REFERENCE_ASSET_PRICES_USDT: Record<Asset, number> = {
+  BTC: 64000,
+  ETH: 3200,
+  SOL: 140
+};
+
+const assetGenerationRules: Record<Asset, { variation: number; maxDeviation: number; priceDecimals: number }> = {
+  BTC: { variation: 0.025, maxDeviation: 0.03, priceDecimals: 2 },
+  ETH: { variation: 0.025, maxDeviation: 0.03, priceDecimals: 2 },
+  SOL: { variation: 0.03, maxDeviation: 0.04, priceDecimals: 3 }
 };
 
 export function getTradeRouteDateKey(date = new Date()): string {
@@ -78,32 +107,49 @@ export function getTradeRouteDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-export function generateTradeRoutePuzzle(date = new Date(), userId?: string | null): TradeRoutePuzzle {
+export function createFallbackReferenceAssetPrices(lastUpdatedAt = new Date().toISOString()): ReferenceAssetPrices {
+  return tradeRouteAssets.reduce((prices, asset) => {
+    prices[asset] = {
+      priceUSDT: FALLBACK_REFERENCE_ASSET_PRICES_USDT[asset],
+      source: "fallback",
+      lastUpdatedAt
+    };
+    return prices;
+  }, {} as ReferenceAssetPrices);
+}
+
+export function generateTradeRoutePuzzle(
+  date = new Date(),
+  userId?: string | null,
+  referencePrices: ReferenceAssetPrices = createFallbackReferenceAssetPrices()
+): TradeRoutePuzzle {
   const dateKey = getTradeRouteDateKey(date);
   const seed = userId ? `${dateKey}-${userId}` : dateKey;
   const random = createSeededRandom(seed);
-
-  const basePrices = tradeRouteAssets.reduce(
-    (prices, asset) => {
-      const range = basePriceRanges[asset];
-      prices[asset] = roundTo(randomBetween(random, range.min, range.max), asset === "SOL" ? 2 : 2);
-      return prices;
-    },
-    {} as Record<Asset, number>
-  );
+  const safeReferencePrices = normalizeReferenceAssetPrices(referencePrices);
 
   const markets = marketNames.map((name, index) => {
     const tradingFeePercent = roundTo(randomBetween(random, 0.001, 0.0035), 5);
     const prices = tradeRouteAssets.reduce(
       (assetPrices, asset) => {
-        const range = basePriceRanges[asset];
-        const marketTilt = randomBetween(random, -range.variation, range.variation);
-        const spread = randomBetween(random, 0.0008, 0.003);
-        const midPrice = basePrices[asset] * (1 + marketTilt);
-
+        const rules = assetGenerationRules[asset];
+        const referencePrice = safeReferencePrices[asset].priceUSDT;
+        const marketVariationPercent = randomBetween(random, -rules.variation, rules.variation);
+        const spreadPercent = randomBetween(random, 0.0005, 0.003);
+        const midPrice = referencePrice * (1 + marketVariationPercent);
+        const buyPrice = clampPriceToReasonableRange(
+          midPrice * (1 + spreadPercent / 2),
+          referencePrice,
+          rules.maxDeviation
+        );
+        const sellPrice = clampPriceToReasonableRange(
+          midPrice * (1 - spreadPercent / 2),
+          referencePrice,
+          rules.maxDeviation
+        );
         assetPrices[asset] = {
-          buy: roundTo(midPrice * (1 + spread), asset === "SOL" ? 3 : 2),
-          sell: roundTo(midPrice * (1 - spread), asset === "SOL" ? 3 : 2)
+          buy: roundTo(buyPrice, rules.priceDecimals),
+          sell: roundTo(sellPrice, rules.priceDecimals)
         };
         return assetPrices;
       },
@@ -156,6 +202,7 @@ export function generateTradeRoutePuzzle(date = new Date(), userId?: string | nu
     seed,
     dateKey,
     startingBalance: TRADE_ROUTE_STARTING_BALANCE,
+    referencePrices: safeReferencePrices,
     markets,
     routes,
     optimalRoute: findOptimalRoute(puzzleInput)
@@ -163,92 +210,7 @@ export function generateTradeRoutePuzzle(date = new Date(), userId?: string | nu
 }
 
 export function createFallbackTradeRoutePuzzle(date = new Date(), userId?: string | null): TradeRoutePuzzle {
-  const dateKey = getTradeRouteDateKey(date);
-  const seed = userId ? `${dateKey}-${userId}-fallback` : `${dateKey}-fallback`;
-  const markets: Market[] = [
-    {
-      id: "market-1",
-      name: "NovaX",
-      tradingFeePercent: 0.0018,
-      prices: {
-        BTC: { buy: 64220, sell: 64040 },
-        ETH: { buy: 3368, sell: 3358 },
-        SOL: { buy: 156.4, sell: 155.9 }
-      }
-    },
-    {
-      id: "market-2",
-      name: "Atlas Exchange",
-      tradingFeePercent: 0.0022,
-      prices: {
-        BTC: { buy: 65020, sell: 64860 },
-        ETH: { buy: 3412, sell: 3401 },
-        SOL: { buy: 159.2, sell: 158.7 }
-      }
-    },
-    {
-      id: "market-3",
-      name: "OrbitSwap",
-      tradingFeePercent: 0.0028,
-      prices: {
-        BTC: { buy: 63690, sell: 63520 },
-        ETH: { buy: 3316, sell: 3308 },
-        SOL: { buy: 153.7, sell: 153.2 }
-      }
-    },
-    {
-      id: "market-4",
-      name: "TradePort",
-      tradingFeePercent: 0.0014,
-      prices: {
-        BTC: { buy: 64650, sell: 64490 },
-        ETH: { buy: 3458, sell: 3448 },
-        SOL: { buy: 162.1, sell: 161.6 }
-      }
-    }
-  ];
-  const routes: TransferRoute[] = [
-    {
-      id: "ethereum",
-      name: "Ethereum Network",
-      networkFeeUSDT: 24.5,
-      slippagePercent: 0.0012,
-      delayLabel: "14 min",
-      riskLabel: "Low"
-    },
-    {
-      id: "solana",
-      name: "Solana Network",
-      networkFeeUSDT: 2.4,
-      slippagePercent: 0.0022,
-      delayLabel: "2 min",
-      riskLabel: "Medium"
-    },
-    {
-      id: "bridge",
-      name: "Bridge Route",
-      networkFeeUSDT: 9.8,
-      slippagePercent: 0.0055,
-      delayLabel: "22 min",
-      riskLabel: "High"
-    }
-  ];
-
-  const puzzleInput = {
-    markets,
-    routes,
-    startingBalance: TRADE_ROUTE_STARTING_BALANCE
-  };
-
-  return {
-    puzzleId: `trade-route-${seed}`,
-    seed,
-    dateKey,
-    startingBalance: TRADE_ROUTE_STARTING_BALANCE,
-    markets,
-    routes,
-    optimalRoute: findOptimalRoute(puzzleInput)
-  };
+  return generateTradeRoutePuzzle(date, userId, createFallbackReferenceAssetPrices());
 }
 
 export function calculateRouteResult(
@@ -346,6 +308,48 @@ export function scoreTradeRoute(selection: UserSelection, result: RouteResult, o
   return clampScore(Math.round((result.finalUSDT / optimalRoute.result.finalUSDT) * 100));
 }
 
+export function calculateRouteOptimizerXp({
+  finalUSDT,
+  startingBalance
+}: {
+  finalUSDT: number;
+  startingBalance: number;
+}): RouteOptimizerXpReward {
+  const roundedProfit = Math.round((finalUSDT - startingBalance) * 100) / 100;
+
+  if (roundedProfit < 0) {
+    return {
+      xpAwarded: 0,
+      outcome: "loss",
+      roundedProfit,
+      multiplier: 0
+    };
+  }
+
+  if (roundedProfit === 0) {
+    return {
+      xpAwarded: BASE_ROUTE_OPTIMIZER_XP,
+      outcome: "breakeven",
+      roundedProfit,
+      multiplier: 1
+    };
+  }
+
+  const profitPercent = roundedProfit / startingBalance;
+  const multiplier = Math.min(
+    1 + profitPercent * PROFIT_MULTIPLIER_FACTOR,
+    MAX_ROUTE_OPTIMIZER_XP_MULTIPLIER
+  );
+  const xpAwarded = Math.max(BASE_ROUTE_OPTIMIZER_XP + 1, Math.round(BASE_ROUTE_OPTIMIZER_XP * multiplier));
+
+  return {
+    xpAwarded,
+    outcome: "profit",
+    roundedProfit,
+    multiplier
+  };
+}
+
 export function isSameSelection(first: UserSelection, second: UserSelection): boolean {
   return (
     first.asset === second.asset &&
@@ -381,6 +385,25 @@ function hashString(value: string): number {
 
 function randomBetween(random: () => number, min: number, max: number): number {
   return min + (max - min) * random();
+}
+
+function normalizeReferenceAssetPrices(referencePrices: ReferenceAssetPrices): ReferenceAssetPrices {
+  const fallback = createFallbackReferenceAssetPrices();
+
+  return tradeRouteAssets.reduce((prices, asset) => {
+    const candidate = referencePrices[asset];
+    prices[asset] =
+      candidate && Number.isFinite(candidate.priceUSDT) && candidate.priceUSDT > 0
+        ? candidate
+        : fallback[asset];
+    return prices;
+  }, {} as ReferenceAssetPrices);
+}
+
+function clampPriceToReasonableRange(price: number, referencePrice: number, maxDeviationPercent: number): number {
+  const min = referencePrice * (1 - maxDeviationPercent);
+  const max = referencePrice * (1 + maxDeviationPercent);
+  return Math.min(Math.max(price, min), max);
 }
 
 function roundTo(value: number, decimals: number): number {

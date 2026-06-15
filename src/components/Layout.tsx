@@ -23,10 +23,10 @@ import { applyRandomHoverCharts } from "../utils/hoverCharts";
 
 const navItems = [
   { to: "/", label: "Home", icon: Sparkles },
-  { to: "/guides", label: "Guides", icon: BookOpen },
   { to: "/courses", label: "Courses", icon: GraduationCap },
+  { to: "/guides", label: "Guides", icon: BookOpen },
   { to: "/charts", label: "Charts", icon: TrendingUp },
-  { to: "/puzzle-of-the-day", label: "Puzzle", icon: BrainCircuit },
+  { to: "/puzzle", label: "Puzzle", icon: BrainCircuit },
   { to: "/trading-academy", label: "Trading Academy", icon: Crown }
 ];
 

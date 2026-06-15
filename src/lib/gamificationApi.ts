@@ -1,4 +1,11 @@
 import { getCurrentPuzzleWindow } from "./puzzleWindows";
+import type {
+  ReferenceAssetPrices,
+  RouteOptimizerXpOutcome,
+  RouteResult,
+  OptimalRoute,
+  UserSelection
+} from "./tradeRouteOptimizer";
 import type { DailyPuzzle, GuideQuiz, Puzzle } from "../types/content";
 import { supabase } from "./supabase";
 
@@ -22,6 +29,28 @@ export interface DailyPuzzleSubmissionResult {
 }
 
 export type PuzzleSubmissionResult = DailyPuzzleSubmissionResult;
+
+export interface RouteOptimizerCompletionResult {
+  completion_id: string;
+  xp_awarded: number;
+  xp_outcome: RouteOptimizerXpOutcome;
+  xp_multiplier: number;
+  rounded_profit: number;
+  total_xp: number;
+  level: number;
+  already_completed: boolean;
+}
+
+export interface RouteOptimizerCompletionInput {
+  puzzleDate: string;
+  puzzleSeed: string;
+  selectedRoute: UserSelection;
+  userResult: RouteResult;
+  optimalRoute: OptimalRoute;
+  score: number;
+  startingBalance: number;
+  referencePricesUsed: ReferenceAssetPrices;
+}
 
 type GuideQuizRow = Omit<GuideQuiz, "answer_options"> & {
   answer_options: unknown;
@@ -113,6 +142,32 @@ export async function submitDailyPuzzle(
   submittedAnswer: string
 ): Promise<DailyPuzzleSubmissionResult> {
   return submitPuzzle(puzzleId, submittedAnswer);
+}
+
+export async function submitTradeRouteOptimizerCompletion(
+  input: RouteOptimizerCompletionInput
+): Promise<RouteOptimizerCompletionResult> {
+  if (!supabase) {
+    throw new Error("Supabase is not connected.");
+  }
+
+  const { data, error } = await supabase.rpc("submit_trade_route_optimizer_completion", {
+    target_puzzle_date: input.puzzleDate,
+    target_puzzle_seed: input.puzzleSeed,
+    selected_route: input.selectedRoute,
+    user_result: input.userResult,
+    optimal_route: input.optimalRoute,
+    target_score: input.score,
+    target_starting_balance: input.startingBalance,
+    reference_prices_used: input.referencePricesUsed
+  });
+
+  if (error) throw error;
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("Route Optimizer completion response was empty.");
+
+  return row as RouteOptimizerCompletionResult;
 }
 
 function normalizePuzzleRow(value: unknown): Puzzle | null {

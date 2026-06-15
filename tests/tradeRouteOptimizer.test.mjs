@@ -48,6 +48,33 @@ test("trade route puzzle generation changes on the next UTC date", () => {
   assert.notEqual(first.seed, second.seed);
 });
 
+test("generated market prices stay near current reference prices", () => {
+  const referencePrices = {
+    BTC: { priceUSDT: 44000, source: "CoinGecko", lastUpdatedAt: "2026-06-15T00:00:00.000Z" },
+    ETH: { priceUSDT: 2500, source: "CoinGecko", lastUpdatedAt: "2026-06-15T00:00:00.000Z" },
+    SOL: { priceUSDT: 95, source: "CoinGecko", lastUpdatedAt: "2026-06-15T00:00:00.000Z" }
+  };
+  const puzzle = tradeRouteOptimizer.generateTradeRoutePuzzle(
+    new Date("2026-06-15T14:00:00.000Z"),
+    "user-1",
+    referencePrices
+  );
+  const maxDeviation = { BTC: 0.03, ETH: 0.03, SOL: 0.04 };
+
+  for (const market of puzzle.markets) {
+    for (const asset of tradeRouteOptimizer.tradeRouteAssets) {
+      const reference = referencePrices[asset].priceUSDT;
+      const min = reference * (1 - maxDeviation[asset]);
+      const max = reference * (1 + maxDeviation[asset]);
+
+      assert.ok(market.prices[asset].buy >= min, `${asset} buy price should be above min deviation`);
+      assert.ok(market.prices[asset].buy <= max, `${asset} buy price should be below max deviation`);
+      assert.ok(market.prices[asset].sell >= min, `${asset} sell price should be above min deviation`);
+      assert.ok(market.prices[asset].sell <= max, `${asset} sell price should be below max deviation`);
+    }
+  }
+});
+
 test("route calculation applies buy fee, sell fee, slippage, and network fee", () => {
   const puzzle = {
     startingBalance: 1000,
@@ -155,6 +182,49 @@ test("exact optimal route receives a perfect score", () => {
   assert.equal(tradeRouteOptimizer.scoreTradeRoute(puzzle.optimalRoute.selection, result, puzzle.optimalRoute), 100);
 });
 
+test("route optimizer XP rewards follow loss, breakeven, profit, and cap rules", () => {
+  assert.deepEqual(
+    tradeRouteOptimizer.calculateRouteOptimizerXp({ finalUSDT: 980, startingBalance: 1000 }),
+    {
+      xpAwarded: 0,
+      outcome: "loss",
+      roundedProfit: -20,
+      multiplier: 0
+    }
+  );
+  assert.deepEqual(
+    tradeRouteOptimizer.calculateRouteOptimizerXp({ finalUSDT: 1000.004, startingBalance: 1000 }),
+    {
+      xpAwarded: 100,
+      outcome: "breakeven",
+      roundedProfit: 0,
+      multiplier: 1
+    }
+  );
+  assert.deepEqual(
+    tradeRouteOptimizer.calculateRouteOptimizerXp({ finalUSDT: 1010, startingBalance: 1000 }),
+    {
+      xpAwarded: 110,
+      outcome: "profit",
+      roundedProfit: 10,
+      multiplier: 1.1
+    }
+  );
+  assert.deepEqual(
+    tradeRouteOptimizer.calculateRouteOptimizerXp({ finalUSDT: 1100, startingBalance: 1000 }),
+    {
+      xpAwarded: 200,
+      outcome: "profit",
+      roundedProfit: 100,
+      multiplier: 2
+    }
+  );
+  assert.equal(
+    tradeRouteOptimizer.calculateRouteOptimizerXp({ finalUSDT: 1250, startingBalance: 1000 }).xpAwarded,
+    200
+  );
+});
+
 test("puzzle page renders the Trade Route Optimizer instead of the old trivia submission flow", async () => {
   const pageSource = await readFile(new URL("../src/pages/PuzzleOfTheDay.tsx", import.meta.url), "utf8");
   const componentSource = await readFile(new URL("../src/components/TradeRouteOptimizer.tsx", import.meta.url), "utf8");
@@ -163,4 +233,6 @@ test("puzzle page renders the Trade Route Optimizer instead of the old trivia su
   assert.doesNotMatch(pageSource, /loadPuzzle|submitPuzzle|Your answer|Submit answer/);
   assert.match(componentSource, /Simulated educational puzzle\. Not financial advice\./);
   assert.match(componentSource, /Lock In Route/);
+  assert.match(componentSource, /Sign in to earn XP from daily puzzles\./);
+  assert.match(componentSource, /submitTradeRouteOptimizerCompletion/);
 });
