@@ -1,7 +1,10 @@
 import {
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
   Download,
   LineChart,
+  Minus,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -10,7 +13,7 @@ import {
   TrendingDown,
   TrendingUp
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -32,9 +35,11 @@ import {
 } from "../lib/demoTradeMath";
 import {
   demoTradeSymbols,
+  demoTradeTimeframes,
   fetchDemoTradeCandles,
   fetchDemoTradeTicker,
-  type DemoTradeCandle
+  type DemoTradeCandle,
+  type DemoTradeTimeframe
 } from "../lib/demoTradeMarketData";
 import {
   getDemoTradeGuestSessionId,
@@ -63,6 +68,7 @@ export function DemoTrade() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [candles, setCandles] = useState<DemoTradeCandle[]>([]);
+  const [timeframe, setTimeframe] = useState<DemoTradeTimeframe>("1h");
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [marketSource, setMarketSource] = useState("Binance.US public market data");
   const [marketError, setMarketError] = useState<string | null>(null);
@@ -137,7 +143,7 @@ export function DemoTrade() {
     setMarketError(null);
     try {
       const [nextCandles, ticker] = await Promise.all([
-        fetchDemoTradeCandles(activeSymbol.symbol),
+        fetchDemoTradeCandles(activeSymbol.symbol, timeframe),
         fetchDemoTradeTicker(activeSymbol.symbol)
       ]);
       setCandles(nextCandles);
@@ -149,7 +155,7 @@ export function DemoTrade() {
     } finally {
       setIsMarketLoading(false);
     }
-  }, [activeSymbol.symbol]);
+  }, [activeSymbol.symbol, timeframe]);
 
   useEffect(() => {
     void loadMarketData();
@@ -163,7 +169,7 @@ export function DemoTrade() {
         .catch(() => setMarketError("Live BTC price update failed. Retrying..."));
     }, 8000);
     const candleTimer = window.setInterval(() => {
-      fetchDemoTradeCandles(activeSymbol.symbol)
+      fetchDemoTradeCandles(activeSymbol.symbol, timeframe)
         .then(setCandles)
         .catch(() => setMarketError("BTC candles could not be refreshed."));
     }, 30000);
@@ -172,7 +178,7 @@ export function DemoTrade() {
       window.clearInterval(priceTimer);
       window.clearInterval(candleTimer);
     };
-  }, [activeSymbol.symbol, loadMarketData]);
+  }, [activeSymbol.symbol, loadMarketData, timeframe]);
 
   useEffect(() => {
     if (!currentPrice || stopLoss) return;
@@ -368,7 +374,13 @@ export function DemoTrade() {
             </div>
             <span className="status-pill premium">Simulated</span>
           </div>
-          <DemoTradeChart candles={candles} currentPrice={currentPrice} position={demoState.openPosition} />
+          <DemoTradeChart
+            candles={candles}
+            currentPrice={currentPrice}
+            position={demoState.openPosition}
+            timeframe={timeframe}
+            onTimeframeChange={setTimeframe}
+          />
         </article>
 
         <aside className="section-panel demo-ticket-panel">
@@ -724,87 +736,198 @@ function TakeProfitEditor({
 function DemoTradeChart({
   candles,
   currentPrice,
-  position
+  position,
+  timeframe,
+  onTimeframeChange
 }: {
   candles: DemoTradeCandle[];
   currentPrice: number | null;
   position: DemoOpenPosition | null;
+  timeframe: DemoTradeTimeframe;
+  onTimeframeChange: (timeframe: DemoTradeTimeframe) => void;
 }) {
-  const [visibleCount, setVisibleCount] = useState(60);
+  const [visibleCount, setVisibleCount] = useState(defaultVisibleCandles(timeframe));
   const [offset, setOffset] = useState(0);
-  const end = Math.max(0, candles.length - offset);
+  const [isRightDragging, setIsRightDragging] = useState(false);
+  const dragStartRef = useRef<{ x: number; offset: number } | null>(null);
+  const maxOffset = Math.max(0, candles.length - visibleCount);
+  const safeOffset = Math.min(offset, maxOffset);
+  const end = Math.max(0, candles.length - safeOffset);
   const visibleCandles = candles.slice(Math.max(0, end - visibleCount), end);
   const overlayLines = buildOverlayLines(position, currentPrice);
   const prices = visibleCandles.flatMap((candle) => [candle.high, candle.low]).concat(overlayLines.map((line) => line.price));
   const minPrice = prices.length ? Math.min(...prices) : 0;
   const maxPrice = prices.length ? Math.max(...prices) : 1;
   const range = Math.max(maxPrice - minPrice, 1);
-  const paddedMin = minPrice - range * 0.08;
-  const paddedMax = maxPrice + range * 0.08;
-  const width = 920;
-  const height = 420;
-  const padding = { top: 24, right: 96, bottom: 32, left: 48 };
-  const chartWidth = width - padding.left - padding.right;
+  const paddedMin = minPrice - range * 0.12;
+  const paddedMax = maxPrice + range * 0.12;
+  const width = 980;
+  const height = 460;
+  const padding = { top: 24, right: 118, bottom: 34, left: 22 };
+  const axisX = width - padding.right;
+  const chartWidth = axisX - padding.left;
   const chartHeight = height - padding.top - padding.bottom;
   const candleGap = chartWidth / Math.max(visibleCandles.length, 1);
-  const candleWidth = Math.max(4, candleGap * 0.58);
+  const candleWidth = clamp(candleGap * 0.64, 5, 16);
   const yForPrice = (price: number) => padding.top + ((paddedMax - price) / (paddedMax - paddedMin)) * chartHeight;
+  const priceTicks = Array.from({ length: 8 }, (_, index) => paddedMax - ((paddedMax - paddedMin) / 7) * index);
+  const verticalGridCount = Math.min(10, Math.max(4, Math.floor(visibleCandles.length / 10)));
+
+  useEffect(() => {
+    setVisibleCount(defaultVisibleCandles(timeframe));
+    setOffset(0);
+  }, [timeframe]);
+
+  useEffect(() => {
+    setOffset((value) => Math.min(value, Math.max(0, candles.length - visibleCount)));
+  }, [candles.length, visibleCount]);
+
+  const panBy = (amount: number) => {
+    setOffset((value) => clamp(value + amount, 0, Math.max(0, candles.length - visibleCount)));
+  };
+
+  const zoomBy = (amount: number) => {
+    setVisibleCount((count) => clamp(count + amount, 28, Math.min(160, Math.max(candles.length, 40))));
+  };
+
+  const startRightDrag = (event: MouseEvent<SVGSVGElement>) => {
+    if (event.button !== 2) return;
+    event.preventDefault();
+    dragStartRef.current = { x: event.clientX, offset: safeOffset };
+    setIsRightDragging(true);
+  };
+
+  const moveRightDrag = (event: MouseEvent<SVGSVGElement>) => {
+    if (!dragStartRef.current) return;
+    event.preventDefault();
+    const deltaCandles = Math.round((dragStartRef.current.x - event.clientX) / Math.max(6, candleGap * 0.55));
+    setOffset(clamp(dragStartRef.current.offset + deltaCandles, 0, Math.max(0, candles.length - visibleCount)));
+  };
+
+  const stopRightDrag = () => {
+    dragStartRef.current = null;
+    setIsRightDragging(false);
+  };
 
   return (
     <div className="demo-chart-shell">
       <div className="demo-chart-controls">
-        <button className="ghost-button compact" type="button" onClick={() => setVisibleCount((count) => Math.max(24, count - 12))}>
-          Zoom In
-        </button>
-        <button className="ghost-button compact" type="button" onClick={() => setVisibleCount((count) => Math.min(120, count + 12))}>
-          Zoom Out
-        </button>
-        <button className="ghost-button compact" type="button" onClick={() => setOffset((value) => Math.min(candles.length, value + 12))}>
-          Pan Left
-        </button>
-        <button className="ghost-button compact" type="button" onClick={() => setOffset((value) => Math.max(0, value - 12))}>
-          Pan Right
-        </button>
+        <div className="demo-timeframe-tabs" aria-label="Chart timeframe">
+          {demoTradeTimeframes.map((item) => (
+            <button
+              className={timeframe === item.value ? "active" : ""}
+              type="button"
+              onClick={() => onTimeframeChange(item.value)}
+              key={item.value}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="demo-chart-icon-controls" aria-label="Chart view controls">
+          <button className="icon-button chart-control-button" type="button" onClick={() => zoomBy(-12)} title="Zoom in">
+            <Plus size={16} />
+            <span className="sr-only">Zoom in</span>
+          </button>
+          <button className="icon-button chart-control-button" type="button" onClick={() => zoomBy(12)} title="Zoom out">
+            <Minus size={16} />
+            <span className="sr-only">Zoom out</span>
+          </button>
+          <button className="icon-button chart-control-button" type="button" onClick={() => panBy(12)} title="Move left">
+            <ArrowLeft size={16} />
+            <span className="sr-only">Move chart left</span>
+          </button>
+          <button className="icon-button chart-control-button" type="button" onClick={() => panBy(-12)} title="Move right">
+            <ArrowRight size={16} />
+            <span className="sr-only">Move chart right</span>
+          </button>
+        </div>
       </div>
 
       {visibleCandles.length ? (
-        <svg className="demo-trade-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Custom BTC USDT demo trading chart">
+        <svg
+          className={isRightDragging ? "demo-trade-chart dragging" : "demo-trade-chart"}
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label="Custom BTC USDT demo trading chart"
+          onContextMenu={(event) => event.preventDefault()}
+          onMouseDown={startRightDrag}
+          onMouseMove={moveRightDrag}
+          onMouseUp={stopRightDrag}
+          onMouseLeave={stopRightDrag}
+        >
+          <defs>
+            <clipPath id="demo-trade-chart-plot">
+              <rect x={padding.left} y={padding.top} width={chartWidth} height={chartHeight} rx="4" />
+            </clipPath>
+          </defs>
           <rect width={width} height={height} rx="10" />
-          {Array.from({ length: 5 }, (_, index) => {
-            const y = padding.top + (chartHeight / 4) * index;
-            return <line className="chart-grid-line" x1={padding.left} x2={width - padding.right} y1={y} y2={y} key={y} />;
-          })}
-          {visibleCandles.map((candle, index) => {
-            const x = padding.left + index * candleGap + candleGap / 2;
-            const openY = yForPrice(candle.open);
-            const closeY = yForPrice(candle.close);
-            const highY = yForPrice(candle.high);
-            const lowY = yForPrice(candle.low);
-            const isUp = candle.close >= candle.open;
+          <rect className="chart-axis-panel" x={axisX} y="0" width={padding.right} height={height} />
+          {priceTicks.map((price) => {
+            const y = yForPrice(price);
             return (
-              <g className={isUp ? "candle up" : "candle down"} key={`${candle.timestamp}-${index}`}>
-                <line x1={x} x2={x} y1={highY} y2={lowY} />
-                <rect
-                  x={x - candleWidth / 2}
-                  y={Math.min(openY, closeY)}
-                  width={candleWidth}
-                  height={Math.max(2, Math.abs(openY - closeY))}
-                  rx="2"
-                />
+              <g key={price}>
+                <line className="chart-grid-line" x1={padding.left} x2={axisX} y1={y} y2={y} />
+                <text className="chart-price-label" x={axisX + 14} y={y + 4}>
+                  {formatChartPrice(price)}
+                </text>
               </g>
             );
           })}
+          {Array.from({ length: verticalGridCount + 1 }, (_, index) => {
+            const x = padding.left + (chartWidth / verticalGridCount) * index;
+            return <line className="chart-grid-line vertical" x1={x} x2={x} y1={padding.top} y2={height - padding.bottom} key={x} />;
+          })}
+          <g clipPath="url(#demo-trade-chart-plot)">
+            {visibleCandles.map((candle, index) => {
+              const x = padding.left + index * candleGap + candleGap / 2;
+              const openY = yForPrice(candle.open);
+              const closeY = yForPrice(candle.close);
+              const highY = yForPrice(candle.high);
+              const lowY = yForPrice(candle.low);
+              const isUp = candle.close >= candle.open;
+              const bodyHeight = Math.max(3, Math.abs(openY - closeY));
+              return (
+                <g className={isUp ? "candle up" : "candle down"} key={`${candle.timestamp}-${index}`}>
+                  <line className="candle-wick" x1={x} x2={x} y1={highY} y2={lowY} />
+                  <rect
+                    className="candle-body"
+                    x={x - candleWidth / 2}
+                    y={Math.min(openY, closeY) - (bodyHeight === 3 ? 1.5 : 0)}
+                    width={candleWidth}
+                    height={bodyHeight}
+                    rx="1.5"
+                  />
+                </g>
+              );
+            })}
+          </g>
           {overlayLines.map((line) => {
             const y = yForPrice(line.price);
             return (
               <g className={`trade-overlay-line ${line.tone}`} key={`${line.label}-${line.price}`}>
-                <line x1={padding.left} x2={width - padding.right + 8} y1={y} y2={y} />
-                <text x={width - padding.right + 14} y={y + 4}>
+                <line x1={padding.left} x2={axisX} y1={y} y2={y} />
+                {line.tone === "mark" ? (
+                  <>
+                    <rect className="chart-price-marker" x={axisX + 8} y={y - 15} width="86" height="28" rx="4" />
+                    <text className="chart-price-marker-text" x={axisX + 16} y={y + 4}>
+                      {formatChartPrice(line.price)}
+                    </text>
+                  </>
+                ) : (
+                  <text x={axisX + 14} y={y + 4}>
+                    {line.label}
+                  </text>
+                )}
+                <text className="chart-overlay-label" x={padding.left + 8} y={y - 6}>
                   {line.label}
                 </text>
               </g>
             );
           })}
+          <text className="chart-drag-hint" x={padding.left + 8} y={height - 12}>
+            Right-click drag to move chart
+          </text>
         </svg>
       ) : (
         <div className="demo-chart-empty">
@@ -967,6 +1090,13 @@ function formatInputPrice(value: number): string {
   return value.toFixed(2);
 }
 
+function formatChartPrice(value: number): string {
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: value >= 1000 ? 1 : 2,
+    maximumFractionDigits: value >= 1000 ? 1 : 2
+  });
+}
+
 function formatCurrency(value: number): string {
   return value.toLocaleString("en-US", {
     style: "currency",
@@ -982,4 +1112,14 @@ function formatDateTime(value: string): string {
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function defaultVisibleCandles(timeframe: DemoTradeTimeframe): number {
+  if (timeframe === "1w") return 72;
+  if (timeframe === "1d") return 80;
+  return 90;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

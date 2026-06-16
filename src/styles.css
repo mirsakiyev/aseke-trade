@@ -5570,7 +5570,7 @@ select:focus {
 }
 
 .demo-chart-controls {
-  justify-content: flex-start;
+  justify-content: space-between;
 }
 
 .demo-trade-chart {
@@ -5580,35 +5580,106 @@ select:focus {
   border: 1px solid rgba(229, 228, 226, 0.12);
   border-radius: 8px;
   background: rgba(3, 5, 7, 0.82);
+  cursor: grab;
+  user-select: none;
+}
+
+.demo-trade-chart.dragging {
+  cursor: grabbing;
 }
 
 .demo-trade-chart > rect {
-  fill: rgba(4, 7, 9, 0.94);
+  fill: #020405;
 }
 
-.chart-grid-line {
-  stroke: rgba(229, 228, 226, 0.08);
+.demo-timeframe-tabs,
+.demo-chart-icon-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.demo-timeframe-tabs {
+  min-height: 38px;
+  padding: 0.2rem;
+  border: 1px solid rgba(229, 228, 226, 0.14);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.045);
+}
+
+.demo-timeframe-tabs button {
+  min-width: 38px;
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.demo-timeframe-tabs button.active {
+  border-color: rgba(126, 224, 167, 0.32);
+  background: rgba(126, 224, 167, 0.12);
+  color: var(--platinum);
+}
+
+.chart-control-button {
+  width: 36px;
+  height: 36px;
+}
+
+.chart-axis-panel {
+  fill: rgba(8, 11, 14, 0.96);
+  stroke: rgba(229, 228, 226, 0.12);
   stroke-width: 1;
 }
 
-.candle line {
-  stroke-width: 2;
+.chart-grid-line {
+  stroke: rgba(229, 228, 226, 0.09);
+  stroke-width: 1;
+}
+
+.chart-grid-line.vertical {
+  stroke: rgba(229, 228, 226, 0.055);
+}
+
+.chart-price-label,
+.chart-overlay-label,
+.chart-drag-hint {
+  fill: rgba(184, 196, 207, 0.86);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chart-drag-hint {
+  fill: rgba(184, 196, 207, 0.5);
+  font-size: 11px;
+}
+
+.candle-wick {
+  stroke-width: 1.6;
+  stroke-linecap: round;
 }
 
 .candle.up line,
 .candle.up rect {
-  fill: rgba(126, 224, 167, 0.82);
-  stroke: rgba(126, 224, 167, 0.82);
+  fill: #28c6af;
+  stroke: #28c6af;
 }
 
 .candle.down line,
 .candle.down rect {
-  fill: rgba(255, 107, 107, 0.82);
-  stroke: rgba(255, 107, 107, 0.82);
+  fill: #ff5b5f;
+  stroke: #ff5b5f;
+}
+
+.candle-body {
+  shape-rendering: geometricPrecision;
 }
 
 .trade-overlay-line line {
-  stroke-width: 1.8;
+  stroke-width: 1.5;
   stroke-dasharray: 7 7;
 }
 
@@ -5619,7 +5690,7 @@ select:focus {
 }
 
 .trade-overlay-line.mark line {
-  stroke: rgba(229, 228, 226, 0.72);
+  stroke: rgba(229, 228, 226, 0.62);
 }
 
 .trade-overlay-line.entry line {
@@ -5634,6 +5705,16 @@ select:focus {
 .trade-overlay-line.danger line,
 .trade-overlay-line.liquidation line {
   stroke: rgba(255, 107, 107, 0.92);
+}
+
+.chart-price-marker {
+  fill: rgba(40, 198, 175, 0.9);
+}
+
+.chart-price-marker-text {
+  fill: #f8fbfc;
+  font-size: 12px;
+  font-weight: 950;
 }
 
 .demo-chart-empty {

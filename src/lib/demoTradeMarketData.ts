@@ -14,6 +14,15 @@ export interface DemoTradeTicker {
   source: string;
 }
 
+export type DemoTradeTimeframe = "1h" | "4h" | "1d" | "1w";
+
+export const demoTradeTimeframes: Array<{ value: DemoTradeTimeframe; label: string }> = [
+  { value: "1h", label: "1H" },
+  { value: "4h", label: "4H" },
+  { value: "1d", label: "D" },
+  { value: "1w", label: "W" }
+];
+
 export const demoTradeSymbols = [
   {
     symbol: "BTCUSDT" as const,
@@ -25,9 +34,13 @@ export const demoTradeSymbols = [
 
 const binanceUsBaseUrl = "https://api.binance.us/api/v3";
 
-export async function fetchDemoTradeCandles(symbol = "BTCUSDT", limit = 90): Promise<DemoTradeCandle[]> {
+export async function fetchDemoTradeCandles(
+  symbol = "BTCUSDT",
+  timeframe: DemoTradeTimeframe = "1h",
+  limit = 140
+): Promise<DemoTradeCandle[]> {
   const safeSymbol = normalizeDemoSymbol(symbol);
-  const url = `${binanceUsBaseUrl}/klines?symbol=${safeSymbol}&interval=1m&limit=${Math.min(Math.max(limit, 20), 200)}`;
+  const url = `${binanceUsBaseUrl}/klines?symbol=${safeSymbol}&interval=${timeframe}&limit=${Math.min(Math.max(limit, 40), 240)}`;
   const payload = await fetchJson(url);
 
   if (!Array.isArray(payload)) throw new Error("BTC candle data was malformed.");
