@@ -40,6 +40,7 @@ import {
   TRADING_SIGNAL_FINAL_STATUSES,
   calculateSignalFinalRoi,
   formatPercent,
+  formatSignalPrice,
   formatSignalStatus,
   getSignalDisplayTitle,
   getSignalTakeProfits,
@@ -1499,15 +1500,6 @@ function formatCoinQuantity(value: number): string {
 
   return value.toLocaleString("en-US", {
     maximumFractionDigits: 8
-  });
-}
-
-function formatSignalPrice(value: string | number): string {
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) return String(value);
-
-  return numericValue.toLocaleString("en-US", {
-    maximumFractionDigits: 10
   });
 }
 

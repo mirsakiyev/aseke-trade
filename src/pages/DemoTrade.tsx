@@ -20,6 +20,7 @@ import {
   createInitialDemoTradeState,
   demoTradeCsvFilename,
   exportDemoTradesToCsv,
+  increaseDemoPosition,
   openDemoPosition,
   resetDemoTradeState,
   updateDemoLeverage,
@@ -66,6 +67,9 @@ const emptyTakeProfits: TakeProfitDraft[] = [
   { id: "tp-1", price: "", closePercent: "100" }
 ];
 
+const DEMO_TRADE_LIVE_REFRESH_MS = 2000;
+const DEMO_TRADE_CANDLE_SYNC_MS = 10000;
+
 export function DemoTrade() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [demoState, setDemoState] = useState<DemoTradeState>(() =>
@@ -95,6 +99,7 @@ export function DemoTrade() {
   const [positionLeverage, setPositionLeverage] = useState("5");
   const [positionTakeProfits, setPositionTakeProfits] = useState<TakeProfitDraft[]>([]);
   const [manualClosePercent, setManualClosePercent] = useState("100");
+  const [positionAddAmount, setPositionAddAmount] = useState("");
   const [positionErrors, setPositionErrors] = useState<string[]>([]);
 
   const stats = useMemo(() => calculateDemoTradeStats(demoState), [demoState]);
@@ -103,6 +108,24 @@ export function DemoTrade() {
   const selectTradeSide = useCallback((nextSide: DemoTradeSide) => {
     setSide(nextSide);
   }, []);
+
+  const persistDemoState = useCallback((nextState: DemoTradeState) => {
+    if (!isHydrated) return;
+
+    setSaveState("saving");
+    const save = user
+      ? saveRegisteredDemoTradeState(user.id, nextState)
+      : Promise.resolve(saveGuestDemoTradeState(nextState));
+
+    void save
+      .then(() => setSaveState("saved"))
+      .catch(() => setSaveState("error"));
+  }, [isHydrated, user]);
+
+  const commitDemoState = useCallback((nextState: DemoTradeState) => {
+    setDemoState(nextState);
+    persistDemoState(nextState);
+  }, [persistDemoState]);
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -165,7 +188,7 @@ export function DemoTrade() {
         fetchDemoTradeCandles(activeSymbol.symbol, timeframe),
         fetchDemoTradeTicker(activeSymbol.symbol)
       ]);
-      setCandles(nextCandles);
+      setCandles(applyLivePriceToCandles(nextCandles, ticker.price));
       setCurrentPrice(ticker.price);
       setMarketSource(ticker.source);
       setDemoState((state) => applyMarketPrice(state, ticker.price));
@@ -183,15 +206,16 @@ export function DemoTrade() {
         .then((ticker) => {
           setCurrentPrice(ticker.price);
           setMarketSource(ticker.source);
+          setCandles((items) => applyLivePriceToCandles(items, ticker.price));
           setDemoState((state) => applyMarketPrice(state, ticker.price));
         })
         .catch(() => setMarketError("Live BTC price update failed. Retrying..."));
-    }, 8000);
+    }, DEMO_TRADE_LIVE_REFRESH_MS);
     const candleTimer = window.setInterval(() => {
       fetchDemoTradeCandles(activeSymbol.symbol, timeframe)
         .then(setCandles)
         .catch(() => setMarketError("BTC candles could not be refreshed."));
-    }, 30000);
+    }, DEMO_TRADE_CANDLE_SYNC_MS);
 
     return () => {
       window.clearInterval(priceTimer);
@@ -205,6 +229,7 @@ export function DemoTrade() {
       setPositionTakeProfits([]);
       setPositionStopLoss("");
       setManualClosePercent("100");
+      setPositionAddAmount("");
       return;
     }
 
@@ -271,7 +296,7 @@ export function DemoTrade() {
     }
 
     setFormErrors([]);
-    setDemoState(result.state);
+    commitDemoState(result.state);
   };
 
   useEffect(() => {
@@ -303,8 +328,8 @@ export function DemoTrade() {
     }
     setOrderType("market");
     setFormErrors([]);
-    setDemoState(result.state);
-  }, [activeSymbol.symbol, currentPrice, demoState, pendingLimitOrder, user]);
+    commitDemoState(result.state);
+  }, [activeSymbol.symbol, commitDemoState, currentPrice, demoState, pendingLimitOrder, user]);
 
   const updateStop = () => {
     const result = updateDemoStopLoss(demoState, parseNumber(positionStopLoss));
@@ -313,7 +338,7 @@ export function DemoTrade() {
       return;
     }
     setPositionErrors([]);
-    setDemoState(result.state);
+    commitDemoState(result.state);
   };
 
   const updateLeverage = () => {
@@ -323,7 +348,7 @@ export function DemoTrade() {
       return;
     }
     setPositionErrors([]);
-    setDemoState(result.state);
+    commitDemoState(result.state);
   };
 
   const updateTps = () => {
@@ -342,7 +367,24 @@ export function DemoTrade() {
       return;
     }
     setPositionErrors([]);
-    setDemoState(result.state);
+    commitDemoState(result.state);
+  };
+
+  const addToPosition = () => {
+    if (!demoState.openPosition) return;
+    const entryPrice = currentPrice ?? demoState.openPosition.markPrice;
+    const result = increaseDemoPosition(demoState, {
+      sizeMode: "notional",
+      amount: parseNumber(positionAddAmount),
+      entryPrice
+    });
+    if (!result.ok) {
+      setPositionErrors(result.errors);
+      return;
+    }
+    setPositionErrors([]);
+    setPositionAddAmount("");
+    commitDemoState(result.state);
   };
 
   const closePosition = () => {
@@ -355,7 +397,7 @@ export function DemoTrade() {
     }
     setPositionErrors([]);
     setManualClosePercent("100");
-    setDemoState(result.state);
+    commitDemoState(result.state);
   };
 
   const requestBalanceReset = () => {
@@ -364,11 +406,11 @@ export function DemoTrade() {
       setShowResetModal(true);
       return;
     }
-    setDemoState(resetDemoTradeState(demoState, parseNumber(nextStartingBalance)));
+    commitDemoState(resetDemoTradeState(demoState, parseNumber(nextStartingBalance)));
   };
 
   const confirmBalanceReset = () => {
-    setDemoState(resetDemoTradeState(demoState, parseNumber(nextStartingBalance)));
+    commitDemoState(resetDemoTradeState(demoState, parseNumber(nextStartingBalance)));
     setShowResetModal(false);
   };
 
@@ -407,7 +449,7 @@ export function DemoTrade() {
 
       {!user && (
         <section className="notice-box demo-save-note">
-          Create an account to save your demo trading progress permanently. Guest progress is kept only for this browser session.
+          Create an account to save your demo trading progress permanently. Guest progress is kept in this browser.
           <Link to="/register">Register</Link>
         </section>
       )}
@@ -463,11 +505,16 @@ export function DemoTrade() {
               leverage={positionLeverage}
               takeProfits={positionTakeProfits}
               closePercent={manualClosePercent}
+              addAmount={positionAddAmount}
+              availableBalance={demoState.availableBalance}
+              currentPrice={currentPrice ?? demoState.openPosition.markPrice}
               errors={positionErrors}
               onStopLossChange={setPositionStopLoss}
               onLeverageChange={setPositionLeverage}
               onTakeProfitsChange={setPositionTakeProfits}
               onClosePercentChange={setManualClosePercent}
+              onAddAmountChange={setPositionAddAmount}
+              onAddToPosition={addToPosition}
               onUpdateStop={updateStop}
               onUpdateLeverage={updateLeverage}
               onUpdateTakeProfits={updateTps}
@@ -814,11 +861,16 @@ function PositionManager({
   leverage,
   takeProfits,
   closePercent,
+  addAmount,
+  availableBalance,
+  currentPrice,
   errors,
   onStopLossChange,
   onLeverageChange,
   onTakeProfitsChange,
   onClosePercentChange,
+  onAddAmountChange,
+  onAddToPosition,
   onUpdateStop,
   onUpdateLeverage,
   onUpdateTakeProfits,
@@ -829,11 +881,16 @@ function PositionManager({
   leverage: string;
   takeProfits: TakeProfitDraft[];
   closePercent: string;
+  addAmount: string;
+  availableBalance: number;
+  currentPrice: number;
   errors: string[];
   onStopLossChange: (value: string) => void;
   onLeverageChange: (value: string) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
   onClosePercentChange: (value: string) => void;
+  onAddAmountChange: (value: string) => void;
+  onAddToPosition: () => void;
   onUpdateStop: () => void;
   onUpdateLeverage: () => void;
   onUpdateTakeProfits: () => void;
@@ -844,9 +901,70 @@ function PositionManager({
   const closingQuantity = position.remainingQuantity * closeRatio;
   const remainingAfterClose = position.remainingQuantity - closingQuantity;
   const closeSliderStyle = { "--size-fill": `${closePercentValue}%` } as CSSProperties;
+  const addAmountValue = parseNumber(addAmount);
+  const maxAddAmount = Math.max(0, availableBalance) * position.leverage;
+  const addPercent = maxAddAmount > 0 ? clamp((addAmountValue / maxAddAmount) * 100, 0, 100) : 0;
+  const addSliderStyle = { "--size-fill": `${addPercent}%` } as CSSProperties;
+  const estimatedAddQuantity = currentPrice > 0 ? addAmountValue / currentPrice : 0;
+
+  const setAddAmountFromPercent = (nextPercent: string) => {
+    const nextPercentValue = clamp(parseNumber(nextPercent), 0, 100);
+    const nextAmount = Math.min(maxAddAmount, maxAddAmount * (nextPercentValue / 100));
+    onAddAmountChange(formatAmountInput(nextAmount));
+  };
 
   return (
     <div className="demo-ticket-stack">
+      <div className="position-add-block">
+        <div className="manual-close-heading">
+          <strong>Add to position</strong>
+          <span>{Math.round(addPercent)}%</span>
+        </div>
+        <label>
+          Quantity (USDT)
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={addAmount}
+            onChange={(event) => onAddAmountChange(event.target.value)}
+            placeholder="Extra size"
+          />
+        </label>
+        <div className="futures-percent-control">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={Math.round(addPercent)}
+            style={addSliderStyle}
+            onChange={(event) => setAddAmountFromPercent(event.target.value)}
+            aria-label="Add position size percent"
+          />
+          <div className="futures-percent-marks" aria-hidden="true">
+            <span>0%</span>
+            <span>25%</span>
+            <span>50%</span>
+            <span>75%</span>
+            <span>100%</span>
+          </div>
+        </div>
+        <dl className="manual-close-metrics">
+          <div>
+            <dt>Available</dt>
+            <dd>{formatUsdt(availableBalance)}</dd>
+          </div>
+          <div>
+            <dt>Est. Qty</dt>
+            <dd>{estimatedAddQuantity.toFixed(6)} BTC</dd>
+          </div>
+        </dl>
+        <button className="ghost-button compact" type="button" onClick={onAddToPosition} disabled={!maxAddAmount}>
+          Add to Position
+        </button>
+      </div>
+
       <div className="demo-inline-edit">
         <label>
           Stop Loss
@@ -1357,6 +1475,20 @@ function ErrorList({ errors }: { errors: string[] }) {
       ))}
     </ul>
   );
+}
+
+function applyLivePriceToCandles(candles: DemoTradeCandle[], price: number): DemoTradeCandle[] {
+  if (!candles.length || !Number.isFinite(price) || price <= 0) return candles;
+
+  const nextCandles = [...candles];
+  const latest = nextCandles[nextCandles.length - 1];
+  nextCandles[nextCandles.length - 1] = {
+    ...latest,
+    close: price,
+    high: Math.max(latest.high, price),
+    low: Math.min(latest.low, price)
+  };
+  return nextCandles;
 }
 
 function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: number | null) {

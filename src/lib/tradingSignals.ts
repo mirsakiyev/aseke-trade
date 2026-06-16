@@ -268,6 +268,18 @@ export function formatPercent(value: string | number): string {
   });
 }
 
+export function formatSignalPrice(value: string | number): string {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return String(value);
+
+  const absoluteValue = Math.abs(numericValue);
+  const maximumFractionDigits = absoluteValue >= 1000 ? 2 : absoluteValue >= 1 ? 6 : 10;
+
+  return numericValue.toLocaleString("en-US", {
+    maximumFractionDigits
+  });
+}
+
 function normalizeTakeProfit(takeProfit: TradingSignalTakeProfit, index: number): TradingSignalTakeProfit {
   return {
     id: takeProfit.id || `tp-${index + 1}`,

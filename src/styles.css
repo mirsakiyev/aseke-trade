@@ -5593,6 +5593,7 @@ select:focus {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.75rem;
   align-items: stretch;
+  width: 100%;
   padding-top: 0.78rem;
   border-top: 1px solid rgba(229, 228, 226, 0.1);
 }
@@ -5602,6 +5603,10 @@ select:focus {
   align-content: center;
   gap: 0.18rem;
   min-width: 116px;
+  padding: 0.44rem 0.5rem;
+  border: 1px solid rgba(229, 228, 226, 0.1);
+  border-radius: 7px;
+  background: rgba(229, 228, 226, 0.04);
 }
 
 .current-trade-heading span,
@@ -5627,6 +5632,7 @@ select:focus {
 
 .current-trade-metrics {
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-width: 0;
 }
 
 .current-trade-metrics > div,
@@ -5838,6 +5844,7 @@ select:focus {
 }
 
 .demo-inline-edit label,
+.position-add-block label,
 .manual-close-block label {
   display: grid;
   gap: 0.28rem;
@@ -5850,17 +5857,24 @@ select:focus {
 
 .demo-inline-edit input,
 .demo-inline-edit select,
+.position-add-block input[type="number"],
 .manual-close-block input[type="number"] {
   min-height: 38px;
   padding: 0.48rem 0.56rem;
   font-size: 0.88rem;
 }
 
+.position-add-block,
 .manual-close-block {
   display: grid;
   gap: 0.5rem;
   padding-top: 0.66rem;
   border-top: 1px solid rgba(229, 228, 226, 0.1);
+}
+
+.position-add-block {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .manual-close-heading {
@@ -5872,6 +5886,10 @@ select:focus {
 
 .manual-close-metrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.position-add-block .ghost-button {
+  width: 100%;
 }
 
 .futures-contract-row,

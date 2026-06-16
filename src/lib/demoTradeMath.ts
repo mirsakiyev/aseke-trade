@@ -15,6 +15,7 @@ export type DemoTradeActionType =
   | "TP edited"
   | "TP removed"
   | "leverage updated"
+  | "position increased"
   | "partial close"
   | "manual close"
   | "SL hit"
@@ -107,6 +108,12 @@ export interface OpenDemoTradeInput {
   entryPrice: number;
   stopLoss: number;
   takeProfits: Array<Pick<DemoTakeProfit, "price" | "closePercent"> & { id?: string }>;
+}
+
+export interface IncreaseDemoPositionInput {
+  sizeMode: DemoTradeSizeMode;
+  amount: number;
+  entryPrice: number;
 }
 
 export interface DemoTradeStats {
@@ -423,6 +430,87 @@ export function updateDemoLeverage(
   position.updatedAt = now;
   position.actionLog.push(action);
   nextState.actionHistory.push(action);
+  return { ok: true, state: refreshBalances(nextState, now) };
+}
+
+export function increaseDemoPosition(
+  state: DemoTradeState,
+  input: IncreaseDemoPositionInput,
+  now = new Date().toISOString()
+): DemoTradeResult {
+  if (!state.openPosition) return { ok: false, errors: ["No open position to add to."], state };
+
+  const amount = toDecimal(input.amount);
+  const entryPrice = toDecimal(input.entryPrice);
+  const errors: string[] = [];
+
+  if (!isPositiveDecimal(amount)) errors.push("Add size must be greater than zero.");
+  if (!isPositiveDecimal(entryPrice)) errors.push("Market price is unavailable.");
+  if (input.sizeMode !== "margin" && input.sizeMode !== "notional") {
+    errors.push("Choose whether the add amount is margin or position size.");
+  }
+
+  const position = state.openPosition;
+  const requiredMargin = calculateInputMargin({
+    sizeMode: input.sizeMode,
+    amount: input.amount,
+    leverage: position.leverage
+  });
+
+  if (!errors.length && gt(requiredMargin, toDecimal(state.availableBalance))) {
+    errors.push("Add size is larger than your available demo balance allows.");
+  }
+
+  if (errors.length) return { ok: false, errors: uniqueErrors(errors), state };
+
+  const nextState = cloneState(state);
+  const nextPosition = nextState.openPosition;
+  if (!nextPosition) return { ok: false, errors: ["No open position to add to."], state };
+
+  const addedNotional = input.sizeMode === "margin"
+    ? mul(requiredMargin, toDecimal(nextPosition.leverage))
+    : toDecimal(input.amount);
+  const addedQuantity = div(addedNotional, entryPrice);
+  const previousQuantity = toDecimal(nextPosition.remainingQuantity);
+  const nextQuantity = add(previousQuantity, addedQuantity);
+  const previousNotional = mul(toDecimal(nextPosition.entryPrice), previousQuantity);
+  const nextEntryPrice = div(add(previousNotional, addedNotional), nextQuantity);
+  const action = createAction(
+    "position increased",
+    `Added ${roundMoney(toNumber(addedNotional)).toLocaleString("en-US")} USDT notional to the position.`,
+    now,
+    input.entryPrice,
+    null
+  );
+
+  nextState.availableBalance = roundMoney(toNumber(sub(toDecimal(nextState.availableBalance), requiredMargin)));
+  nextPosition.status = "OPEN";
+  nextPosition.entryPrice = roundPrice(toNumber(nextEntryPrice));
+  nextPosition.markPrice = roundPrice(input.entryPrice);
+  nextPosition.initialMargin = roundMoney(toNumber(add(toDecimal(nextPosition.initialMargin), requiredMargin)));
+  nextPosition.remainingMargin = roundMoney(toNumber(add(toDecimal(nextPosition.remainingMargin), requiredMargin)));
+  nextPosition.initialQuantity = roundQuantity(toNumber(add(toDecimal(nextPosition.initialQuantity), addedQuantity)));
+  nextPosition.remainingQuantity = roundQuantity(toNumber(nextQuantity));
+  nextPosition.unrealizedPnl = calculateUnrealizedPnl({
+    side: nextPosition.side,
+    avgEntryPrice: nextPosition.entryPrice,
+    markPrice: input.entryPrice,
+    quantityRemaining: nextPosition.remainingQuantity
+  });
+  nextPosition.returnPercent = nextPosition.initialMargin > 0
+    ? roundPercent(((nextPosition.realizedPnl + nextPosition.unrealizedPnl) / nextPosition.initialMargin) * 100)
+    : 0;
+  nextPosition.liquidationPrice = calculateLiquidationPrice({
+    side: nextPosition.side,
+    avgEntryPrice: nextPosition.entryPrice,
+    quantityRemaining: nextPosition.remainingQuantity,
+    isolatedMarginRemaining: nextPosition.remainingMargin,
+    maintenanceMarginRate: nextState.settings.maintenanceMarginRate
+  });
+  nextPosition.updatedAt = now;
+  nextPosition.actionLog.push(action);
+  nextState.actionHistory.push(action);
+
   return { ok: true, state: refreshBalances(nextState, now) };
 }
 

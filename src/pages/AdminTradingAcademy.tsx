@@ -26,6 +26,7 @@ import {
   calculateTpPercentTotal,
   calculateWeightedRoi,
   formatPercent,
+  formatSignalPrice,
   formatSignalStatus,
   generateSignalTitle,
   getSignalDisplayTitle,
@@ -1036,15 +1037,6 @@ function signalDetailsFingerprint(
       price: Number(takeProfit.price),
       positionSizePercent: Number(takeProfit.positionSizePercent)
     }))
-  });
-}
-
-function formatSignalPrice(value: string | number): string {
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) return String(value);
-
-  return numericValue.toLocaleString("en-US", {
-    maximumFractionDigits: 10
   });
 }
 

@@ -60,6 +60,13 @@ test("take profit validation requires prices and exactly 100 percent allocation"
   );
 });
 
+test("signal price formatting keeps low-price coin decimals while rounding BTC-like prices", () => {
+  assert.equal(tradingSignals.formatSignalPrice("1.2137"), "1.2137");
+  assert.equal(tradingSignals.formatSignalPrice("1.203"), "1.203");
+  assert.equal(tradingSignals.formatSignalPrice("0.0000123456"), "0.0000123456");
+  assert.equal(tradingSignals.formatSignalPrice("65978.1234"), "65,978.12");
+});
+
 test("ROI calculation handles long, short, and weighted partial exits", () => {
   assert.equal(tradingSignals.calculatePortionRoi("long", 100, 110, 10), 100);
   assert.equal(tradingSignals.calculatePortionRoi("short", 100, 90, 5), 50);

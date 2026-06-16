@@ -15,6 +15,10 @@ const migration = await readFile(
   new URL("../supabase/migrations/202606120006_inbox_notifications.sql", import.meta.url),
   "utf8"
 );
+const priceFormattingMigration = await readFile(
+  new URL("../supabase/migrations/202606160002_trading_signal_price_formatting.sql", import.meta.url),
+  "utf8"
+);
 
 test("notification migration creates inbox tables, read tracking, and server-side premium filters", () => {
   for (const expected of [
@@ -33,6 +37,17 @@ test("notification migration creates inbox tables, read tracking, and server-sid
   assert.match(migration, /n\.type not in \('market_outlook', 'trading_signal'\)/i);
   assert.match(migration, /'premium',\s*'trading_signal'/i);
   assert.match(migration, /related_signal_id/i);
+});
+
+test("trading signal inbox notifications preserve decimal prices", () => {
+  assert.match(priceFormattingMigration, /format_trading_signal_price/);
+  assert.match(priceFormattingMigration, /abs\(input_price\) >= 1000[\s\S]*round\(input_price, 2\)/);
+  assert.match(priceFormattingMigration, /abs\(input_price\) >= 1[\s\S]*round\(input_price, 6\)/);
+  assert.match(priceFormattingMigration, /round\(input_price, 10\)/);
+  assert.match(priceFormattingMigration, /Entry: ' \|\| entry_text/);
+  assert.match(priceFormattingMigration, /Stop Loss: ' \|\| stop_text/);
+  assert.match(priceFormattingMigration, /regexp_replace[\s\S]*Entry: /);
+  assert.match(priceFormattingMigration, /regexp_replace[\s\S]*Stop Loss: /);
 });
 
 test("dashboard renders inbox, read handling, display name editing, and compact level UI", () => {

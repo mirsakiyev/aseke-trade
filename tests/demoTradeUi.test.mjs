@@ -26,6 +26,9 @@ test("Demo Trade page includes guest and authenticated persistence paths", () =>
   assert.match(pageSource, /loadRegisteredDemoTradeState/);
   assert.match(pageSource, /saveRegisteredDemoTradeState/);
   assert.match(persistenceSource, /window\.sessionStorage/);
+  assert.match(persistenceSource, /window\.localStorage/);
+  assert.match(persistenceSource, /registeredStateKey/);
+  assert.match(persistenceSource, /chooseLatestState/);
   assert.match(persistenceSource, /demo_trade_states/);
   assert.match(persistenceSource, /save_demo_trade_state/);
 });
@@ -52,6 +55,9 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /hasBracketLines/);
   assert.match(pageSource, /startRightDrag/);
   assert.match(pageSource, /Minus/);
+  assert.match(pageSource, /DEMO_TRADE_LIVE_REFRESH_MS = 2000/);
+  assert.match(pageSource, /DEMO_TRADE_CANDLE_SYNC_MS = 10000/);
+  assert.match(pageSource, /applyLivePriceToCandles/);
   assert.match(marketDataSource, /"6h"/);
   assert.match(marketDataSource, /"12h"/);
   assert.match(marketDataSource, /"1M"/);
@@ -77,6 +83,10 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /function PositionManager/);
   assert.match(pageSource, /function CurrentTradeRow/);
   assert.match(pageSource, /current-trade-row/);
+  assert.match(pageSource, /increaseDemoPosition/);
+  assert.match(pageSource, /Add to Position/);
+  assert.match(pageSource, /Add position size percent/);
+  assert.match(pageSource, /commitDemoState/);
   assert.match(pageSource, /closeOpenPositionByPercent/);
   assert.match(pageSource, /Manual close size percent/);
   assert.match(pageSource, /openDemoPosition/);

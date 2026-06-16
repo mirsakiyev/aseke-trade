@@ -236,6 +236,44 @@ test("notional sizing allows the full reduced available balance", () => {
   assert.ok(tooLarge.errors.includes("Trade is larger than your available demo balance allows."));
 });
 
+test("adding to an open position updates average entry, margin, and quantity", () => {
+  const state = openPosition({ takeProfits: [], stopLoss: 0 });
+  const result = demoTrade.increaseDemoPosition(
+    state,
+    {
+      sizeMode: "notional",
+      amount: 500,
+      entryPrice: 125
+    },
+    "2026-06-16T12:02:00.000Z"
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.state.openPosition.status, "OPEN");
+  assertClose(result.state.openPosition.remainingQuantity, 14);
+  assertClose(result.state.openPosition.initialQuantity, 14);
+  assertClose(result.state.openPosition.entryPrice, 107.14);
+  assertClose(result.state.openPosition.remainingMargin, 150);
+  assertClose(result.state.openPosition.initialMargin, 150);
+  assertClose(result.state.availableBalance, 850);
+  assert.equal(result.state.openPosition.actionLog.at(-1).type, "position increased");
+});
+
+test("adding to an open position rejects amounts above available margin", () => {
+  const result = demoTrade.increaseDemoPosition(
+    openPosition({ takeProfits: [], stopLoss: 0 }),
+    {
+      sizeMode: "notional",
+      amount: 10000,
+      entryPrice: 125
+    },
+    "2026-06-16T12:02:00.000Z"
+  );
+
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes("Add size is larger than your available demo balance allows."));
+});
+
 test("stop-loss hit closes remaining position", () => {
   const state = demoTrade.applyMarketPrice(openPosition({ stopLoss: 95, takeProfits: [] }), 95);
   assert.equal(state.openPosition, null);
