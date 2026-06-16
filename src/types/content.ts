@@ -109,11 +109,9 @@ export interface XPTransaction {
   amount: number;
   source_type:
     | "guide"
-    | "puzzle_of_day"
     | "admin_adjustment"
     | "course_badge"
-    | "loyalty_badge"
-    | "trade_route_optimizer";
+    | "loyalty_badge";
   source_id: string;
   description: string | null;
   created_at: string;
@@ -153,31 +151,6 @@ export type PublicUserBadge = Pick<
   UserBadge,
   "id" | "badge_type" | "name" | "description" | "icon" | "style_variant" | "xp_awarded" | "earned_at" | "metadata"
 >;
-
-export interface Puzzle {
-  id: string;
-  puzzle_date?: string;
-  puzzle_window_id: string;
-  window_start_at: string;
-  next_refresh_at: string;
-  title: string;
-  prompt: string;
-  category: string;
-  reward_claimed: boolean;
-  user_completed: boolean;
-}
-
-export type DailyPuzzle = Puzzle;
-
-export interface DailyPuzzleSolve {
-  id: string;
-  puzzle_id: string;
-  user_id: string;
-  submitted_answer: string;
-  is_correct: boolean;
-  is_first_solver: boolean;
-  created_at: string;
-}
 
 export interface Course {
   id: string;

@@ -56,10 +56,12 @@ interface TakeProfitDraft {
 }
 
 type DemoOrderType = "market" | "limit";
+type DemoQuantityUnit = "usdt" | "btc" | "cont";
 
 interface PendingLimitOrder {
   side: DemoTradeSide;
   marginMode: DemoMarginMode;
+  quantityUnit: DemoQuantityUnit;
   amount: string;
   leverage: string;
   stopLoss: string;
@@ -74,6 +76,13 @@ const emptyTakeProfits: TakeProfitDraft[] = [
 const DEMO_TRADE_LIVE_REFRESH_MS = 1000;
 const DEMO_TRADE_CANDLE_SYNC_MS = 10000;
 const PERCENT_SLIDER_THUMB_SIZE = 12;
+const DEMO_CONTRACT_BTC_SIZE = 0.0001;
+
+const quantityUnitLabels: Record<DemoQuantityUnit, string> = {
+  usdt: "USDT",
+  btc: "BTC",
+  cont: "Cont"
+};
 
 export function DemoTrade() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -91,6 +100,9 @@ export function DemoTrade() {
   const [limitPrice, setLimitPrice] = useState("");
   const [pendingLimitOrder, setPendingLimitOrder] = useState<PendingLimitOrder | null>(null);
   const [marginMode, setMarginMode] = useState<DemoMarginMode>("isolated");
+  const [quantityUnit, setQuantityUnit] = useState<DemoQuantityUnit>("usdt");
+  const [draftQuantityUnit, setDraftQuantityUnit] = useState<DemoQuantityUnit>("usdt");
+  const [showQuantityUnitModal, setShowQuantityUnitModal] = useState(false);
   const [amount, setAmount] = useState("");
   const [leverage, setLeverage] = useState("5");
   const [isBracketEnabled, setIsBracketEnabled] = useState(false);
@@ -109,6 +121,21 @@ export function DemoTrade() {
   const stats = useMemo(() => calculateDemoTradeStats(demoState), [demoState]);
   const equityTone = stats.equity >= demoState.startingBalance ? "positive" : "negative";
   const activeSymbol = demoTradeSymbols[0];
+  const quantityConversionPrice = currentPrice ?? demoState.openPosition?.markPrice ?? candles[candles.length - 1]?.close ?? 0;
+
+  const openQuantityUnitSettings = () => {
+    setDraftQuantityUnit(quantityUnit);
+    setShowQuantityUnitModal(true);
+  };
+
+  const confirmQuantityUnitSettings = () => {
+    if (draftQuantityUnit !== quantityUnit) {
+      setAmount((value) => convertQuantityInput(value, quantityUnit, draftQuantityUnit, quantityConversionPrice));
+      setPositionAddAmount((value) => convertQuantityInput(value, quantityUnit, draftQuantityUnit, quantityConversionPrice));
+      setQuantityUnit(draftQuantityUnit);
+    }
+    setShowQuantityUnitModal(false);
+  };
 
   const persistDemoState = useCallback((nextState: DemoTradeState) => {
     if (!isHydrated) return;
@@ -252,13 +279,14 @@ export function DemoTrade() {
   const openTrade = (requestedSide: DemoTradeSide) => {
     const entryPrice = currentPrice ?? candles[candles.length - 1]?.close ?? 0;
     const submittedBracket = buildSubmittedBracket(isBracketEnabled, stopLoss, takeProfits);
+    const amountValue = parseNumber(amount);
 
     if (orderType === "limit") {
       const nextLimitPrice = parseNumber(limitPrice);
       const nextErrors: string[] = [];
       if (!user) nextErrors.push("Limit orders are available for registered users only.");
       if (!Number.isFinite(nextLimitPrice) || nextLimitPrice <= 0) nextErrors.push("Enter a valid limit price.");
-      if (parseNumber(amount) <= 0) nextErrors.push("Enter a position quantity.");
+      if (amountValue <= 0) nextErrors.push("Enter a position quantity.");
 
       if (nextErrors.length) {
         setFormErrors(nextErrors);
@@ -268,6 +296,7 @@ export function DemoTrade() {
       setPendingLimitOrder({
         side: requestedSide,
         marginMode,
+        quantityUnit,
         amount,
         leverage,
         stopLoss: String(submittedBracket.stopLoss),
@@ -289,7 +318,7 @@ export function DemoTrade() {
       side: requestedSide,
       marginMode,
       sizeMode: "notional",
-      amount: parseNumber(amount),
+      amount: quantityInputToNotional(amountValue, quantityUnit, entryPrice),
       leverage: parseNumber(leverage),
       entryPrice,
       stopLoss: submittedBracket.stopLoss,
@@ -317,7 +346,11 @@ export function DemoTrade() {
       side: pendingLimitOrder.side,
       marginMode: pendingLimitOrder.marginMode,
       sizeMode: "notional",
-      amount: parseNumber(pendingLimitOrder.amount),
+      amount: quantityInputToNotional(
+        parseNumber(pendingLimitOrder.amount),
+        pendingLimitOrder.quantityUnit,
+        pendingLimitPrice
+      ),
       leverage: parseNumber(pendingLimitOrder.leverage),
       entryPrice: pendingLimitPrice,
       stopLoss: parseNumber(pendingLimitOrder.stopLoss),
@@ -382,7 +415,7 @@ export function DemoTrade() {
     const entryPrice = currentPrice ?? demoState.openPosition.markPrice;
     const result = increaseDemoPosition(demoState, {
       sizeMode: "notional",
-      amount: parseNumber(positionAddAmount),
+      amount: quantityInputToNotional(parseNumber(positionAddAmount), quantityUnit, entryPrice),
       entryPrice
     });
     if (!result.ok) {
@@ -502,6 +535,7 @@ export function DemoTrade() {
               takeProfits={positionTakeProfits}
               closePercent={manualClosePercent}
               addAmount={positionAddAmount}
+              quantityUnit={quantityUnit}
               availableBalance={demoState.availableBalance}
               currentPrice={currentPrice ?? demoState.openPosition.markPrice}
               errors={positionErrors}
@@ -510,6 +544,7 @@ export function DemoTrade() {
               onTakeProfitsChange={setPositionTakeProfits}
               onClosePercentChange={setManualClosePercent}
               onAddAmountChange={setPositionAddAmount}
+              onQuantityUnitSettingsOpen={openQuantityUnitSettings}
               onAddToPosition={addToPosition}
               onUpdateStop={updateStop}
               onUpdateLeverage={updateLeverage}
@@ -521,6 +556,7 @@ export function DemoTrade() {
               orderType={orderType}
               marginMode={marginMode}
               amount={amount}
+              quantityUnit={quantityUnit}
               leverage={leverage}
               isBracketEnabled={isBracketEnabled}
               limitPrice={limitPrice}
@@ -535,6 +571,7 @@ export function DemoTrade() {
               onOrderTypeChange={setOrderType}
               onMarginModeChange={setMarginMode}
               onAmountChange={setAmount}
+              onQuantityUnitSettingsOpen={openQuantityUnitSettings}
               onLeverageChange={setLeverage}
               onBracketEnabledChange={(enabled) => {
                 setIsBracketEnabled(enabled);
@@ -579,6 +616,45 @@ export function DemoTrade() {
 
       <TradeHistoryTable trades={demoState.tradeHistory} onExport={exportCsv} />
 
+      {showQuantityUnitModal && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal-card futures-unit-modal" role="dialog" aria-modal="true" aria-labelledby="futures-unit-title">
+            <div className="modal-title-row">
+              <h2 id="futures-unit-title">Futures Unit Settings</h2>
+              <button className="icon-button compact-icon-button" type="button" onClick={() => setShowQuantityUnitModal(false)} aria-label="Close unit settings">
+                &times;
+              </button>
+            </div>
+            <div className="futures-unit-options" role="radiogroup" aria-label="Order by quantity">
+              <strong>Order by Quantity</strong>
+              <div>
+                {(["btc", "usdt", "cont"] as DemoQuantityUnit[]).map((unit) => (
+                  <label key={unit}>
+                    <input
+                      type="radio"
+                      name="futures-unit"
+                      value={unit}
+                      checked={draftQuantityUnit === unit}
+                      onChange={() => setDraftQuantityUnit(unit)}
+                    />
+                    <span>{quantityUnitLabels[unit]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <p className="futures-unit-copy">{unitSettingsCopy(draftQuantityUnit, quantityConversionPrice)}</p>
+            <div className="futures-unit-actions">
+              <button className="ghost-button" type="button" onClick={() => setShowQuantityUnitModal(false)}>
+                Cancel
+              </button>
+              <button className="primary-button" type="button" onClick={confirmQuantityUnitSettings}>
+                Confirm
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {showResetModal && (
         <div className="modal-backdrop" role="presentation">
           <section className="modal-card reset-demo-modal" role="dialog" aria-modal="true" aria-labelledby="reset-demo-title">
@@ -611,6 +687,7 @@ function TradeEntryForm({
   orderType,
   marginMode,
   amount,
+  quantityUnit,
   leverage,
   isBracketEnabled,
   limitPrice,
@@ -625,6 +702,7 @@ function TradeEntryForm({
   onOrderTypeChange,
   onMarginModeChange,
   onAmountChange,
+  onQuantityUnitSettingsOpen,
   onLeverageChange,
   onBracketEnabledChange,
   onLimitPriceChange,
@@ -636,6 +714,7 @@ function TradeEntryForm({
   orderType: DemoOrderType;
   marginMode: DemoMarginMode;
   amount: string;
+  quantityUnit: DemoQuantityUnit;
   leverage: string;
   isBracketEnabled: boolean;
   limitPrice: string;
@@ -650,6 +729,7 @@ function TradeEntryForm({
   onOrderTypeChange: (type: DemoOrderType) => void;
   onMarginModeChange: (mode: DemoMarginMode) => void;
   onAmountChange: (value: string) => void;
+  onQuantityUnitSettingsOpen: () => void;
   onLeverageChange: (value: string) => void;
   onBracketEnabledChange: (enabled: boolean) => void;
   onLimitPriceChange: (value: string) => void;
@@ -660,26 +740,31 @@ function TradeEntryForm({
 }) {
   const parsedLeverage = Math.max(1, Math.trunc(parseNumber(leverage)) || 1);
   const amountValue = parseNumber(amount);
+  const unitLabel = quantityUnitLabels[quantityUnit];
+  const limitReferencePrice = parseNumber(limitPrice);
+  const quantityReferencePrice = orderType === "limit" && limitReferencePrice > 0
+    ? limitReferencePrice
+    : currentPrice ?? 0;
   const maxMargin = Math.max(0, availableBalance);
-  const maxOpenableAmount = maxMargin * parsedLeverage;
-  const amountPercent = maxOpenableAmount > 0 ? clamp((amountValue / maxOpenableAmount) * 100, 0, 100) : 0;
+  const maxOpenableNotional = maxMargin * parsedLeverage;
+  const notional = quantityInputToNotional(amountValue, quantityUnit, quantityReferencePrice);
+  const amountPercent = maxOpenableNotional > 0 ? clamp((notional / maxOpenableNotional) * 100, 0, 100) : 0;
   const sliderStyle = percentSliderStyle(amountPercent);
-  const notional = amountValue;
   const margin = notional / parsedLeverage;
   const liquidationCollateral = marginMode === "cross" ? availableBalance : margin;
-  const quantity = currentPrice && currentPrice > 0 ? notional / currentPrice : 0;
-  const longLiquidation = currentPrice
+  const quantity = quantityReferencePrice > 0 ? notional / quantityReferencePrice : 0;
+  const longLiquidation = quantityReferencePrice > 0
     ? calculateLiquidationPrice({
         side: "long",
-        avgEntryPrice: currentPrice,
+        avgEntryPrice: quantityReferencePrice,
         quantityRemaining: quantity,
         isolatedMarginRemaining: liquidationCollateral
       })
     : null;
-  const shortLiquidation = currentPrice
+  const shortLiquidation = quantityReferencePrice > 0
     ? calculateLiquidationPrice({
         side: "short",
-        avgEntryPrice: currentPrice,
+        avgEntryPrice: quantityReferencePrice,
         quantityRemaining: quantity,
         isolatedMarginRemaining: liquidationCollateral
       })
@@ -687,8 +772,8 @@ function TradeEntryForm({
 
   const setAmountFromPercent = (nextPercent: string) => {
     const nextPercentValue = clamp(parseNumber(nextPercent), 0, 100);
-    const nextAmount = Math.min(maxOpenableAmount, maxOpenableAmount * (nextPercentValue / 100));
-    onAmountChange(formatAmountInput(nextAmount));
+    const nextNotional = Math.min(maxOpenableNotional, maxOpenableNotional * (nextPercentValue / 100));
+    onAmountChange(formatQuantityInput(notionalToQuantityInput(nextNotional, quantityUnit, quantityReferencePrice), quantityUnit));
   };
 
   const openSide = (nextSide: DemoTradeSide) => {
@@ -758,15 +843,20 @@ function TradeEntryForm({
       </div>
 
       <label className="futures-quantity-card">
-        <span>Quantity (USDT)</span>
+        <span className="futures-quantity-label">
+          Quantity ({unitLabel})
+          <button type="button" onClick={onQuantityUnitSettingsOpen}>
+            {unitLabel}
+          </button>
+        </span>
         <div className="futures-quantity-input-row">
           <input
             type="number"
             min="0"
-            step="1"
+            step={quantityInputStep(quantityUnit)}
             value={amount}
             onChange={(event) => onAmountChange(event.target.value)}
-            placeholder="Max. openable quantity"
+            placeholder={quantityInputPlaceholder(quantityUnit)}
           />
           <strong>{Math.round(amountPercent)}%</strong>
         </div>
@@ -794,10 +884,10 @@ function TradeEntryForm({
 
       <div className="futures-side-notional">
         <span>
-          Buy <strong>{formatUsdt(notional)}</strong>
+          Buy <strong>{formatQuantityAmount(amountValue, quantityUnit)}</strong>
         </span>
         <span>
-          Sell <strong>{formatUsdt(notional)}</strong>
+          Sell <strong>{formatQuantityAmount(amountValue, quantityUnit)}</strong>
         </span>
       </div>
 
@@ -857,6 +947,7 @@ function PositionManager({
   takeProfits,
   closePercent,
   addAmount,
+  quantityUnit,
   availableBalance,
   currentPrice,
   errors,
@@ -865,6 +956,7 @@ function PositionManager({
   onTakeProfitsChange,
   onClosePercentChange,
   onAddAmountChange,
+  onQuantityUnitSettingsOpen,
   onAddToPosition,
   onUpdateStop,
   onUpdateLeverage,
@@ -877,6 +969,7 @@ function PositionManager({
   takeProfits: TakeProfitDraft[];
   closePercent: string;
   addAmount: string;
+  quantityUnit: DemoQuantityUnit;
   availableBalance: number;
   currentPrice: number;
   errors: string[];
@@ -885,6 +978,7 @@ function PositionManager({
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
   onClosePercentChange: (value: string) => void;
   onAddAmountChange: (value: string) => void;
+  onQuantityUnitSettingsOpen: () => void;
   onAddToPosition: () => void;
   onUpdateStop: () => void;
   onUpdateLeverage: () => void;
@@ -897,15 +991,16 @@ function PositionManager({
   const remainingAfterClose = position.remainingQuantity - closingQuantity;
   const closeSliderStyle = percentSliderStyle(closePercentValue, 1, 100);
   const addAmountValue = parseNumber(addAmount);
-  const maxAddAmount = Math.max(0, availableBalance) * position.leverage;
-  const addPercent = maxAddAmount > 0 ? clamp((addAmountValue / maxAddAmount) * 100, 0, 100) : 0;
+  const addNotional = quantityInputToNotional(addAmountValue, quantityUnit, currentPrice);
+  const maxAddNotional = Math.max(0, availableBalance) * position.leverage;
+  const addPercent = maxAddNotional > 0 ? clamp((addNotional / maxAddNotional) * 100, 0, 100) : 0;
   const addSliderStyle = percentSliderStyle(addPercent);
-  const estimatedAddQuantity = currentPrice > 0 ? addAmountValue / currentPrice : 0;
+  const estimatedAddQuantity = currentPrice > 0 ? addNotional / currentPrice : 0;
 
   const setAddAmountFromPercent = (nextPercent: string) => {
     const nextPercentValue = clamp(parseNumber(nextPercent), 0, 100);
-    const nextAmount = Math.min(maxAddAmount, maxAddAmount * (nextPercentValue / 100));
-    onAddAmountChange(formatAmountInput(nextAmount));
+    const nextNotional = Math.min(maxAddNotional, maxAddNotional * (nextPercentValue / 100));
+    onAddAmountChange(formatQuantityInput(notionalToQuantityInput(nextNotional, quantityUnit, currentPrice), quantityUnit));
   };
 
   return (
@@ -916,14 +1011,19 @@ function PositionManager({
           <span>{Math.round(addPercent)}%</span>
         </div>
         <label>
-          Quantity (USDT)
+          <span className="futures-quantity-label">
+            Quantity ({quantityUnitLabels[quantityUnit]})
+            <button type="button" onClick={onQuantityUnitSettingsOpen}>
+              {quantityUnitLabels[quantityUnit]}
+            </button>
+          </span>
           <input
             type="number"
             min="0"
-            step="1"
+            step={quantityInputStep(quantityUnit)}
             value={addAmount}
             onChange={(event) => onAddAmountChange(event.target.value)}
-            placeholder="Extra size"
+            placeholder={quantityInputPlaceholder(quantityUnit)}
           />
         </label>
         <div className="futures-percent-control">
@@ -955,7 +1055,7 @@ function PositionManager({
             <dd>{estimatedAddQuantity.toFixed(6)} BTC</dd>
           </div>
         </dl>
-        <button className="ghost-button compact" type="button" onClick={onAddToPosition} disabled={!maxAddAmount}>
+        <button className="ghost-button compact" type="button" onClick={onAddToPosition} disabled={!maxAddNotional}>
           Add to Position
         </button>
       </div>
@@ -1148,11 +1248,7 @@ function DemoTradeChart({
   const basePriceMidpoint = (minPrice + maxPrice) / 2;
   const scaledRange = range * priceScale;
   const visiblePriceRange = scaledRange * 1.24;
-  const priceEdgePadding = Math.max(range * 0.04, visiblePriceRange * 0.02);
-  const minPricePan = maxPrice + priceEdgePadding - basePriceMidpoint - visiblePriceRange / 2;
-  const maxPricePan = minPrice - priceEdgePadding - basePriceMidpoint + visiblePriceRange / 2;
-  const clampedPricePan = clampPricePan(pricePan, minPricePan, maxPricePan);
-  const priceMidpoint = basePriceMidpoint + clampedPricePan;
+  const priceMidpoint = basePriceMidpoint + pricePan;
   const paddedMin = priceMidpoint - visiblePriceRange / 2;
   const paddedMax = priceMidpoint + visiblePriceRange / 2;
   const width = 1040;
@@ -1185,13 +1281,6 @@ function DemoTradeChart({
     setOffset((value) => clamp(value, -futurePaddingCandles, Math.max(0, candles.length - visibleCount)));
   }, [candles.length, futurePaddingCandles, visibleCount]);
 
-  useEffect(() => {
-    setPricePan((value) => {
-      const nextValue = clampPricePan(value, minPricePan, maxPricePan);
-      return Object.is(nextValue, value) ? value : nextValue;
-    });
-  }, [minPricePan, maxPricePan]);
-
   const zoomBy = (amount: number) => {
     setVisibleCount((count) => clamp(count + amount, 28, Math.min(160, Math.max(candles.length, 40))));
   };
@@ -1208,7 +1297,7 @@ function DemoTradeChart({
       setIsPriceScaling(true);
       return;
     }
-    dragStartRef.current = { x: event.clientX, y: event.clientY, offset: safeOffset, pricePan: clampedPricePan, pointerId: event.pointerId };
+    dragStartRef.current = { x: event.clientX, y: event.clientY, offset: safeOffset, pricePan, pointerId: event.pointerId };
     setIsRightDragging(true);
   };
 
@@ -1236,7 +1325,7 @@ function DemoTradeChart({
     const pricePerPixel = visiblePriceRange / Math.max(1, chartHeight);
     const deltaY = event.clientY - dragStartRef.current.y;
     setOffset(clamp(dragStartRef.current.offset + deltaCandles, -futurePaddingCandles, Math.max(0, candles.length - visibleCount)));
-    setPricePan(clampPricePan(dragStartRef.current.pricePan + deltaY * pricePerPixel, minPricePan, maxPricePan));
+    setPricePan(dragStartRef.current.pricePan + deltaY * pricePerPixel);
   };
 
   const handleChartPointerMove = (event: PointerEvent<SVGSVGElement>) => {
@@ -1345,9 +1434,7 @@ function DemoTradeChart({
                 highY,
                 lowY,
                 minBodyHeight,
-                minWickHeight,
-                chartTop: padding.top,
-                chartBottom: height - padding.bottom
+                minWickHeight
               });
               return (
                 <g className={isUp ? "candle up" : "candle down"} key={`${candle.timestamp}-${index}`}>
@@ -1607,9 +1694,7 @@ function buildCandleShape({
   highY,
   lowY,
   minBodyHeight,
-  minWickHeight,
-  chartTop,
-  chartBottom
+  minWickHeight
 }: {
   openY: number;
   closeY: number;
@@ -1617,24 +1702,14 @@ function buildCandleShape({
   lowY: number;
   minBodyHeight: number;
   minWickHeight: number;
-  chartTop: number;
-  chartBottom: number;
 }) {
   const rawBodyHeight = Math.abs(openY - closeY);
   const bodyHeight = Math.max(minBodyHeight, rawBodyHeight);
   const bodyCenter = (openY + closeY) / 2;
-  const bodyY = clamp(bodyCenter - bodyHeight / 2, chartTop, chartBottom - bodyHeight);
+  const bodyY = bodyCenter - bodyHeight / 2;
   const renderedBodyCenter = bodyY + bodyHeight / 2;
-  const wickY1 = clamp(
-    Math.min(highY, lowY, bodyY, renderedBodyCenter - minWickHeight / 2),
-    chartTop,
-    chartBottom
-  );
-  const wickY2 = clamp(
-    Math.max(highY, lowY, bodyY + bodyHeight, renderedBodyCenter + minWickHeight / 2),
-    chartTop,
-    chartBottom
-  );
+  const wickY1 = Math.min(highY, lowY, bodyY, renderedBodyCenter - minWickHeight / 2);
+  const wickY2 = Math.max(highY, lowY, bodyY + bodyHeight, renderedBodyCenter + minWickHeight / 2);
 
   return {
     bodyY,
@@ -1691,6 +1766,70 @@ function buildSubmittedBracket(
       closePercent: parseNumber(takeProfit.closePercent)
     }))
   };
+}
+
+function quantityInputToNotional(value: number, unit: DemoQuantityUnit, price: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (unit === "usdt") return value;
+  if (!Number.isFinite(price) || price <= 0) return 0;
+  if (unit === "btc") return value * price;
+  return value * DEMO_CONTRACT_BTC_SIZE * price;
+}
+
+function notionalToQuantityInput(notional: number, unit: DemoQuantityUnit, price: number): number {
+  if (!Number.isFinite(notional) || notional <= 0) return 0;
+  if (unit === "usdt") return notional;
+  if (!Number.isFinite(price) || price <= 0) return 0;
+  if (unit === "btc") return notional / price;
+  return notional / (DEMO_CONTRACT_BTC_SIZE * price);
+}
+
+function convertQuantityInput(value: string, fromUnit: DemoQuantityUnit, toUnit: DemoQuantityUnit, price: number): string {
+  if (fromUnit === toUnit || value.trim() === "") return value;
+  const notional = quantityInputToNotional(parseNumber(value), fromUnit, price);
+  return formatQuantityInput(notionalToQuantityInput(notional, toUnit, price), toUnit);
+}
+
+function formatQuantityInput(value: number, unit: DemoQuantityUnit): string {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (unit === "cont") {
+    const flooredValue = floorTo(value, value >= 100 ? 0 : 2);
+    return flooredValue > 0 ? flooredValue.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 2 }) : "";
+  }
+  if (unit === "btc") {
+    const flooredValue = floorTo(value, 6);
+    return flooredValue > 0 ? flooredValue.toFixed(6).replace(/0+$/, "").replace(/\.$/, "") : "";
+  }
+  return formatAmountInput(value);
+}
+
+function formatQuantityAmount(value: number, unit: DemoQuantityUnit): string {
+  if (!Number.isFinite(value) || value <= 0) return `0 ${quantityUnitLabels[unit]}`;
+  if (unit === "btc") return `${value.toLocaleString("en-US", { maximumFractionDigits: 6 })} BTC`;
+  if (unit === "cont") return `${value.toLocaleString("en-US", { maximumFractionDigits: 2 })} Cont`;
+  return formatUsdt(value);
+}
+
+function quantityInputStep(unit: DemoQuantityUnit): string {
+  if (unit === "btc") return "0.000001";
+  return "1";
+}
+
+function quantityInputPlaceholder(unit: DemoQuantityUnit): string {
+  if (unit === "btc") return "Amount in BTC";
+  if (unit === "cont") return "Contracts";
+  return "Max. openable quantity";
+}
+
+function unitSettingsCopy(unit: DemoQuantityUnit, price: number): string {
+  if (unit === "btc") return "Enter the futures quantity in BTC. The global unit will switch to BTC.";
+  if (unit === "cont") {
+    const contractValue = quantityInputToNotional(1, "cont", price);
+    return `Enter the futures quantity in cont. 1 cont. = ${DEMO_CONTRACT_BTC_SIZE} BTC${
+      contractValue > 0 ? ` ~= ${formatUsdt(contractValue)}` : ""
+    }. The global unit will switch to cont.`;
+  }
+  return "Enter the futures quantity in USDT. The global unit will switch to USDT.";
 }
 
 function formatInputPrice(value: number): string {
@@ -1751,12 +1890,6 @@ function isBullishCandle(candle: DemoTradeCandle, previousClose = candle.open): 
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
-}
-
-function clampPricePan(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return 0;
-  if (min > max) return (min + max) / 2;
-  return clamp(value, min, max);
 }
 
 function percentSliderStyle(percent: number, min = 0, max = 100): CSSProperties {

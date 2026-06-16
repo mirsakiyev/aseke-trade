@@ -3,7 +3,7 @@ drop constraint if exists xp_transactions_source_type_check;
 
 alter table public.xp_transactions
 add constraint xp_transactions_source_type_check
-check (source_type in ('guide', 'puzzle_of_day', 'admin_adjustment', 'course_badge', 'loyalty_badge'));
+check (source_type in ('guide', 'admin_adjustment', 'course_badge', 'loyalty_badge'));
 
 create table if not exists public.user_badges (
   id uuid primary key default gen_random_uuid(),

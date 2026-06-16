@@ -142,7 +142,7 @@ create table if not exists public.xp_transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   amount integer not null check (amount > 0),
-  source_type text not null check (source_type in ('guide', 'puzzle_of_day', 'admin_adjustment')),
+  source_type text not null check (source_type in ('guide', 'admin_adjustment')),
   source_id uuid not null,
   description text,
   created_at timestamptz not null default now(),
@@ -154,44 +154,6 @@ on public.xp_transactions(user_id);
 
 create index if not exists xp_transactions_source_idx
 on public.xp_transactions(source_type, source_id);
-
-create table if not exists public.daily_puzzles (
-  id uuid primary key default gen_random_uuid(),
-  puzzle_date date not null unique,
-  title text not null,
-  prompt text not null,
-  answer text not null,
-  category text not null default 'crypto trivia',
-  first_solver_user_id uuid references auth.users(id) on delete set null,
-  first_solved_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-drop trigger if exists set_daily_puzzles_updated_at on public.daily_puzzles;
-create trigger set_daily_puzzles_updated_at
-before update on public.daily_puzzles
-for each row execute function public.set_updated_at();
-
-create table if not exists public.daily_puzzle_solves (
-  id uuid primary key default gen_random_uuid(),
-  puzzle_id uuid not null references public.daily_puzzles(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  submitted_answer text not null,
-  is_correct boolean not null default false,
-  is_first_solver boolean not null default false,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists daily_puzzle_solves_user_id_idx
-on public.daily_puzzle_solves(user_id);
-
-create index if not exists daily_puzzle_solves_puzzle_id_idx
-on public.daily_puzzle_solves(puzzle_id);
-
-create unique index if not exists daily_puzzle_solves_first_solver_unique_idx
-on public.daily_puzzle_solves(puzzle_id)
-where is_first_solver = true;
 
 insert into public.premium_plans (
   id,
@@ -489,233 +451,6 @@ begin
 end;
 $$;
 
-create or replace function public.ensure_daily_puzzle(target_date date default current_date)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  puzzle_id uuid;
-  puzzle_index integer;
-  titles text[] := array[
-    'Seed Phrase Scramble',
-    'Block Time Riddle',
-    'Wallet Safety Check',
-    'Gas Fee Logic',
-    'Bitcoin Halving Clue',
-    'Ethereum Builder Trivia',
-    'Cold Storage Riddle'
-  ];
-  prompts text[] := array[
-    'Unscramble this wallet safety phrase: DSEE RHPAES. What two words does it make?',
-    'I group transactions, point to the block before me, and become part of a chain. What am I?',
-    'You should never type this recovery backup into a random website. What is it called?',
-    'On Ethereum, users pay this cost to execute transactions and smart contracts. What is it called?',
-    'This Bitcoin event cuts new issuance roughly every four years. What is it called?',
-    'This kind of contract runs on-chain and follows code instead of a human middleman. What is it called?',
-    'A wallet setup that keeps private keys offline is usually called what?'
-  ];
-  answers text[] := array[
-    'seed phrase',
-    'block',
-    'seed phrase',
-    'gas fee',
-    'halving',
-    'smart contract',
-    'cold wallet'
-  ];
-  categories text[] := array[
-    'word puzzle',
-    'blockchain riddle',
-    'wallet safety',
-    'ethereum trivia',
-    'bitcoin trivia',
-    'smart contracts',
-    'wallet safety'
-  ];
-begin
-  select dp.id
-  into puzzle_id
-  from public.daily_puzzles as dp
-  where dp.puzzle_date = target_date;
-
-  if puzzle_id is not null then
-    return puzzle_id;
-  end if;
-
-  puzzle_index := (abs(('x' || substr(md5(target_date::text), 1, 8))::bit(32)::integer) % array_length(titles, 1)) + 1;
-
-  insert into public.daily_puzzles (
-    puzzle_date,
-    title,
-    prompt,
-    answer,
-    category
-  )
-  values (
-    target_date,
-    titles[puzzle_index],
-    prompts[puzzle_index],
-    answers[puzzle_index],
-    categories[puzzle_index]
-  )
-  on conflict (puzzle_date) do nothing
-  returning id into puzzle_id;
-
-  if puzzle_id is null then
-    select dp.id
-    into puzzle_id
-    from public.daily_puzzles as dp
-    where dp.puzzle_date = target_date;
-  end if;
-
-  return puzzle_id;
-end;
-$$;
-
-create or replace function public.get_daily_puzzle(target_date date default current_date)
-returns table (
-  id uuid,
-  puzzle_date date,
-  title text,
-  prompt text,
-  category text,
-  reward_claimed boolean
-)
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  puzzle_id uuid;
-begin
-  puzzle_id := public.ensure_daily_puzzle(target_date);
-
-  return query
-  select
-    dp.id,
-    dp.puzzle_date,
-    dp.title,
-    dp.prompt,
-    dp.category,
-    dp.first_solver_user_id is not null
-  from public.daily_puzzles as dp
-  where dp.id = puzzle_id;
-end;
-$$;
-
-create or replace function public.submit_daily_puzzle(
-  target_puzzle_id uuid,
-  submitted_answer text
-)
-returns table (
-  is_correct boolean,
-  is_first_solver boolean,
-  xp_awarded integer,
-  reward_already_claimed boolean,
-  total_xp integer,
-  level integer
-)
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  puzzle record;
-  inserted_amount integer := 0;
-  next_profile record;
-begin
-  if auth.uid() is null then
-    raise exception 'Login is required to solve the daily puzzle';
-  end if;
-
-  if target_puzzle_id is null then
-    raise exception 'Puzzle is required';
-  end if;
-
-  select dp.*
-  into puzzle
-  from public.daily_puzzles as dp
-  where dp.id = target_puzzle_id
-  for update;
-
-  if not found then
-    raise exception 'Puzzle not found';
-  end if;
-
-  is_correct := public.normalize_answer(submitted_answer) = public.normalize_answer(puzzle.answer);
-  is_first_solver := false;
-  reward_already_claimed := puzzle.first_solver_user_id is not null;
-
-  if is_correct and puzzle.first_solver_user_id is null then
-    update public.daily_puzzles as dp
-    set first_solver_user_id = auth.uid(),
-        first_solved_at = now(),
-        updated_at = now()
-    where dp.id = puzzle.id
-      and dp.first_solver_user_id is null;
-
-    is_first_solver := found;
-  end if;
-
-  insert into public.daily_puzzle_solves (
-    puzzle_id,
-    user_id,
-    submitted_answer,
-    is_correct,
-    is_first_solver
-  )
-  values (
-    target_puzzle_id,
-    auth.uid(),
-    submitted_answer,
-    is_correct,
-    is_first_solver
-  );
-
-  if is_first_solver then
-    insert into public.xp_transactions (
-      user_id,
-      amount,
-      source_type,
-      source_id,
-      description
-    )
-    values (
-      auth.uid(),
-      100,
-      'puzzle_of_day',
-      target_puzzle_id,
-      'Puzzle of the Day first solver'
-    )
-    on conflict (user_id, source_type, source_id) do nothing
-    returning amount into inserted_amount;
-
-    inserted_amount := coalesce(inserted_amount, 0);
-
-    if inserted_amount > 0 then
-      insert into public.profiles (id, total_xp)
-      values (auth.uid(), inserted_amount)
-      on conflict (id) do update set
-        total_xp = public.profiles.total_xp + excluded.total_xp;
-    end if;
-  end if;
-
-  select p.total_xp, p.level
-  into next_profile
-  from public.profiles as p
-  where p.id = auth.uid();
-
-  xp_awarded := inserted_amount;
-  reward_already_claimed := reward_already_claimed or (is_correct and not is_first_solver);
-  total_xp := coalesce(next_profile.total_xp, 0);
-  level := coalesce(next_profile.level, 1);
-
-  return next;
-end;
-$$;
-
 create or replace function public.admin_issue_trading_academy_subscription(
   target_user_id uuid,
   target_starts_at timestamptz default now(),
@@ -877,8 +612,6 @@ $$;
 alter table public.guide_quizzes enable row level security;
 alter table public.guide_completions enable row level security;
 alter table public.xp_transactions enable row level security;
-alter table public.daily_puzzles enable row level security;
-alter table public.daily_puzzle_solves enable row level security;
 
 drop policy if exists "guide_quizzes_admin_manage" on public.guide_quizzes;
 create policy "guide_quizzes_admin_manage"
@@ -894,17 +627,6 @@ using (user_id = auth.uid() or public.is_admin());
 drop policy if exists "xp_transactions_select_owner_or_admin" on public.xp_transactions;
 create policy "xp_transactions_select_owner_or_admin"
 on public.xp_transactions for select
-using (user_id = auth.uid() or public.is_admin());
-
-drop policy if exists "daily_puzzles_admin_manage" on public.daily_puzzles;
-create policy "daily_puzzles_admin_manage"
-on public.daily_puzzles for all
-using (public.is_admin())
-with check (public.is_admin());
-
-drop policy if exists "daily_puzzle_solves_select_owner_or_admin" on public.daily_puzzle_solves;
-create policy "daily_puzzle_solves_select_owner_or_admin"
-on public.daily_puzzle_solves for select
 using (user_id = auth.uid() or public.is_admin());
 
 drop policy if exists "premium_subscriptions_admin_manage" on public.premium_subscriptions;
@@ -1021,35 +743,18 @@ from public.guides as g
 where g.is_archived = false
 on conflict (guide_id) do nothing;
 
-insert into public.daily_puzzles (
-  puzzle_date,
-  title,
-  prompt,
-  answer,
-  category
-)
-values
-  (current_date, 'Seed Phrase Scramble', 'Unscramble this wallet safety phrase: DSEE RHPAES. What two words does it make?', 'seed phrase', 'word puzzle'),
-  (current_date + 1, 'Gas Fee Logic', 'On Ethereum, users pay this cost to execute transactions and smart contracts. What is it called?', 'gas fee', 'ethereum trivia'),
-  (current_date + 2, 'Block Time Riddle', 'I group transactions, point to the block before me, and become part of a chain. What am I?', 'block', 'blockchain riddle')
-on conflict (puzzle_date) do nothing;
-
-grant select on public.guide_completions, public.xp_transactions, public.daily_puzzle_solves to authenticated;
+grant select on public.guide_completions, public.xp_transactions to authenticated;
 grant select, insert, update, delete on public.guide_quizzes, public.premium_subscriptions to authenticated;
 grant execute on function public.get_xp_required_for_next_level(integer) to anon, authenticated;
 grant execute on function public.get_level_from_xp(integer) to anon, authenticated;
 grant execute on function public.get_guide_quiz(uuid) to anon, authenticated;
 grant execute on function public.submit_guide_quiz(uuid, text) to authenticated;
-grant execute on function public.get_daily_puzzle(date) to anon, authenticated;
-grant execute on function public.submit_daily_puzzle(uuid, text) to authenticated;
 grant execute on function public.admin_issue_trading_academy_subscription(uuid, timestamptz, timestamptz, integer, text, text) to authenticated;
 grant execute on function public.admin_update_trading_academy_subscription(uuid, timestamptz, timestamptz, text) to authenticated;
 
 revoke execute on function public.refresh_premium_subscription_statuses(uuid) from public;
 revoke execute on function public.sync_user_trading_academy_profile(uuid) from public;
-revoke execute on function public.ensure_daily_puzzle(date) from public;
 revoke execute on function public.refresh_premium_subscription_statuses(uuid) from anon, authenticated;
 revoke execute on function public.sync_user_trading_academy_profile(uuid) from anon, authenticated;
-revoke execute on function public.ensure_daily_puzzle(date) from anon, authenticated;
 
 notify pgrst, 'reload schema';

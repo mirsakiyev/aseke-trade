@@ -19,7 +19,6 @@ import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { NotFound } from "./pages/NotFound";
 import { Premium } from "./pages/Premium";
-import { PuzzleOfTheDay } from "./pages/PuzzleOfTheDay";
 import { Register } from "./pages/Register";
 import { ResetPassword } from "./pages/ResetPassword";
 import { Support } from "./pages/Support";
@@ -64,9 +63,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="puzzle" element={<PuzzleOfTheDay />} />
         <Route path="demo-trade" element={<DemoTrade />} />
-        <Route path="puzzle-of-the-day" element={<Navigate to="/puzzle" replace />} />
         <Route path="premium" element={<Navigate to="/trading-academy" replace />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
