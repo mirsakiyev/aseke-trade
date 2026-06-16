@@ -14,9 +14,12 @@ export interface DemoTradeTicker {
   source: string;
 }
 
-export type DemoTradeTimeframe = "1h" | "4h" | "1d" | "1w";
+export type DemoTradeTimeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
 
 export const demoTradeTimeframes: Array<{ value: DemoTradeTimeframe; label: string }> = [
+  { value: "1m", label: "1m" },
+  { value: "5m", label: "5m" },
+  { value: "15m", label: "15m" },
   { value: "1h", label: "1H" },
   { value: "4h", label: "4H" },
   { value: "1d", label: "D" },

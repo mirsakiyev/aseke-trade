@@ -13,11 +13,12 @@ import {
   TrendingDown,
   TrendingUp
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
   applyMarketPrice,
+  calculateLiquidationPrice,
   calculateDemoTradeStats,
   closeOpenPosition,
   createInitialDemoTradeState,
@@ -520,70 +521,99 @@ function TradeEntryForm({
   onOpen: () => void;
 }) {
   const notional = sizeMode === "margin" ? parseNumber(amount) * parseNumber(leverage) : parseNumber(amount);
+  const margin = sizeMode === "margin" ? parseNumber(amount) : notional / Math.max(1, parseNumber(leverage));
+  const quantity = currentPrice && currentPrice > 0 ? notional / currentPrice : 0;
+  const estimatedLiquidation = currentPrice
+    ? calculateLiquidationPrice({
+        side,
+        avgEntryPrice: currentPrice,
+        quantityRemaining: quantity,
+        isolatedMarginRemaining: margin
+      })
+    : null;
 
   return (
-    <div className="demo-ticket-stack">
+    <div className="demo-ticket-stack futures-ticket">
+      <div className="futures-ticket-header">
+        <div>
+          <span>BTCUSDT Perpetual</span>
+          <strong>Isolated · Market</strong>
+        </div>
+        <span className="futures-leverage-badge">{parseNumber(leverage) || 1}x</span>
+      </div>
+
       <div className="demo-side-toggle" aria-label="Choose trade direction">
         <button className={side === "long" ? "long active" : "long"} type="button" onClick={() => onSideChange("long")}>
           <TrendingUp size={16} />
-          Long
+          Buy / Long
         </button>
         <button className={side === "short" ? "short active" : "short"} type="button" onClick={() => onSideChange("short")}>
           <TrendingDown size={16} />
-          Short
+          Sell / Short
         </button>
       </div>
 
-      <label>
-        Entry Price
-        <input value={currentPrice ? formatInputPrice(currentPrice) : ""} disabled />
-      </label>
+      <div className="futures-size-toggle" aria-label="Choose size input mode">
+        <button className={sizeMode === "margin" ? "active" : ""} type="button" onClick={() => onSizeModeChange("margin")}>
+          Margin
+        </button>
+        <button className={sizeMode === "notional" ? "active" : ""} type="button" onClick={() => onSizeModeChange("notional")}>
+          Position Size
+        </button>
+      </div>
 
-      <label>
-        Size Mode
-        <select value={sizeMode} onChange={(event) => onSizeModeChange(event.target.value as DemoTradeSizeMode)}>
-          <option value="margin">Margin amount</option>
-          <option value="notional">Position size</option>
-        </select>
-      </label>
+      <div className="futures-ticket-grid">
+        <label>
+          Entry Price
+          <input value={currentPrice ? formatInputPrice(currentPrice) : ""} disabled />
+        </label>
 
-      <label>
-        {sizeMode === "margin" ? "Margin" : "Position Size"}
-        <input type="number" min="0" step="1" value={amount} onChange={(event) => onAmountChange(event.target.value)} />
-      </label>
+        <label>
+          Leverage
+          <select value={leverage} onChange={(event) => onLeverageChange(event.target.value)}>
+            {Array.from({ length: 100 }, (_, index) => index + 1).map((value) => (
+              <option value={value} key={value}>
+                {value}x
+              </option>
+            ))}
+          </select>
+        </label>
 
-      <label>
-        Leverage
-        <select value={leverage} onChange={(event) => onLeverageChange(event.target.value)}>
-          {Array.from({ length: 100 }, (_, index) => index + 1).map((value) => (
-            <option value={value} key={value}>
-              {value}x
-            </option>
-          ))}
-        </select>
-      </label>
+        <label>
+          {sizeMode === "margin" ? "Margin USDT" : "Position USDT"}
+          <input type="number" min="0" step="1" value={amount} onChange={(event) => onAmountChange(event.target.value)} />
+        </label>
 
-      <label>
-        Stop Loss
-        <input type="number" min="0" step="0.01" value={stopLoss} onChange={(event) => onStopLossChange(event.target.value)} />
-      </label>
+        <label>
+          Stop Loss
+          <input type="number" min="0" step="0.01" value={stopLoss} onChange={(event) => onStopLossChange(event.target.value)} />
+        </label>
+      </div>
 
       <TakeProfitEditor takeProfits={takeProfits} onChange={onTakeProfitsChange} />
 
-      <dl className="demo-estimate-grid">
+      <dl className="demo-estimate-grid futures-estimate-grid">
         <div>
-          <dt>Estimated Notional</dt>
+          <dt>Notional</dt>
           <dd>{formatCurrency(notional)}</dd>
         </div>
         <div>
-          <dt>Estimated Margin</dt>
-          <dd>{formatCurrency(sizeMode === "margin" ? parseNumber(amount) : notional / Math.max(1, parseNumber(leverage)))}</dd>
+          <dt>Margin</dt>
+          <dd>{formatCurrency(margin)}</dd>
+        </div>
+        <div>
+          <dt>Qty</dt>
+          <dd>{quantity > 0 ? `${quantity.toFixed(6)} BTC` : "N/A"}</dd>
+        </div>
+        <div>
+          <dt>Est. Liq</dt>
+          <dd>{estimatedLiquidation ? formatCurrency(estimatedLiquidation) : "N/A"}</dd>
         </div>
       </dl>
 
       <ErrorList errors={errors} />
-      <button className="primary-button" type="button" onClick={onOpen} disabled={!currentPrice}>
-        Open Demo Trade
+      <button className={side === "long" ? "primary-button futures-submit long" : "primary-button futures-submit short"} type="button" onClick={onOpen} disabled={!currentPrice}>
+        {side === "long" ? "Open Long" : "Open Short"}
       </button>
     </div>
   );
@@ -749,7 +779,7 @@ function DemoTradeChart({
   const [visibleCount, setVisibleCount] = useState(defaultVisibleCandles(timeframe));
   const [offset, setOffset] = useState(0);
   const [isRightDragging, setIsRightDragging] = useState(false);
-  const dragStartRef = useRef<{ x: number; offset: number } | null>(null);
+  const dragStartRef = useRef<{ x: number; offset: number; pointerId: number } | null>(null);
   const maxOffset = Math.max(0, candles.length - visibleCount);
   const safeOffset = Math.min(offset, maxOffset);
   const end = Math.max(0, candles.length - safeOffset);
@@ -790,21 +820,25 @@ function DemoTradeChart({
     setVisibleCount((count) => clamp(count + amount, 28, Math.min(160, Math.max(candles.length, 40))));
   };
 
-  const startRightDrag = (event: MouseEvent<SVGSVGElement>) => {
-    if (event.button !== 2) return;
+  const startRightDrag = (event: PointerEvent<SVGSVGElement>) => {
+    if (event.button !== 0 && event.button !== 2) return;
     event.preventDefault();
-    dragStartRef.current = { x: event.clientX, offset: safeOffset };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragStartRef.current = { x: event.clientX, offset: safeOffset, pointerId: event.pointerId };
     setIsRightDragging(true);
   };
 
-  const moveRightDrag = (event: MouseEvent<SVGSVGElement>) => {
+  const moveRightDrag = (event: PointerEvent<SVGSVGElement>) => {
     if (!dragStartRef.current) return;
     event.preventDefault();
     const deltaCandles = Math.round((dragStartRef.current.x - event.clientX) / Math.max(6, candleGap * 0.55));
     setOffset(clamp(dragStartRef.current.offset + deltaCandles, 0, Math.max(0, candles.length - visibleCount)));
   };
 
-  const stopRightDrag = () => {
+  const stopRightDrag = (event?: PointerEvent<SVGSVGElement>) => {
+    if (event && dragStartRef.current && event.currentTarget.hasPointerCapture(dragStartRef.current.pointerId)) {
+      event.currentTarget.releasePointerCapture(dragStartRef.current.pointerId);
+    }
     dragStartRef.current = null;
     setIsRightDragging(false);
   };
@@ -851,10 +885,11 @@ function DemoTradeChart({
           role="img"
           aria-label="Custom BTC USDT demo trading chart"
           onContextMenu={(event) => event.preventDefault()}
-          onMouseDown={startRightDrag}
-          onMouseMove={moveRightDrag}
-          onMouseUp={stopRightDrag}
-          onMouseLeave={stopRightDrag}
+          onPointerDown={startRightDrag}
+          onPointerMove={moveRightDrag}
+          onPointerUp={stopRightDrag}
+          onPointerCancel={stopRightDrag}
+          onPointerLeave={stopRightDrag}
         >
           <defs>
             <clipPath id="demo-trade-chart-plot">
@@ -925,9 +960,6 @@ function DemoTradeChart({
               </g>
             );
           })}
-          <text className="chart-drag-hint" x={padding.left + 8} y={height - 12}>
-            Right-click drag to move chart
-          </text>
         </svg>
       ) : (
         <div className="demo-chart-empty">

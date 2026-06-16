@@ -5739,10 +5739,57 @@ select:focus {
   gap: 0.78rem;
 }
 
+.futures-ticket {
+  gap: 0.62rem;
+}
+
+.futures-ticket-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.58rem 0.66rem;
+  border: 1px solid rgba(229, 228, 226, 0.14);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.04);
+}
+
+.futures-ticket-header div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.futures-ticket-header span,
+.futures-size-toggle button {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.futures-ticket-header strong {
+  color: var(--platinum);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.futures-leverage-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 30px;
+  border: 1px solid rgba(126, 224, 167, 0.28);
+  border-radius: 7px;
+  background: rgba(126, 224, 167, 0.1);
+  color: var(--platinum) !important;
+  font-size: 0.8rem !important;
+}
+
 .demo-side-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.55rem;
+  gap: 0.42rem;
 }
 
 .demo-side-toggle button {
@@ -5750,11 +5797,12 @@ select:focus {
   align-items: center;
   justify-content: center;
   gap: 0.42rem;
-  min-height: 42px;
+  min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(229, 228, 226, 0.045);
   color: var(--platinum-soft);
+  font-size: 0.86rem;
   font-weight: 900;
 }
 
@@ -5771,12 +5819,78 @@ select:focus {
   color: #ffd8d8;
 }
 
+.futures-size-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.28rem;
+  padding: 0.2rem;
+  border: 1px solid rgba(229, 228, 226, 0.14);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.035);
+}
+
+.futures-size-toggle button {
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.futures-size-toggle button.active {
+  border-color: rgba(184, 214, 222, 0.28);
+  background: rgba(184, 214, 222, 0.1);
+  color: var(--platinum);
+}
+
+.futures-ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.futures-ticket label,
+.tp-builder label {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.futures-ticket input,
+.futures-ticket select,
+.tp-builder input {
+  min-height: 38px;
+  padding: 0.48rem 0.56rem;
+  font-size: 0.88rem;
+}
+
 .tp-draft-row,
 .demo-inline-edit {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(90px, 0.5fr) auto;
   gap: 0.5rem;
   align-items: end;
+}
+
+.futures-ticket .tp-builder {
+  gap: 0.45rem;
+  padding: 0.58rem;
+  border: 1px solid rgba(229, 228, 226, 0.12);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.032);
+}
+
+.futures-ticket .tp-builder-heading strong {
+  color: var(--platinum);
+  font-size: 0.86rem;
+}
+
+.futures-ticket .tp-draft-row {
+  grid-template-columns: minmax(0, 1fr) minmax(72px, 0.45fr) 34px;
+  gap: 0.4rem;
 }
 
 .demo-inline-edit {
@@ -5793,6 +5907,34 @@ select:focus {
 .demo-estimate-grid,
 .demo-position-metrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.futures-estimate-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.futures-estimate-grid > div {
+  padding: 0.58rem;
+}
+
+.futures-estimate-grid dd {
+  font-size: 0.86rem;
+}
+
+.futures-submit {
+  min-height: 42px;
+}
+
+.futures-submit.long {
+  border-color: rgba(126, 224, 167, 0.35);
+  background: linear-gradient(135deg, rgba(126, 224, 167, 0.95), rgba(40, 198, 175, 0.84));
+  color: #04100b;
+}
+
+.futures-submit.short {
+  border-color: rgba(255, 107, 107, 0.35);
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.95), rgba(196, 64, 76, 0.86));
+  color: #fff4f4;
 }
 
 .demo-stats-grid {
@@ -6810,11 +6952,13 @@ select:focus {
   }
 
   .demo-stats-grid,
-  .demo-position-metrics {
+  .demo-position-metrics,
+  .futures-estimate-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .signal-card-setup,
+  .futures-ticket-grid,
   .telegram-contact-grid,
   .display-name-form,
   .level-compact-header,

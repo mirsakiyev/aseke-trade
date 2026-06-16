@@ -42,6 +42,8 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /chart-axis-panel/);
   assert.match(pageSource, /chart-price-label/);
   assert.match(pageSource, /onContextMenu=\{\(event\) => event\.preventDefault\(\)\}/);
+  assert.match(pageSource, /onPointerDown=\{startRightDrag\}/);
+  assert.match(pageSource, /setPointerCapture/);
   assert.match(pageSource, /startRightDrag/);
   assert.match(pageSource, /ArrowLeft|ArrowRight|Minus/);
   assert.doesNotMatch(pageSource, /Zoom In|Zoom Out|Pan Left|Pan Right/);
@@ -49,6 +51,9 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
 
 test("Demo Trade page includes trade ticket, management, CSV export, and reset modal", () => {
   assert.match(pageSource, /function TradeEntryForm/);
+  assert.match(pageSource, /futures-ticket/);
+  assert.match(pageSource, /BTCUSDT Perpetual/);
+  assert.match(pageSource, /Est\. Liq/);
   assert.match(pageSource, /function PositionManager/);
   assert.match(pageSource, /openDemoPosition/);
   assert.match(pageSource, /updateDemoStopLoss/);
@@ -63,7 +68,7 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
 test("BTC market data provider is isolated and uses public REST data", () => {
   assert.match(marketDataSource, /fetchDemoTradeCandles/);
   assert.match(marketDataSource, /fetchDemoTradeTicker/);
-  assert.match(marketDataSource, /DemoTradeTimeframe = "1h" \| "4h" \| "1d" \| "1w"/);
+  assert.match(marketDataSource, /DemoTradeTimeframe = "1m" \| "5m" \| "15m" \| "1h" \| "4h" \| "1d" \| "1w"/);
   assert.match(marketDataSource, /api\.binance\.us\/api\/v3/);
   assert.doesNotMatch(marketDataSource, /apiKey|secret|TradingView/);
 });
