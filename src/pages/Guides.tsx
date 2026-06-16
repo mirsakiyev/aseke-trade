@@ -1,4 +1,4 @@
-import { ArrowRight, Award, BookOpen, BookmarkPlus, Filter, LockKeyhole, Timer } from "lucide-react";
+import { ArrowRight, Award, BookOpen, BookmarkPlus, Filter, Timer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
@@ -60,10 +60,6 @@ export function Guides() {
             Browse foundations, safety guides, market research, on-chain intelligence, and Trading Academy materials.
           </p>
         </div>
-        <Link className="primary-button" to="/trading-academy">
-          <LockKeyhole size={17} />
-          Join Trading Academy
-        </Link>
       </section>
 
       <section className="filter-bar" aria-label="Guide filters">

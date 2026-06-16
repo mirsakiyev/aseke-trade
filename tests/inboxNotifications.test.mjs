@@ -6,6 +6,8 @@ const dashboardSource = await readFile(new URL("../src/pages/Dashboard.tsx", imp
 const adminSource = await readFile(new URL("../src/pages/Admin.tsx", import.meta.url), "utf8");
 const coursesSource = await readFile(new URL("../src/pages/Courses.tsx", import.meta.url), "utf8");
 const courseDetailSource = await readFile(new URL("../src/pages/CourseDetail.tsx", import.meta.url), "utf8");
+const guidesSource = await readFile(new URL("../src/pages/Guides.tsx", import.meta.url), "utf8");
+const stylesSource = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 const notificationsApiSource = await readFile(new URL("../src/lib/notificationsApi.ts", import.meta.url), "utf8");
 const validationSource = await readFile(new URL("../src/lib/validation.ts", import.meta.url), "utf8");
 const typesSource = await readFile(new URL("../src/types/content.ts", import.meta.url), "utf8");
@@ -84,6 +86,17 @@ test("admin manages courses as guide bundles without lessons or course pricing",
   assert.match(courseDetailSource, /No guides added yet/);
   assert.doesNotMatch(coursesSource, /formatMoney\(course\.price_cents\)|lessons/);
   assert.doesNotMatch(courseDetailSource, /formatMoney\(course\.price_cents\)|loadPurchasedCourseIds|markLessonComplete/);
+});
+
+test("courses keeps academy CTA in the lower-right title area while guides omits it", () => {
+  assert.match(coursesSource, /className="page-title-row compact-title-row courses-title-row"/);
+  assert.match(coursesSource, /className="platinum-button courses-title-cta"/);
+  assert.match(coursesSource, /academy-platinum-pill/);
+  assert.match(stylesSource, /\.courses-title-cta[\s\S]*align-self: flex-end/);
+  assert.match(stylesSource, /\.courses-title-cta[\s\S]*margin-top: auto/);
+  assert.match(stylesSource, /\.status-pill\.academy-platinum-pill[\s\S]*color: #060708/);
+  assert.doesNotMatch(guidesSource, /Join Trading Academy/);
+  assert.doesNotMatch(guidesSource, /to="\/trading-academy"/);
 });
 
 test("notification client types and helper validate premium-only delivery", () => {

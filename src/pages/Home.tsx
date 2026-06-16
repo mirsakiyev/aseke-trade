@@ -60,8 +60,6 @@ export function Home() {
             chart reading, technical analysis, risk management, trading psychology, futures,
             derivatives, and practical strategy development.
           </p>
-          <p className="founder-line">Learn without hype. Build discipline before risking capital.</p>
-
           <div className="hero-actions" aria-label="Primary actions">
             <Link className="primary-button" to="/trading-academy">
               Join Trading Academy

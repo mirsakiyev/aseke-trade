@@ -27,7 +27,7 @@ export function Courses() {
 
   return (
     <main className="page page-stack">
-      <section className="page-title-row compact-title-row">
+      <section className="page-title-row compact-title-row courses-title-row">
         <div>
           <p className="eyebrow">Courses</p>
           <h1>Structured crypto education</h1>
@@ -36,7 +36,7 @@ export function Courses() {
             technical analysis, risk management, futures, and trading psychology.
           </p>
         </div>
-        <Link className="platinum-button" to="/trading-academy">
+        <Link className="platinum-button courses-title-cta" to="/trading-academy">
           <Crown size={17} />
           Join Trading Academy
         </Link>
@@ -51,7 +51,7 @@ export function Courses() {
           {courses.map((course) => (
             <article className="content-card course-card" key={course.id}>
               <div className="card-topline">
-                <span className={course.is_premium ? "status-pill premium" : "status-pill free"}>
+                <span className={course.is_premium ? "status-pill premium academy-platinum-pill" : "status-pill free"}>
                   {course.is_premium ? "Trading Academy" : "Free"}
                 </span>
                 <span className="meta-with-icon">

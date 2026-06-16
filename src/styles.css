@@ -2122,6 +2122,13 @@ button.leaderboard-badge-more:hover {
   font-size: clamp(5rem, 10vw, 8.5rem);
 }
 
+.courses-title-cta {
+  position: relative;
+  z-index: 1;
+  align-self: flex-end;
+  margin-top: auto;
+}
+
 .filter-bar,
 .tab-bar {
   display: flex;
@@ -3518,6 +3525,16 @@ button.leaderboard-badge-more:hover {
   border-color: rgba(229, 228, 226, 0.52);
   background: rgba(229, 228, 226, 0.12);
   color: #eef3f6;
+}
+
+.status-pill.academy-platinum-pill {
+  border-color: rgba(248, 251, 252, 0.76);
+  background:
+    var(--crypto-gradient-hover),
+    linear-gradient(135deg, #f8fbfc, #aeb8c1 52%, #e9edf0);
+  color: #060708;
+  font-weight: 900;
+  box-shadow: 0 10px 24px rgba(229, 228, 226, 0.13);
 }
 
 .status-pill.free {
