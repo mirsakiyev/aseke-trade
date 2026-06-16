@@ -2,11 +2,12 @@ import {
   AlertTriangle,
   Download,
   LineChart,
-  Minus,
   Plus,
   RotateCcw,
   Save,
-  Trash2
+  Trash2,
+  ZoomIn,
+  ZoomOut
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { Link } from "react-router-dom";
@@ -72,6 +73,7 @@ const emptyTakeProfits: TakeProfitDraft[] = [
 
 const DEMO_TRADE_LIVE_REFRESH_MS = 1000;
 const DEMO_TRADE_CANDLE_SYNC_MS = 10000;
+const PERCENT_SLIDER_THUMB_SIZE = 12;
 
 export function DemoTrade() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -661,7 +663,7 @@ function TradeEntryForm({
   const maxMargin = Math.max(0, availableBalance);
   const maxOpenableAmount = maxMargin * parsedLeverage;
   const amountPercent = maxOpenableAmount > 0 ? clamp((amountValue / maxOpenableAmount) * 100, 0, 100) : 0;
-  const sliderStyle = { "--size-fill": `${amountPercent}%` } as CSSProperties;
+  const sliderStyle = percentSliderStyle(amountPercent);
   const notional = amountValue;
   const margin = notional / parsedLeverage;
   const liquidationCollateral = marginMode === "cross" ? availableBalance : margin;
@@ -893,11 +895,11 @@ function PositionManager({
   const closeRatio = closePercentValue / 100;
   const closingQuantity = position.remainingQuantity * closeRatio;
   const remainingAfterClose = position.remainingQuantity - closingQuantity;
-  const closeSliderStyle = { "--size-fill": `${closePercentValue}%` } as CSSProperties;
+  const closeSliderStyle = percentSliderStyle(closePercentValue, 1, 100);
   const addAmountValue = parseNumber(addAmount);
   const maxAddAmount = Math.max(0, availableBalance) * position.leverage;
   const addPercent = maxAddAmount > 0 ? clamp((addAmountValue / maxAddAmount) * 100, 0, 100) : 0;
-  const addSliderStyle = { "--size-fill": `${addPercent}%` } as CSSProperties;
+  const addSliderStyle = percentSliderStyle(addPercent);
   const estimatedAddQuantity = currentPrice > 0 ? addAmountValue / currentPrice : 0;
 
   const setAddAmountFromPercent = (nextPercent: string) => {
@@ -1143,10 +1145,16 @@ function DemoTradeChart({
   const minPrice = prices.length ? Math.min(...prices) : 0;
   const maxPrice = prices.length ? Math.max(...prices) : 1;
   const range = Math.max(maxPrice - minPrice, 1);
-  const priceMidpoint = (minPrice + maxPrice) / 2 + pricePan;
+  const basePriceMidpoint = (minPrice + maxPrice) / 2;
   const scaledRange = range * priceScale;
-  const paddedMin = priceMidpoint - scaledRange * 0.62;
-  const paddedMax = priceMidpoint + scaledRange * 0.62;
+  const visiblePriceRange = scaledRange * 1.24;
+  const priceEdgePadding = Math.max(range * 0.04, visiblePriceRange * 0.02);
+  const minPricePan = maxPrice + priceEdgePadding - basePriceMidpoint - visiblePriceRange / 2;
+  const maxPricePan = minPrice - priceEdgePadding - basePriceMidpoint + visiblePriceRange / 2;
+  const clampedPricePan = clampPricePan(pricePan, minPricePan, maxPricePan);
+  const priceMidpoint = basePriceMidpoint + clampedPricePan;
+  const paddedMin = priceMidpoint - visiblePriceRange / 2;
+  const paddedMax = priceMidpoint + visiblePriceRange / 2;
   const width = 1040;
   const height = 660;
   const padding = { top: 24, right: 118, bottom: 34, left: 22 };
@@ -1162,6 +1170,9 @@ function DemoTradeChart({
   const priceForY = (y: number) => paddedMax - ((y - padding.top) / chartHeight) * (paddedMax - paddedMin);
   const priceTicks = Array.from({ length: 8 }, (_, index) => paddedMax - ((paddedMax - paddedMin) / 7) * index);
   const verticalGridCount = Math.min(10, Math.max(4, Math.floor(visibleCount / 10)));
+  const latestVisibleCandle = visibleCandles[visibleCandles.length - 1];
+  const latestPreviousClose = visibleCandles[visibleCandles.length - 2]?.close ?? latestVisibleCandle?.open ?? 0;
+  const latestCandleTone = latestVisibleCandle && isBullishCandle(latestVisibleCandle, latestPreviousClose) ? "up" : "down";
 
   useEffect(() => {
     setVisibleCount(defaultVisibleCandles(timeframe));
@@ -1174,6 +1185,13 @@ function DemoTradeChart({
     setOffset((value) => clamp(value, -futurePaddingCandles, Math.max(0, candles.length - visibleCount)));
   }, [candles.length, futurePaddingCandles, visibleCount]);
 
+  useEffect(() => {
+    setPricePan((value) => {
+      const nextValue = clampPricePan(value, minPricePan, maxPricePan);
+      return Object.is(nextValue, value) ? value : nextValue;
+    });
+  }, [minPricePan, maxPricePan]);
+
   const zoomBy = (amount: number) => {
     setVisibleCount((count) => clamp(count + amount, 28, Math.min(160, Math.max(candles.length, 40))));
   };
@@ -1182,6 +1200,7 @@ function DemoTradeChart({
     if (event.button !== 0 && event.button !== 2) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    setCrosshair(null);
     const bounds = event.currentTarget.getBoundingClientRect();
     const axisStart = bounds.left + (axisX / width) * bounds.width;
     if (event.clientX >= axisStart) {
@@ -1189,7 +1208,7 @@ function DemoTradeChart({
       setIsPriceScaling(true);
       return;
     }
-    dragStartRef.current = { x: event.clientX, y: event.clientY, offset: safeOffset, pricePan, pointerId: event.pointerId };
+    dragStartRef.current = { x: event.clientX, y: event.clientY, offset: safeOffset, pricePan: clampedPricePan, pointerId: event.pointerId };
     setIsRightDragging(true);
   };
 
@@ -1214,10 +1233,10 @@ function DemoTradeChart({
     if (!dragStartRef.current) return;
     event.preventDefault();
     const deltaCandles = Math.round((event.clientX - dragStartRef.current.x) / Math.max(5, candleGap));
-    const pricePerPixel = scaledRange / Math.max(1, chartHeight);
+    const pricePerPixel = visiblePriceRange / Math.max(1, chartHeight);
     const deltaY = event.clientY - dragStartRef.current.y;
     setOffset(clamp(dragStartRef.current.offset + deltaCandles, -futurePaddingCandles, Math.max(0, candles.length - visibleCount)));
-    setPricePan(dragStartRef.current.pricePan + deltaY * pricePerPixel);
+    setPricePan(clampPricePan(dragStartRef.current.pricePan + deltaY * pricePerPixel, minPricePan, maxPricePan));
   };
 
   const handleChartPointerMove = (event: PointerEvent<SVGSVGElement>) => {
@@ -1239,7 +1258,7 @@ function DemoTradeChart({
   };
 
   const leaveChart = (event: PointerEvent<SVGSVGElement>) => {
-    stopRightDrag(event);
+    if (dragStartRef.current || priceScaleStartRef.current) return;
     setCrosshair(null);
   };
   const chartClassName = [
@@ -1265,11 +1284,11 @@ function DemoTradeChart({
         </div>
         <div className="demo-chart-icon-controls" aria-label="Chart view controls">
           <button className="icon-button chart-control-button" type="button" onClick={() => zoomBy(-12)} title="Zoom in">
-            <Plus size={16} />
+            <ZoomIn size={17} />
             <span className="sr-only">Zoom in</span>
           </button>
           <button className="icon-button chart-control-button" type="button" onClick={() => zoomBy(12)} title="Zoom out">
-            <Minus size={16} />
+            <ZoomOut size={17} />
             <span className="sr-only">Zoom out</span>
           </button>
         </div>
@@ -1286,6 +1305,7 @@ function DemoTradeChart({
           onPointerMove={handleChartPointerMove}
           onPointerUp={stopRightDrag}
           onPointerCancel={stopRightDrag}
+          onLostPointerCapture={stopRightDrag}
           onPointerLeave={leaveChart}
         >
           <defs>
@@ -1318,7 +1338,7 @@ function DemoTradeChart({
               const highY = yForPrice(candle.high);
               const lowY = yForPrice(candle.low);
               const previousClose = visibleCandles[index - 1]?.close ?? candle.open;
-              const isUp = candle.close === candle.open ? candle.close >= previousClose : candle.close > candle.open;
+              const isUp = isBullishCandle(candle, previousClose);
               const candleShape = buildCandleShape({
                 openY,
                 closeY,
@@ -1347,8 +1367,11 @@ function DemoTradeChart({
           {overlayLines.map((line) => {
             const rawY = yForPrice(line.price);
             const y = clamp(rawY, padding.top + 10, height - padding.bottom - 10);
+            const overlayClassName = ["trade-overlay-line", line.tone, line.tone === "mark" ? latestCandleTone : ""]
+              .filter(Boolean)
+              .join(" ");
             return (
-              <g className={`trade-overlay-line ${line.tone}`} key={`${line.label}-${line.price}`}>
+              <g className={overlayClassName} key={`${line.label}-${line.price}`}>
                 <line x1={padding.left} x2={axisX} y1={y} y2={y} />
                 {line.tone === "mark" ? (
                   <>
@@ -1722,8 +1745,33 @@ function defaultVisibleCandles(timeframe: DemoTradeTimeframe): number {
   return 90;
 }
 
+function isBullishCandle(candle: DemoTradeCandle, previousClose = candle.open): boolean {
+  return candle.close === candle.open ? candle.close >= previousClose : candle.close > candle.open;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function clampPricePan(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (min > max) return (min + max) / 2;
+  return clamp(value, min, max);
+}
+
+function percentSliderStyle(percent: number, min = 0, max = 100): CSSProperties {
+  const clampedPercent = clamp(percent, min, max);
+  const normalizedPercent = max > min ? ((clampedPercent - min) / (max - min)) * 100 : 0;
+  const thumbOffset = PERCENT_SLIDER_THUMB_SIZE / 2 - (normalizedPercent / 100) * PERCENT_SLIDER_THUMB_SIZE;
+  const thumbCenterOperator = thumbOffset < 0 ? "-" : "+";
+
+  return {
+    "--size-fill": `${normalizedPercent}%`,
+    "--slider-thumb-size": `${PERCENT_SLIDER_THUMB_SIZE}px`,
+    "--slider-thumb-half": `${PERCENT_SLIDER_THUMB_SIZE / 2}px`,
+    "--slider-quarter-offset": `${PERCENT_SLIDER_THUMB_SIZE / 4}px`,
+    "--slider-thumb-center": `calc(${normalizedPercent}% ${thumbCenterOperator} ${Math.abs(thumbOffset)}px)`
+  } as CSSProperties;
 }
 
 function floorTo(value: number, digits: number): number {
