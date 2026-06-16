@@ -1,7 +1,5 @@
 import {
   AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
   Download,
   LineChart,
   Minus,
@@ -29,7 +27,6 @@ import {
   updateDemoTakeProfits,
   type DemoOpenPosition,
   type DemoTradeSide,
-  type DemoTradeSizeMode,
   type DemoTradeState
 } from "../lib/demoTradeMath";
 import {
@@ -54,9 +51,19 @@ interface TakeProfitDraft {
   closePercent: string;
 }
 
+type DemoOrderType = "market" | "limit";
+
+interface PendingLimitOrder {
+  side: DemoTradeSide;
+  amount: string;
+  leverage: string;
+  stopLoss: string;
+  takeProfits: TakeProfitDraft[];
+  limitPrice: string;
+}
+
 const emptyTakeProfits: TakeProfitDraft[] = [
-  { id: "tp-1", price: "", closePercent: "50" },
-  { id: "tp-2", price: "", closePercent: "50" }
+  { id: "tp-1", price: "", closePercent: "100" }
 ];
 
 export function DemoTrade() {
@@ -73,8 +80,10 @@ export function DemoTrade() {
   const [marketError, setMarketError] = useState<string | null>(null);
   const [isMarketLoading, setIsMarketLoading] = useState(true);
   const [side, setSide] = useState<DemoTradeSide>("long");
-  const [sizeMode, setSizeMode] = useState<DemoTradeSizeMode>("margin");
-  const [amount, setAmount] = useState("100");
+  const [orderType, setOrderType] = useState<DemoOrderType>("market");
+  const [limitPrice, setLimitPrice] = useState("");
+  const [pendingLimitOrder, setPendingLimitOrder] = useState<PendingLimitOrder | null>(null);
+  const [amount, setAmount] = useState("");
   const [leverage, setLeverage] = useState("5");
   const [stopLoss, setStopLoss] = useState("");
   const [takeProfits, setTakeProfits] = useState<TakeProfitDraft[]>(emptyTakeProfits);
@@ -93,11 +102,9 @@ export function DemoTrade() {
     if (!price) return;
     const defaultStop = nextSide === "long" ? price * 0.98 : price * 1.02;
     const defaultTp1 = nextSide === "long" ? price * 1.02 : price * 0.98;
-    const defaultTp2 = nextSide === "long" ? price * 1.04 : price * 0.96;
     setStopLoss(formatInputPrice(defaultStop));
     setTakeProfits([
-      { id: "tp-1", price: formatInputPrice(defaultTp1), closePercent: "50" },
-      { id: "tp-2", price: formatInputPrice(defaultTp2), closePercent: "50" }
+      { id: "tp-1", price: formatInputPrice(defaultTp1), closePercent: "100" }
     ]);
   }, [currentPrice]);
   const selectTradeSide = useCallback((nextSide: DemoTradeSide) => {
@@ -152,6 +159,12 @@ export function DemoTrade() {
 
     return () => window.clearTimeout(saveTimer);
   }, [demoState, isHydrated, user]);
+
+  useEffect(() => {
+    if (user) return;
+    setOrderType("market");
+    setPendingLimitOrder(null);
+  }, [user]);
 
   const loadMarketData = useCallback(async () => {
     setMarketError(null);
@@ -220,39 +233,47 @@ export function DemoTrade() {
 
   const openTrade = (requestedSide = side) => {
     const entryPrice = currentPrice ?? candles[candles.length - 1]?.close ?? 0;
-    const isOppositeSideSubmit = requestedSide !== side && entryPrice > 0;
-    const submittedStopLoss = isOppositeSideSubmit
-      ? requestedSide === "long" ? entryPrice * 0.98 : entryPrice * 1.02
-      : parseNumber(stopLoss);
-    const submittedTakeProfits = isOppositeSideSubmit
-      ? [
-          {
-            id: "tp-1",
-            price: requestedSide === "long" ? entryPrice * 1.02 : entryPrice * 0.98,
-            closePercent: 50
-          },
-          {
-            id: "tp-2",
-            price: requestedSide === "long" ? entryPrice * 1.04 : entryPrice * 0.96,
-            closePercent: 50
-          }
-        ]
-      : takeProfits.map((takeProfit) => ({
+    const submittedBracket = buildSubmittedBracket(requestedSide, side, entryPrice, stopLoss, takeProfits);
+
+    if (orderType === "limit") {
+      const nextLimitPrice = parseNumber(limitPrice);
+      const nextErrors: string[] = [];
+      if (!user) nextErrors.push("Limit orders are available for registered users only.");
+      if (!Number.isFinite(nextLimitPrice) || nextLimitPrice <= 0) nextErrors.push("Enter a valid limit price.");
+      if (parseNumber(amount) <= 0) nextErrors.push("Enter a position quantity.");
+
+      if (nextErrors.length) {
+        setFormErrors(nextErrors);
+        return;
+      }
+
+      setPendingLimitOrder({
+        side: requestedSide,
+        amount,
+        leverage,
+        stopLoss: String(submittedBracket.stopLoss),
+        takeProfits: submittedBracket.takeProfits.map((takeProfit) => ({
           id: takeProfit.id,
-          price: parseNumber(takeProfit.price),
-          closePercent: parseNumber(takeProfit.closePercent)
-        }));
+          price: String(takeProfit.price),
+          closePercent: String(takeProfit.closePercent)
+        })),
+        limitPrice: formatInputPrice(nextLimitPrice)
+      });
+      setFormErrors([]);
+      return;
+    }
+
     const result = openDemoPosition(demoState, {
       userId: user?.id ?? null,
       sessionId: demoState.sessionId,
       symbol: activeSymbol.symbol,
       side: requestedSide,
-      sizeMode,
+      sizeMode: "notional",
       amount: parseNumber(amount),
       leverage: parseNumber(leverage),
       entryPrice,
-      stopLoss: submittedStopLoss,
-      takeProfits: submittedTakeProfits
+      stopLoss: submittedBracket.stopLoss,
+      takeProfits: submittedBracket.takeProfits
     });
 
     if (!result.ok) {
@@ -263,6 +284,38 @@ export function DemoTrade() {
     setFormErrors([]);
     setDemoState(result.state);
   };
+
+  useEffect(() => {
+    if (!pendingLimitOrder || !currentPrice || demoState.openPosition) return;
+    const triggerPrice = parseNumber(pendingLimitOrder.limitPrice);
+    if (!Number.isFinite(triggerPrice) || triggerPrice <= 0 || currentPrice > triggerPrice) return;
+
+    const result = openDemoPosition(demoState, {
+      userId: user?.id ?? null,
+      sessionId: demoState.sessionId,
+      symbol: activeSymbol.symbol,
+      side: pendingLimitOrder.side,
+      sizeMode: "notional",
+      amount: parseNumber(pendingLimitOrder.amount),
+      leverage: parseNumber(pendingLimitOrder.leverage),
+      entryPrice: triggerPrice,
+      stopLoss: parseNumber(pendingLimitOrder.stopLoss),
+      takeProfits: pendingLimitOrder.takeProfits.map((takeProfit) => ({
+        id: takeProfit.id,
+        price: parseNumber(takeProfit.price),
+        closePercent: parseNumber(takeProfit.closePercent)
+      }))
+    });
+
+    setPendingLimitOrder(null);
+    if (!result.ok) {
+      setFormErrors(result.errors);
+      return;
+    }
+    setOrderType("market");
+    setFormErrors([]);
+    setDemoState(result.state);
+  }, [activeSymbol.symbol, currentPrice, demoState, pendingLimitOrder, user]);
 
   const updateStop = () => {
     const result = updateDemoStopLoss(demoState, parseNumber(positionStopLoss));
@@ -392,13 +445,7 @@ export function DemoTrade() {
 
       <section className="demo-trade-grid">
         <article className="section-panel demo-chart-panel">
-          <div className="section-heading compact-heading">
-            <div>
-              <p className="eyebrow">Custom chart</p>
-              <h2>BTC/USDT practice chart</h2>
-            </div>
-            <span className="status-pill premium">Simulated</span>
-          </div>
+          <p className="eyebrow compact-panel-label">Custom chart</p>
           <DemoTradeChart
             candles={candles}
             currentPrice={currentPrice}
@@ -409,12 +456,7 @@ export function DemoTrade() {
         </article>
 
         <aside className="section-panel demo-ticket-panel">
-          <div className="section-heading compact-heading">
-            <div>
-              <p className="eyebrow">Trade ticket</p>
-              <h2>{demoState.openPosition ? "Manage position" : "Open demo trade"}</h2>
-            </div>
-          </div>
+          <p className="eyebrow compact-panel-label">{demoState.openPosition ? "Manage position" : "Trade ticket"}</p>
 
           {demoState.openPosition ? (
             <PositionManager
@@ -434,20 +476,26 @@ export function DemoTrade() {
           ) : (
             <TradeEntryForm
               side={side}
-              sizeMode={sizeMode}
+              orderType={orderType}
               amount={amount}
               leverage={leverage}
+              limitPrice={limitPrice}
               stopLoss={stopLoss}
               takeProfits={takeProfits}
               currentPrice={currentPrice}
               availableBalance={demoState.availableBalance}
+              isRegistered={Boolean(user)}
+              hasPendingLimitOrder={Boolean(pendingLimitOrder)}
+              pendingLimitPrice={pendingLimitOrder?.limitPrice ?? ""}
               errors={formErrors}
               onSideChange={selectTradeSide}
-              onSizeModeChange={setSizeMode}
+              onOrderTypeChange={setOrderType}
               onAmountChange={setAmount}
               onLeverageChange={setLeverage}
+              onLimitPriceChange={setLimitPrice}
               onStopLossChange={setStopLoss}
               onTakeProfitsChange={setTakeProfits}
+              onCancelLimitOrder={() => setPendingLimitOrder(null)}
               onOpen={openTrade}
             />
           )}
@@ -514,47 +562,59 @@ export function DemoTrade() {
 
 function TradeEntryForm({
   side,
-  sizeMode,
+  orderType,
   amount,
   leverage,
+  limitPrice,
   stopLoss,
   takeProfits,
   currentPrice,
   availableBalance,
+  isRegistered,
+  hasPendingLimitOrder,
+  pendingLimitPrice,
   errors,
   onSideChange,
-  onSizeModeChange,
+  onOrderTypeChange,
   onAmountChange,
   onLeverageChange,
+  onLimitPriceChange,
   onStopLossChange,
   onTakeProfitsChange,
+  onCancelLimitOrder,
   onOpen
 }: {
   side: DemoTradeSide;
-  sizeMode: DemoTradeSizeMode;
+  orderType: DemoOrderType;
   amount: string;
   leverage: string;
+  limitPrice: string;
   stopLoss: string;
   takeProfits: TakeProfitDraft[];
   currentPrice: number | null;
   availableBalance: number;
+  isRegistered: boolean;
+  hasPendingLimitOrder: boolean;
+  pendingLimitPrice: string;
   errors: string[];
   onSideChange: (side: DemoTradeSide) => void;
-  onSizeModeChange: (mode: DemoTradeSizeMode) => void;
+  onOrderTypeChange: (type: DemoOrderType) => void;
   onAmountChange: (value: string) => void;
   onLeverageChange: (value: string) => void;
+  onLimitPriceChange: (value: string) => void;
   onStopLossChange: (value: string) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
+  onCancelLimitOrder: () => void;
   onOpen: (side: DemoTradeSide) => void;
 }) {
   const parsedLeverage = Math.max(1, Math.trunc(parseNumber(leverage)) || 1);
   const amountValue = parseNumber(amount);
   const maxMargin = Math.max(0, availableBalance);
-  const maxOpenableAmount = sizeMode === "margin" ? maxMargin : maxMargin * parsedLeverage;
+  const maxOpenableAmount = maxMargin * parsedLeverage;
   const amountPercent = maxOpenableAmount > 0 ? clamp((amountValue / maxOpenableAmount) * 100, 0, 100) : 0;
   const sliderStyle = { "--size-fill": `${amountPercent}%` } as CSSProperties;
-  const notional = sizeMode === "margin" ? amountValue * parsedLeverage : amountValue;
-  const margin = sizeMode === "margin" ? amountValue : notional / parsedLeverage;
+  const notional = amountValue;
+  const margin = notional / parsedLeverage;
   const quantity = currentPrice && currentPrice > 0 ? notional / currentPrice : 0;
   const longLiquidation = currentPrice
     ? calculateLiquidationPrice({
@@ -599,23 +659,39 @@ function TradeEntryForm({
             </option>
           ))}
         </select>
-        <select className="futures-mode-chip" value={sizeMode} onChange={(event) => onSizeModeChange(event.target.value as DemoTradeSizeMode)} aria-label="Amount mode">
-          <option value="margin">Margin</option>
-          <option value="notional">Size</option>
-        </select>
+        <span className="futures-mode-chip">S</span>
       </div>
 
       <div className="futures-order-tabs" aria-label="Order type">
-        <button type="button" disabled>
+        <button
+          className={orderType === "limit" ? "active" : ""}
+          type="button"
+          disabled={!isRegistered}
+          title={isRegistered ? "Place a limit order" : "Limit orders are for registered users"}
+          onClick={() => onOrderTypeChange("limit")}
+        >
           Limit
         </button>
-        <button className="active" type="button">
+        <button className={orderType === "market" ? "active" : ""} type="button" onClick={() => onOrderTypeChange("market")}>
           Market
         </button>
-        <button type="button" disabled>
-          Chase Limit
-        </button>
       </div>
+
+      {orderType === "limit" && (
+        <label className="futures-limit-price">
+          Limit Price
+          <input type="number" min="0" step="0.01" value={limitPrice} onChange={(event) => onLimitPriceChange(event.target.value)} />
+        </label>
+      )}
+
+      {hasPendingLimitOrder && (
+        <div className="futures-pending-limit">
+          <span>Limit pending at {formatUsdt(parseNumber(pendingLimitPrice))}</span>
+          <button type="button" onClick={onCancelLimitOrder}>
+            Cancel
+          </button>
+        </div>
+      )}
 
       <div className="futures-available-row">
         <span>Available</span>
@@ -880,18 +956,26 @@ function DemoTradeChart({
   const [visibleCount, setVisibleCount] = useState(defaultVisibleCandles(timeframe));
   const [offset, setOffset] = useState(0);
   const [isRightDragging, setIsRightDragging] = useState(false);
+  const [isPriceScaling, setIsPriceScaling] = useState(false);
+  const [priceScale, setPriceScale] = useState(1);
   const dragStartRef = useRef<{ x: number; offset: number; pointerId: number } | null>(null);
+  const priceScaleStartRef = useRef<{ y: number; scale: number; pointerId: number } | null>(null);
   const maxOffset = Math.max(0, candles.length - visibleCount);
   const safeOffset = Math.min(offset, maxOffset);
   const end = Math.max(0, candles.length - safeOffset);
   const visibleCandles = candles.slice(Math.max(0, end - visibleCount), end);
   const overlayLines = buildOverlayLines(position, currentPrice);
-  const prices = visibleCandles.flatMap((candle) => [candle.high, candle.low]).concat(overlayLines.map((line) => line.price));
+  const autoscaleOverlayPrices = overlayLines
+    .filter((line) => line.tone !== "liquidation")
+    .map((line) => line.price);
+  const prices = visibleCandles.flatMap((candle) => [candle.high, candle.low]).concat(autoscaleOverlayPrices);
   const minPrice = prices.length ? Math.min(...prices) : 0;
   const maxPrice = prices.length ? Math.max(...prices) : 1;
   const range = Math.max(maxPrice - minPrice, 1);
-  const paddedMin = minPrice - range * 0.12;
-  const paddedMax = maxPrice + range * 0.12;
+  const priceMidpoint = (minPrice + maxPrice) / 2;
+  const scaledRange = range * priceScale;
+  const paddedMin = priceMidpoint - scaledRange * 0.62;
+  const paddedMax = priceMidpoint + scaledRange * 0.62;
   const width = 1040;
   const height = 500;
   const padding = { top: 24, right: 118, bottom: 34, left: 22 };
@@ -907,15 +991,12 @@ function DemoTradeChart({
   useEffect(() => {
     setVisibleCount(defaultVisibleCandles(timeframe));
     setOffset(0);
+    setPriceScale(1);
   }, [timeframe]);
 
   useEffect(() => {
     setOffset((value) => Math.min(value, Math.max(0, candles.length - visibleCount)));
   }, [candles.length, visibleCount]);
-
-  const panBy = (amount: number) => {
-    setOffset((value) => clamp(value + amount, 0, Math.max(0, candles.length - visibleCount)));
-  };
 
   const zoomBy = (amount: number) => {
     setVisibleCount((count) => clamp(count + amount, 28, Math.min(160, Math.max(candles.length, 40))));
@@ -925,11 +1006,24 @@ function DemoTradeChart({
     if (event.button !== 0 && event.button !== 2) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const axisStart = bounds.left + (axisX / width) * bounds.width;
+    if (event.clientX >= axisStart) {
+      priceScaleStartRef.current = { y: event.clientY, scale: priceScale, pointerId: event.pointerId };
+      setIsPriceScaling(true);
+      return;
+    }
     dragStartRef.current = { x: event.clientX, offset: safeOffset, pointerId: event.pointerId };
     setIsRightDragging(true);
   };
 
   const moveRightDrag = (event: PointerEvent<SVGSVGElement>) => {
+    if (priceScaleStartRef.current) {
+      event.preventDefault();
+      const deltaY = event.clientY - priceScaleStartRef.current.y;
+      setPriceScale(clamp(priceScaleStartRef.current.scale * Math.exp(deltaY / 180), 0.45, 4));
+      return;
+    }
     if (!dragStartRef.current) return;
     event.preventDefault();
     const deltaCandles = Math.round((event.clientX - dragStartRef.current.x) / Math.max(5, candleGap));
@@ -940,9 +1034,19 @@ function DemoTradeChart({
     if (event && dragStartRef.current && event.currentTarget.hasPointerCapture(dragStartRef.current.pointerId)) {
       event.currentTarget.releasePointerCapture(dragStartRef.current.pointerId);
     }
+    if (event && priceScaleStartRef.current && event.currentTarget.hasPointerCapture(priceScaleStartRef.current.pointerId)) {
+      event.currentTarget.releasePointerCapture(priceScaleStartRef.current.pointerId);
+    }
     dragStartRef.current = null;
+    priceScaleStartRef.current = null;
     setIsRightDragging(false);
+    setIsPriceScaling(false);
   };
+  const chartClassName = [
+    "demo-trade-chart",
+    isRightDragging ? "dragging" : "",
+    isPriceScaling ? "scaling" : ""
+  ].filter(Boolean).join(" ");
 
   return (
     <div className="demo-chart-shell">
@@ -968,20 +1072,12 @@ function DemoTradeChart({
             <Minus size={16} />
             <span className="sr-only">Zoom out</span>
           </button>
-          <button className="icon-button chart-control-button" type="button" onClick={() => panBy(12)} title="Move left">
-            <ArrowLeft size={16} />
-            <span className="sr-only">Move chart left</span>
-          </button>
-          <button className="icon-button chart-control-button" type="button" onClick={() => panBy(-12)} title="Move right">
-            <ArrowRight size={16} />
-            <span className="sr-only">Move chart right</span>
-          </button>
         </div>
       </div>
 
       {visibleCandles.length ? (
         <svg
-          className={isRightDragging ? "demo-trade-chart dragging" : "demo-trade-chart"}
+          className={chartClassName}
           viewBox={`0 0 ${width} ${height}`}
           role="img"
           aria-label="Custom BTC USDT demo trading chart"
@@ -1039,7 +1135,8 @@ function DemoTradeChart({
             })}
           </g>
           {overlayLines.map((line) => {
-            const y = yForPrice(line.price);
+            const rawY = yForPrice(line.price);
+            const y = clamp(rawY, padding.top + 10, height - padding.bottom - 10);
             return (
               <g className={`trade-overlay-line ${line.tone}`} key={`${line.label}-${line.price}`}>
                 <line x1={padding.left} x2={axisX} y1={y} y2={y} />
@@ -1217,6 +1314,36 @@ function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: numb
 function parseNumber(value: string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildSubmittedBracket(
+  requestedSide: DemoTradeSide,
+  activeSide: DemoTradeSide,
+  entryPrice: number,
+  stopLoss: string,
+  takeProfits: TakeProfitDraft[]
+) {
+  if (requestedSide !== activeSide && entryPrice > 0) {
+    return {
+      stopLoss: requestedSide === "long" ? entryPrice * 0.98 : entryPrice * 1.02,
+      takeProfits: [
+        {
+          id: "tp-1",
+          price: requestedSide === "long" ? entryPrice * 1.02 : entryPrice * 0.98,
+          closePercent: 100
+        }
+      ]
+    };
+  }
+
+  return {
+    stopLoss: parseNumber(stopLoss),
+    takeProfits: takeProfits.map((takeProfit) => ({
+      id: takeProfit.id,
+      price: parseNumber(takeProfit.price),
+      closePercent: parseNumber(takeProfit.closePercent)
+    }))
+  };
 }
 
 function formatInputPrice(value: number): string {

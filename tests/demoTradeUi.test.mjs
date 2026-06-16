@@ -32,7 +32,7 @@ test("Demo Trade page includes guest and authenticated persistence paths", () =>
 
 test("Demo Trade page includes custom chart and no TradingView widget", () => {
   assert.match(pageSource, /function DemoTradeChart/);
-  assert.match(pageSource, /className=\{isRightDragging \? "demo-trade-chart dragging" : "demo-trade-chart"\}/);
+  assert.match(pageSource, /chartClassName/);
   assert.match(pageSource, /buildOverlayLines/);
   assert.doesNotMatch(pageSource, /TradingViewChart|tradingview-widget|s3\.tradingview/);
 });
@@ -45,18 +45,25 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /onPointerDown=\{startRightDrag\}/);
   assert.match(pageSource, /setPointerCapture/);
   assert.match(pageSource, /event\.clientX - dragStartRef\.current\.x/);
+  assert.match(pageSource, /priceScaleStartRef/);
+  assert.match(pageSource, /line\.tone !== "liquidation"/);
   assert.match(pageSource, /startRightDrag/);
-  assert.match(pageSource, /ArrowLeft|ArrowRight|Minus/);
+  assert.match(pageSource, /Minus/);
   assert.doesNotMatch(pageSource, /Zoom In|Zoom Out|Pan Left|Pan Right/);
+  assert.doesNotMatch(pageSource, /ArrowLeft|ArrowRight/);
 });
 
 test("Demo Trade page includes trade ticket, management, CSV export, and reset modal", () => {
   assert.match(pageSource, /function TradeEntryForm/);
   assert.match(pageSource, /futures-ticket/);
   assert.match(pageSource, /BTCUSDT Perpetual/);
+  assert.match(pageSource, /Limit orders are available for registered users only/);
+  assert.match(pageSource, /Limit Price/);
   assert.match(pageSource, /Position size percent/);
   assert.match(pageSource, /Long Liquidation Price/);
   assert.match(pageSource, /Open Short/);
+  assert.doesNotMatch(pageSource, /Chase Limit/);
+  assert.doesNotMatch(pageSource, /Position Size/);
   assert.match(pageSource, /function PositionManager/);
   assert.match(pageSource, /openDemoPosition/);
   assert.match(pageSource, /updateDemoStopLoss/);

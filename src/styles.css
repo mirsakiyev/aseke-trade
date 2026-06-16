@@ -5554,6 +5554,10 @@ select:focus {
   gap: 0.9rem;
 }
 
+.compact-panel-label {
+  margin: 0;
+}
+
 .compact-heading {
   align-items: center;
   gap: 0.75rem;
@@ -5571,6 +5575,7 @@ select:focus {
 
 .demo-chart-controls {
   justify-content: space-between;
+  margin-top: -0.1rem;
 }
 
 .demo-trade-chart {
@@ -5587,6 +5592,10 @@ select:focus {
 
 .demo-trade-chart.dragging {
   cursor: grabbing;
+}
+
+.demo-trade-chart.scaling {
+  cursor: ns-resize;
 }
 
 .demo-trade-chart > rect {
@@ -5634,6 +5643,7 @@ select:focus {
   fill: rgba(8, 11, 14, 0.96);
   stroke: rgba(229, 228, 226, 0.12);
   stroke-width: 1;
+  cursor: ns-resize;
 }
 
 .chart-grid-line {
@@ -5840,6 +5850,42 @@ select.futures-mode-chip {
 .futures-order-tabs button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.futures-limit-price {
+  display: grid;
+  gap: 0.32rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.futures-limit-price input {
+  min-height: 38px;
+  padding: 0.48rem 0.56rem;
+}
+
+.futures-pending-limit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.42rem 0.5rem;
+  border: 1px solid rgba(126, 224, 167, 0.22);
+  border-radius: 7px;
+  background: rgba(126, 224, 167, 0.08);
+  color: var(--platinum);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.futures-pending-limit button {
+  border: 0;
+  background: transparent;
+  color: #ffb2b2;
+  font-size: 0.72rem;
+  font-weight: 900;
 }
 
 .futures-direction-toggle {
