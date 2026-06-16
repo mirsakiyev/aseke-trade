@@ -314,11 +314,7 @@ export function TradingAcademyDashboard() {
             Welcome back, {displayName}. Track leaderboard progress, review signals, request AML checks, and contact premium support.
           </p>
         </div>
-        <div className="inline-actions">
-          <span className="status-pill premium">
-            <Crown size={15} />
-            {accountStatus.planLabel}
-          </span>
+        <div className="inline-actions academy-title-actions">
           <button className="ghost-button compact" type="button" onClick={() => void loadDashboard()}>
             <RefreshCw size={16} />
             Refresh

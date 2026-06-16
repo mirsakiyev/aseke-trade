@@ -1,0 +1,84 @@
+export interface DemoTradeCandle {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface DemoTradeTicker {
+  symbol: "BTCUSDT";
+  price: number;
+  timestamp: string;
+  source: string;
+}
+
+export const demoTradeSymbols = [
+  {
+    symbol: "BTCUSDT" as const,
+    label: "BTC/USDT",
+    baseAsset: "BTC",
+    quoteAsset: "USDT"
+  }
+];
+
+const binanceUsBaseUrl = "https://api.binance.us/api/v3";
+
+export async function fetchDemoTradeCandles(symbol = "BTCUSDT", limit = 90): Promise<DemoTradeCandle[]> {
+  const safeSymbol = normalizeDemoSymbol(symbol);
+  const url = `${binanceUsBaseUrl}/klines?symbol=${safeSymbol}&interval=1m&limit=${Math.min(Math.max(limit, 20), 200)}`;
+  const payload = await fetchJson(url);
+
+  if (!Array.isArray(payload)) throw new Error("BTC candle data was malformed.");
+
+  const candles = payload.map(normalizeKline).filter((candle): candle is DemoTradeCandle => candle !== null);
+  if (!candles.length) throw new Error("BTC candle data is unavailable.");
+  return candles;
+}
+
+export async function fetchDemoTradeTicker(symbol = "BTCUSDT"): Promise<DemoTradeTicker> {
+  const safeSymbol = normalizeDemoSymbol(symbol);
+  const payload = await fetchJson(`${binanceUsBaseUrl}/ticker/price?symbol=${safeSymbol}`, { cache: "no-store" });
+
+  if (!isRecord(payload)) throw new Error("BTC price data was malformed.");
+  const price = Number(payload.price);
+  if (!Number.isFinite(price) || price <= 0) throw new Error("BTC price data is unavailable.");
+
+  return {
+    symbol: "BTCUSDT",
+    price,
+    timestamp: new Date().toISOString(),
+    source: "Binance.US public market data"
+  };
+}
+
+function normalizeDemoSymbol(symbol: string): "BTCUSDT" {
+  const normalized = symbol.replace(/[^a-z0-9]/gi, "").toUpperCase();
+  if (normalized !== "BTCUSDT") throw new Error("BTC/USDT is the only supported demo pair for v1.");
+  return "BTCUSDT";
+}
+
+function normalizeKline(row: unknown): DemoTradeCandle | null {
+  if (!Array.isArray(row) || row.length < 6) return null;
+
+  const timestamp = Number(row[0]);
+  const open = Number(row[1]);
+  const high = Number(row[2]);
+  const low = Number(row[3]);
+  const close = Number(row[4]);
+  const volume = Number(row[5]);
+
+  if (![timestamp, open, high, low, close, volume].every(Number.isFinite)) return null;
+  return { timestamp, open, high, low, close, volume };
+}
+
+async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
+  const response = await fetch(url, init);
+  if (!response.ok) throw new Error("BTC market data could not be loaded.");
+  return response.json() as Promise<unknown>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

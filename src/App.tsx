@@ -12,6 +12,7 @@ import { Courses } from "./pages/Courses";
 import { CryptoCheckout } from "./pages/CryptoCheckout";
 import { CryptoPayment } from "./pages/CryptoPayment";
 import { Dashboard } from "./pages/Dashboard";
+import { DemoTrade } from "./pages/DemoTrade";
 import { GuideDetail } from "./pages/GuideDetail";
 import { Guides } from "./pages/Guides";
 import { Home } from "./pages/Home";
@@ -64,6 +65,7 @@ export default function App() {
           }
         />
         <Route path="puzzle" element={<PuzzleOfTheDay />} />
+        <Route path="demo-trade" element={<DemoTrade />} />
         <Route path="puzzle-of-the-day" element={<Navigate to="/puzzle" replace />} />
         <Route path="premium" element={<Navigate to="/trading-academy" replace />} />
         <Route path="login" element={<Login />} />
