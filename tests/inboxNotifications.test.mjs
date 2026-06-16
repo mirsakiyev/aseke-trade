@@ -45,10 +45,13 @@ test("dashboard renders inbox, read handling, display name editing, and compact 
     "inbox-panel",
     "inbox-list-empty",
     "inbox-message-body",
+    "<h2>Inbox</h2>",
     "Extend Trading Academy Access"
   ]) {
     assert.match(dashboardSource, new RegExp(expected.replace(/[.]/g, "\\.")));
   }
+  assert.doesNotMatch(dashboardSource, /<p className="eyebrow">Inbox<\/p>/);
+  assert.doesNotMatch(dashboardSource, /Account notifications/);
   assert.doesNotMatch(dashboardSource, /Your Trading Academy access is active/);
   assert.doesNotMatch(dashboardSource, /Join Trading Academy/);
 });

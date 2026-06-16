@@ -49,7 +49,7 @@ export function Premium() {
       <section className="page-title-row">
         <div>
           <p className="eyebrow">Trading Academy</p>
-          <h1>Join the ASEKE TRADE Trading Academy</h1>
+          <h1>Join Trading Academy</h1>
           <p className="muted">
             Trading Academy unlocks advanced trading education, risk management frameworks, trading psychology,
             futures and derivatives lessons, educational market signals, individual strategy support, and 1-on-1 guidance.

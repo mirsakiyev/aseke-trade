@@ -1,10 +1,21 @@
-import { ArrowRight, Award, BookOpen, CheckCircle2, LockKeyhole, Timer, WalletCards, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Award,
+  BookOpen,
+  CheckCircle2,
+  LockKeyhole,
+  RotateCcw,
+  Timer,
+  WalletCards,
+  XCircle
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { loadGuideBySlug, loadPurchasedCourseIds, loadPurchasedGuideIds } from "../lib/contentApi";
-import { loadGuideQuiz, submitGuideQuiz, type GuideQuizSubmissionResult } from "../lib/gamificationApi";
+import { loadGuideQuizzes, submitGuideQuiz, type GuideQuizSubmissionResult } from "../lib/gamificationApi";
 import { getProgressToNextLevel } from "../lib/levels";
 import { premiumCheckoutPath } from "../lib/premiumPlans";
 import type { Guide, GuideQuiz } from "../types/content";
@@ -15,8 +26,10 @@ export function GuideDetail() {
   const [guide, setGuide] = useState<Guide | null>(null);
   const [purchasedCourseIds, setPurchasedCourseIds] = useState<Set<string>>(new Set());
   const [purchasedGuideIds, setPurchasedGuideIds] = useState<Set<string>>(new Set());
-  const [guideQuiz, setGuideQuiz] = useState<GuideQuiz | null>(null);
-  const [quizAnswer, setQuizAnswer] = useState("");
+  const [guideQuizzes, setGuideQuizzes] = useState<GuideQuiz[]>([]);
+  const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
+  const [draftQuizAnswers, setDraftQuizAnswers] = useState<Record<string, string>>({});
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [quizResult, setQuizResult] = useState<GuideQuizSubmissionResult | null>(null);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
   const [isQuizSubmitting, setIsQuizSubmitting] = useState(false);
@@ -76,8 +89,10 @@ export function GuideDetail() {
   useEffect(() => {
     let mounted = true;
 
-    setGuideQuiz(null);
-    setQuizAnswer("");
+    setGuideQuizzes([]);
+    setCurrentQuizQuestionIndex(0);
+    setDraftQuizAnswers({});
+    setQuizAnswers({});
     setQuizResult(null);
     setQuizNotice(null);
 
@@ -89,10 +104,10 @@ export function GuideDetail() {
     }
 
     setIsQuizLoading(true);
-    loadGuideQuiz(guide.id)
-      .then((quiz) => {
+    loadGuideQuizzes(guide.id)
+      .then((quizzes) => {
         if (!mounted) return;
-        setGuideQuiz(quiz);
+        setGuideQuizzes(quizzes.slice(0, 5));
       })
       .finally(() => {
         if (mounted) setIsQuizLoading(false);
@@ -103,8 +118,66 @@ export function GuideDetail() {
     };
   }, [guide?.id, hasAccess]);
 
+  const currentQuizQuestion = guideQuizzes[currentQuizQuestionIndex];
+  const selectedCurrentQuizAnswer = currentQuizQuestion
+    ? draftQuizAnswers[currentQuizQuestion.id] ?? quizAnswers[currentQuizQuestion.id]
+    : undefined;
+  const answeredQuizCount = guideQuizzes.filter((quiz) => Boolean(quizAnswers[quiz.id])).length;
+  const guideQuizProgress = guideQuizzes.length > 0 ? Math.round((answeredQuizCount / guideQuizzes.length) * 100) : 0;
+  const isGuideQuizSubmitted = Boolean(quizResult);
+  const isGuideQuizReady = guideQuizzes.length === 5;
+
+  const selectDraftQuizAnswer = (questionId: string, option: string) => {
+    if (isGuideQuizSubmitted) return;
+
+    setDraftQuizAnswers((current) => ({
+      ...current,
+      [questionId]: option
+    }));
+  };
+
+  const confirmCurrentQuizAnswer = () => {
+    if (!currentQuizQuestion || !selectedCurrentQuizAnswer || isGuideQuizSubmitted) return;
+
+    const nextAnswers = {
+      ...quizAnswers,
+      [currentQuizQuestion.id]: selectedCurrentQuizAnswer
+    };
+
+    setQuizAnswers(nextAnswers);
+    setDraftQuizAnswers((current) => ({
+      ...current,
+      [currentQuizQuestion.id]: selectedCurrentQuizAnswer
+    }));
+
+    const nextUnansweredIndex = guideQuizzes.findIndex(
+      (quiz, index) => index > currentQuizQuestionIndex && !nextAnswers[quiz.id]
+    );
+    const fallbackUnansweredIndex = guideQuizzes.findIndex((quiz) => !nextAnswers[quiz.id]);
+
+    if (nextUnansweredIndex !== -1) {
+      setCurrentQuizQuestionIndex(nextUnansweredIndex);
+      return;
+    }
+
+    if (fallbackUnansweredIndex !== -1) {
+      setCurrentQuizQuestionIndex(fallbackUnansweredIndex);
+      return;
+    }
+
+    setCurrentQuizQuestionIndex((index) => Math.min(index + 1, guideQuizzes.length - 1));
+  };
+
+  const resetGuideQuizAttempt = () => {
+    setCurrentQuizQuestionIndex(0);
+    setDraftQuizAnswers({});
+    setQuizAnswers({});
+    setQuizResult(null);
+    setQuizNotice(null);
+  };
+
   const submitQuiz = async () => {
-    if (!guide || !guideQuiz || !quizAnswer) return;
+    if (!guide || !isGuideQuizReady || answeredQuizCount !== guideQuizzes.length) return;
 
     if (!user) {
       setQuizNotice("Login to submit the quiz and earn XP.");
@@ -115,7 +188,7 @@ export function GuideDetail() {
     setQuizNotice(null);
 
     try {
-      const result = await submitGuideQuiz(guide.id, quizAnswer);
+      const result = await submitGuideQuiz(guide.id, quizAnswers);
       setQuizResult(result);
       await refreshProfile();
     } catch {
@@ -249,43 +322,123 @@ export function GuideDetail() {
 
           {isQuizLoading ? (
             <LoadingState label="Loading guide quiz" />
-          ) : guideQuiz ? (
+          ) : guideQuizzes.length > 0 && currentQuizQuestion ? (
             <>
-              <div className="guide-quiz-question">
-                <h3>{guideQuiz.question}</h3>
-                <div className="quiz-option-list">
-                  {guideQuiz.answer_options.map((option) => (
-                    <button
-                      className={quizAnswer === option ? "quiz-option selected" : "quiz-option"}
-                      type="button"
-                      disabled={isQuizSubmitting}
-                      onClick={() => setQuizAnswer(option)}
-                      key={option}
-                    >
-                      <span>{option}</span>
-                    </button>
-                  ))}
+              <section className="quiz-status-grid guide-quiz-status-grid" aria-label="Guide quiz status">
+                <div className="quiz-status-panel">
+                  <span className="status-pill">{isGuideQuizReady ? "5 questions" : `${guideQuizzes.length}/5 ready`}</span>
+                  <strong>
+                    {answeredQuizCount}/{guideQuizzes.length} answered
+                  </strong>
+                  <div className="quiz-progress-track" aria-hidden="true">
+                    <span style={{ width: `${guideQuizProgress}%` }} />
+                  </div>
                 </div>
-              </div>
+              </section>
 
-              <div className="quiz-card-footer">
-                <p>
-                  XP is awarded server-side after a passing answer, and each guide can only award XP
-                  once per account.
-                </p>
-                <button
-                  className="primary-button"
-                  type="button"
-                  disabled={!quizAnswer || isQuizSubmitting}
-                  onClick={() => void submitQuiz()}
-                >
-                  Submit quiz
-                  <CheckCircle2 size={18} />
-                </button>
-              </div>
+              <section className="quiz-carousel guide-quiz-carousel" aria-label="Guide quiz carousel">
+                <div className="quiz-question-nav guide-quiz-nav" aria-label="Jump to guide quiz question">
+                  {guideQuizzes.map((quiz, index) => {
+                    const isCurrent = index === currentQuizQuestionIndex;
+                    const isAnswered = Boolean(quizAnswers[quiz.id]);
+                    const correctAnswer = quizResult?.correct_answers?.[quiz.id];
+                    const isCorrect = Boolean(correctAnswer && quizAnswers[quiz.id] === correctAnswer);
+                    const className = [
+                      "quiz-question-nav-button",
+                      isCurrent ? "current" : "",
+                      isAnswered ? "answered" : "",
+                      quizResult && isAnswered && isCorrect ? "correct" : "",
+                      quizResult && isAnswered && !isCorrect ? "incorrect" : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+
+                    return (
+                      <button
+                        className={className}
+                        type="button"
+                        onClick={() => setCurrentQuizQuestionIndex(index)}
+                        aria-current={isCurrent ? "step" : undefined}
+                        key={quiz.id}
+                      >
+                        {index + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <GuideQuizQuestionSlide
+                  question={currentQuizQuestion}
+                  questionIndex={currentQuizQuestionIndex}
+                  totalQuestions={guideQuizzes.length}
+                  selectedAnswer={selectedCurrentQuizAnswer}
+                  confirmedAnswer={quizAnswers[currentQuizQuestion.id]}
+                  submitted={isGuideQuizSubmitted}
+                  correctAnswer={quizResult?.correct_answers?.[currentQuizQuestion.id]}
+                  explanation={quizResult?.explanations?.[currentQuizQuestion.id]}
+                  onSelect={selectDraftQuizAnswer}
+                  onConfirm={confirmCurrentQuizAnswer}
+                />
+
+                <div className="quiz-carousel-controls">
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    disabled={currentQuizQuestionIndex === 0}
+                    onClick={() => setCurrentQuizQuestionIndex((index) => Math.max(index - 1, 0))}
+                  >
+                    <ArrowLeft size={18} />
+                    Previous
+                  </button>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    disabled={currentQuizQuestionIndex === guideQuizzes.length - 1}
+                    onClick={() => setCurrentQuizQuestionIndex((index) => Math.min(index + 1, guideQuizzes.length - 1))}
+                  >
+                    Next
+                    <ArrowRight size={18} />
+                  </button>
+                </div>
+              </section>
+
+              <section className="quiz-submit-panel guide-quiz-submit-panel">
+                {!isGuideQuizReady ? (
+                  <p>The full 5-question guide quiz is still being prepared. Please try again after the latest content update.</p>
+                ) : !quizResult ? (
+                  <>
+                    <p>
+                      Answer all 5 questions, then submit. XP is awarded server-side only after a
+                      fully passing guide quiz, once per account.
+                    </p>
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled={!isGuideQuizReady || answeredQuizCount !== guideQuizzes.length || isQuizSubmitting}
+                      onClick={() => void submitQuiz()}
+                    >
+                      Submit quiz
+                      <CheckCircle2 size={18} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      You can review each question above. Correct answers and explanations are shown
+                      after submission.
+                    </p>
+                    {!quizResult.passed && (
+                      <button className="ghost-button" type="button" onClick={resetGuideQuizAttempt}>
+                        Try again
+                        <RotateCcw size={18} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </section>
 
               {quizNotice && <p className="warning-box">{quizNotice}</p>}
-              {quizResult && <GuideQuizResultPanel result={quizResult} />}
+              {quizResult && <GuideQuizResultPanel result={quizResult} onRetake={resetGuideQuizAttempt} />}
             </>
           ) : (
             <p className="muted">
@@ -298,8 +451,116 @@ export function GuideDetail() {
   );
 }
 
-function GuideQuizResultPanel({ result }: { result: GuideQuizSubmissionResult }) {
+function GuideQuizQuestionSlide({
+  question,
+  questionIndex,
+  totalQuestions,
+  selectedAnswer,
+  confirmedAnswer,
+  submitted,
+  correctAnswer,
+  explanation,
+  onSelect,
+  onConfirm
+}: {
+  question: GuideQuiz;
+  questionIndex: number;
+  totalQuestions: number;
+  selectedAnswer: string | undefined;
+  confirmedAnswer: string | undefined;
+  submitted: boolean;
+  correctAnswer: string | undefined;
+  explanation: string | undefined;
+  onSelect: (questionId: string, option: string) => void;
+  onConfirm: () => void;
+}) {
+  const answeredCorrectly = Boolean(correctAnswer && confirmedAnswer === correctAnswer);
+
+  return (
+    <article className="quiz-question-card guide-quiz-question-card">
+      <div className="quiz-question-topline">
+        <span className="status-pill">
+          Question {questionIndex + 1} of {totalQuestions}
+        </span>
+      </div>
+
+      <h2>{question.question}</h2>
+
+      <div className="quiz-option-list">
+        {question.answer_options.map((option) => {
+          const isSelected = selectedAnswer === option;
+          const isCorrectAnswer = correctAnswer === option;
+          const isIncorrectSelection = submitted && confirmedAnswer === option && !isCorrectAnswer;
+          const className = [
+            "quiz-option",
+            isSelected ? "selected" : "",
+            submitted && isCorrectAnswer ? "correct" : "",
+            isIncorrectSelection ? "incorrect" : ""
+          ]
+            .filter(Boolean)
+            .join(" ");
+
+          return (
+            <button
+              className={className}
+              type="button"
+              disabled={submitted}
+              onClick={() => onSelect(question.id, option)}
+              key={option}
+            >
+              <span>{option}</span>
+              {submitted && isCorrectAnswer && (
+                <span className="quiz-answer-state correct" aria-label="Correct answer">
+                  <CheckCircle2 size={18} />
+                </span>
+              )}
+              {isIncorrectSelection && (
+                <span className="quiz-answer-state incorrect" aria-label="Your selected answer">
+                  <XCircle size={18} />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {!submitted && (
+        <div className="quiz-card-footer">
+          <p>
+            {confirmedAnswer
+              ? "Answer confirmed. You can still change it before submitting."
+              : "Choose one option, then confirm to move forward."}
+          </p>
+          <button className="primary-button" type="button" disabled={!selectedAnswer} onClick={onConfirm}>
+            Confirm answer
+            <CheckCircle2 size={18} />
+          </button>
+        </div>
+      )}
+
+      {submitted && correctAnswer && (
+        <div className={answeredCorrectly ? "quiz-explanation correct" : "quiz-explanation incorrect"}>
+          <strong>{answeredCorrectly ? "Correct" : "Review this one"}</strong>
+          <p>
+            Your answer: {confirmedAnswer}. Correct answer: {correctAnswer}.
+          </p>
+          {explanation && <p>{explanation}</p>}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function GuideQuizResultPanel({
+  result,
+  onRetake
+}: {
+  result: GuideQuizSubmissionResult;
+  onRetake: () => void;
+}) {
   const progress = getProgressToNextLevel(result.total_xp);
+  const score = result.score ?? 0;
+  const totalQuestions = result.total_questions ?? 5;
 
   if (!result.passed) {
     return (
@@ -308,7 +569,14 @@ function GuideQuizResultPanel({ result }: { result: GuideQuizSubmissionResult })
           <XCircle size={18} />
           Not passed yet
         </strong>
-        <p>XP was not awarded. Review the guide and try the quiz again when you are ready.</p>
+        <p>
+          You scored {score}/{totalQuestions}. XP was not awarded. Review the guide and try the quiz again
+          when you are ready.
+        </p>
+        <button className="ghost-button compact" type="button" onClick={onRetake}>
+          Try again
+          <RotateCcw size={16} />
+        </button>
       </div>
     );
   }
@@ -319,6 +587,7 @@ function GuideQuizResultPanel({ result }: { result: GuideQuizSubmissionResult })
         <CheckCircle2 size={18} />
         {result.xp_awarded > 0 ? `Passed - ${result.xp_awarded} XP awarded` : "Passed - XP already awarded"}
       </strong>
+      <p>You scored {score}/{totalQuestions} on this guide quiz.</p>
       {result.explanation && <p>{result.explanation}</p>}
       <div className="xp-mini-summary">
         <span className="level-badge">LVL {result.level}</span>

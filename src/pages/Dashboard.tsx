@@ -4,6 +4,8 @@ import {
   Bell,
   BookMarked,
   Camera,
+  ChevronDown,
+  ChevronUp,
   Crown,
   Edit3,
   GraduationCap,
@@ -101,6 +103,7 @@ export function Dashboard() {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [isPasswordSuccess, setIsPasswordSuccess] = useState(false);
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
+  const [isPasswordSectionExpanded, setIsPasswordSectionExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [error, setError] = useState<string | null>(null);
   const totalXP = profile?.total_xp ?? 0;
@@ -316,6 +319,22 @@ export function Dashboard() {
     }
   };
 
+  const togglePasswordSection = () => {
+    setIsPasswordSectionExpanded((expanded) => {
+      const nextExpanded = !expanded;
+
+      if (!nextExpanded) {
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmNewPassword("");
+        setPasswordMessage(null);
+        setIsPasswordSuccess(false);
+      }
+
+      return nextExpanded;
+    });
+  };
+
   const openInboxMessage = async (message: InboxMessage) => {
     setSelectedInboxMessageId(message.id);
     if (message.is_read) return;
@@ -335,7 +354,7 @@ export function Dashboard() {
 
   return (
     <main className="page page-stack">
-      <section className="page-title-row">
+      <section className="page-title-row compact-title-row">
         <div>
           <p className="eyebrow">Dashboard</p>
           <h1>Account Dashboard</h1>
@@ -443,57 +462,80 @@ export function Dashboard() {
                   Update your account password. For security, enter your current password before choosing a new one.
                 </p>
               </div>
+              <button
+                className="ghost-button compact profile-password-toggle"
+                type="button"
+                onClick={togglePasswordSection}
+                aria-expanded={isPasswordSectionExpanded}
+                aria-controls="password-change-content"
+              >
+                {isPasswordSectionExpanded ? (
+                  <>
+                    <ChevronUp size={16} />
+                    Hide form
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={16} />
+                    Open form
+                  </>
+                )}
+              </button>
             </div>
 
-            {canChangeAccountPassword ? (
-              <form className="password-change-form" onSubmit={saveAccountPassword}>
-                <label>
-                  Current Password
-                  <input
-                    type="password"
-                    autoComplete="current-password"
-                    value={currentPassword}
-                    onChange={(event) => setCurrentPassword(event.target.value)}
-                    disabled={isPasswordSaving}
-                    required
-                  />
-                </label>
-                <label>
-                  New Password
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    value={newPassword}
-                    onChange={(event) => setNewPassword(event.target.value)}
-                    disabled={isPasswordSaving}
-                    minLength={8}
-                    required
-                  />
-                </label>
-                <label>
-                  Confirm New Password
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    value={confirmNewPassword}
-                    onChange={(event) => setConfirmNewPassword(event.target.value)}
-                    disabled={isPasswordSaving}
-                    minLength={8}
-                    required
-                  />
-                </label>
-                {passwordMessage && (
-                  <p className={isPasswordSuccess ? "form-success" : "form-error"} aria-live="polite">
-                    {passwordMessage}
-                  </p>
+            {isPasswordSectionExpanded && (
+              <div id="password-change-content">
+                {canChangeAccountPassword ? (
+                  <form className="password-change-form" onSubmit={saveAccountPassword}>
+                    <label>
+                      Current Password
+                      <input
+                        type="password"
+                        autoComplete="current-password"
+                        value={currentPassword}
+                        onChange={(event) => setCurrentPassword(event.target.value)}
+                        disabled={isPasswordSaving}
+                        required
+                      />
+                    </label>
+                    <label>
+                      New Password
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={newPassword}
+                        onChange={(event) => setNewPassword(event.target.value)}
+                        disabled={isPasswordSaving}
+                        minLength={8}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Confirm New Password
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={confirmNewPassword}
+                        onChange={(event) => setConfirmNewPassword(event.target.value)}
+                        disabled={isPasswordSaving}
+                        minLength={8}
+                        required
+                      />
+                    </label>
+                    {passwordMessage && (
+                      <p className={isPasswordSuccess ? "form-success" : "form-error"} aria-live="polite">
+                        {passwordMessage}
+                      </p>
+                    )}
+                    <button className="ghost-button compact" type="submit" disabled={isPasswordSaving || !supabase}>
+                      <ShieldCheck size={16} />
+                      {isPasswordSaving ? "Updating..." : "Update password"}
+                    </button>
+                  </form>
+                ) : (
+                  <p className="soft-notice">{SOCIAL_PASSWORD_MESSAGE}</p>
                 )}
-                <button className="ghost-button compact" type="submit" disabled={isPasswordSaving || !supabase}>
-                  <ShieldCheck size={16} />
-                  {isPasswordSaving ? "Updating..." : "Update password"}
-                </button>
-              </form>
-            ) : (
-              <p className="soft-notice">{SOCIAL_PASSWORD_MESSAGE}</p>
+              </div>
             )}
           </section>
         </article>
@@ -501,8 +543,7 @@ export function Dashboard() {
         <article className="section-panel inbox-panel dashboard-inbox-card">
           <div className="lesson-title-line">
             <div>
-              <p className="eyebrow">Inbox</p>
-              <h2>Account notifications</h2>
+              <h2>Inbox</h2>
             </div>
             <span className={unreadInboxCount ? "status-pill premium" : "status-pill free"}>
               <Bell size={15} />

@@ -53,8 +53,8 @@ export function Home() {
       <section className="hero">
         <div className="hero-overlay" />
         <div className="page hero-content">
-          <p className="eyebrow">Risk-First Crypto Trading Education</p>
-          <h1>From Zero Crypto Knowledge to Disciplined Trader</h1>
+          <p className="eyebrow">Structured Crypto Trading Education</p>
+          <h1>From Zero to Disciplined Trader</h1>
           <p className="hero-lede">
             ASEKE TRADE helps you learn crypto from the ground up: wallet safety, market foundations,
             chart reading, technical analysis, risk management, trading psychology, futures,
@@ -73,9 +73,6 @@ export function Home() {
             <Link className="ghost-button" to="/quiz">
               Take the Crypto Level Quiz
               <BrainCircuit size={18} />
-            </Link>
-            <Link className="platinum-button" to="/courses">
-              View Courses
             </Link>
           </div>
         </div>

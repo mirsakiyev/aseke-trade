@@ -62,7 +62,7 @@ export function Layout() {
           </span>
           <span>
             <strong>ASEKE TRADE</strong>
-            <small>Crypto Education</small>
+            <small>Crypto Trading Education</small>
           </span>
         </Link>
 

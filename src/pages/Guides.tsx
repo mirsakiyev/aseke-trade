@@ -55,7 +55,7 @@ export function Guides() {
       <section className="page-title-row compact-title-row">
         <div>
           <p className="eyebrow">Guides and Tutorials</p>
-          <h1>Crypto guides for safer market decisions</h1>
+          <h1>Crypto guides</h1>
           <p className="muted">
             Browse foundations, safety guides, market research, on-chain intelligence, and Trading Academy materials.
           </p>

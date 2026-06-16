@@ -30,7 +30,7 @@ export function Courses() {
       <section className="page-title-row compact-title-row">
         <div>
           <p className="eyebrow">Courses</p>
-          <h1>Structured crypto education for better trading decisions</h1>
+          <h1>Structured crypto education</h1>
           <p className="muted">
             Start with foundations, then move toward Trading Academy topics like market structure,
             technical analysis, risk management, futures, and trading psychology.

@@ -416,7 +416,7 @@ export function Admin() {
       <section className="page-title-row compact-title-row">
         <div>
           <p className="eyebrow">Admin Panel</p>
-          <h1>Content and access management</h1>
+          <h1>Content management</h1>
           <p className="muted">
             Admin-only route backed by Supabase Row Level Security for content, users, purchases, and Trading Academy grants.
           </p>
