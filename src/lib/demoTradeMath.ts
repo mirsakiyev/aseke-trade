@@ -1,5 +1,6 @@
 export type DemoTradeSide = "long" | "short";
 export type DemoTradeSizeMode = "margin" | "notional";
+export type DemoMarginMode = "isolated" | "cross";
 export type DemoTradeStatus =
   | "OPEN"
   | "PARTIALLY_CLOSED"
@@ -47,6 +48,7 @@ export interface DemoOpenPosition {
   sessionId: string;
   symbol: string;
   side: DemoTradeSide;
+  marginMode: DemoMarginMode;
   status: DemoTradeStatus;
   entryPrice: number;
   exitPrice: number | null;
@@ -102,6 +104,7 @@ export interface OpenDemoTradeInput {
   sessionId: string;
   symbol?: string;
   side: DemoTradeSide;
+  marginMode?: DemoMarginMode;
   sizeMode: DemoTradeSizeMode;
   amount: number;
   leverage: number;
@@ -184,10 +187,12 @@ export function validateDemoTradeInput(state: DemoTradeState, input: OpenDemoTra
   const entryPrice = toDecimal(input.entryPrice);
   const stopLoss = toDecimal(input.stopLoss);
   const leverage = Math.trunc(Number(input.leverage));
+  const marginMode = normalizeMarginMode(input.marginMode);
 
   if (symbol !== "BTCUSDT") errors.push("BTC/USDT is the only supported demo pair for v1.");
   if (state.openPosition) errors.push("Close the current demo position before opening another one.");
   if (input.side !== "long" && input.side !== "short") errors.push("Choose Long or Short.");
+  if (!marginMode) errors.push("Choose Isolated or Cross margin.");
   if (!isPositiveDecimal(amount)) errors.push("Trade size must be greater than zero.");
   if (!isPositiveDecimal(entryPrice)) errors.push("Entry price must be greater than zero.");
   if (input.sizeMode !== "margin" && input.sizeMode !== "notional") {
@@ -216,13 +221,16 @@ export function openDemoPosition(
   input: OpenDemoTradeInput,
   now = new Date().toISOString()
 ): DemoTradeResult {
+  const normalizedMarginMode = normalizeMarginMode(input.marginMode);
   const normalizedInput = {
     ...input,
     symbol: normalizeSymbol(input.symbol ?? state.symbol),
+    marginMode: normalizedMarginMode ?? "isolated",
     leverage: Math.trunc(Number(input.leverage)),
     takeProfits: normalizeTakeProfits(input.takeProfits)
   };
   const errors = validateDemoTradeInput(state, normalizedInput);
+  if (!normalizedMarginMode) errors.push("Choose Isolated or Cross margin.");
   if (errors.length) return { ok: false, errors, state };
 
   const nextState = cloneState(state);
@@ -234,27 +242,33 @@ export function openDemoPosition(
   const quantity = div(notional, entryPrice);
   const tradeId = createId("demo-trade");
   const action = createAction("opened", "Demo trade opened.", now, normalizedInput.entryPrice, null);
+  const requiredMarginAmount = roundMoney(toNumber(requiredMargin));
+  const availableAfterOpen = roundMoney(toNumber(sub(toDecimal(nextState.availableBalance), requiredMargin)));
+  const liquidationCollateral = normalizedInput.marginMode === "cross"
+    ? roundMoney(availableAfterOpen + requiredMarginAmount)
+    : requiredMarginAmount;
   const liquidationPrice = calculateLiquidationPrice({
     side: normalizedInput.side,
     avgEntryPrice: normalizedInput.entryPrice,
     quantityRemaining: toNumber(quantity),
-    isolatedMarginRemaining: toNumber(requiredMargin),
+    isolatedMarginRemaining: liquidationCollateral,
     maintenanceMarginRate: nextState.settings.maintenanceMarginRate
   });
 
-  nextState.availableBalance = roundMoney(toNumber(sub(toDecimal(nextState.availableBalance), requiredMargin)));
+  nextState.availableBalance = availableAfterOpen;
   nextState.openPosition = {
     tradeId,
     userId: normalizedInput.userId ?? nextState.userId,
     sessionId: normalizedInput.sessionId,
     symbol: "BTCUSDT",
     side: normalizedInput.side,
+    marginMode: normalizedInput.marginMode,
     status: "OPEN",
     entryPrice: roundPrice(normalizedInput.entryPrice),
     exitPrice: null,
     markPrice: roundPrice(normalizedInput.entryPrice),
-    initialMargin: roundMoney(toNumber(requiredMargin)),
-    remainingMargin: roundMoney(toNumber(requiredMargin)),
+    initialMargin: requiredMarginAmount,
+    remainingMargin: requiredMarginAmount,
     leverage: normalizedInput.leverage,
     initialQuantity: roundQuantity(toNumber(quantity)),
     remainingQuantity: roundQuantity(toNumber(quantity)),
@@ -424,7 +438,7 @@ export function updateDemoLeverage(
     side: position.side,
     avgEntryPrice: position.entryPrice,
     quantityRemaining: position.remainingQuantity,
-    isolatedMarginRemaining: position.remainingMargin,
+    isolatedMarginRemaining: calculateLiquidationCollateral(nextState, position),
     maintenanceMarginRate: nextState.settings.maintenanceMarginRate
   });
   position.updatedAt = now;
@@ -504,7 +518,7 @@ export function increaseDemoPosition(
     side: nextPosition.side,
     avgEntryPrice: nextPosition.entryPrice,
     quantityRemaining: nextPosition.remainingQuantity,
-    isolatedMarginRemaining: nextPosition.remainingMargin,
+    isolatedMarginRemaining: calculateLiquidationCollateral(nextState, nextPosition),
     maintenanceMarginRate: nextState.settings.maintenanceMarginRate
   });
   nextPosition.updatedAt = now;
@@ -705,6 +719,7 @@ export function exportDemoTradesToCsv(state: DemoTradeState): string {
     "Session ID",
     "Symbol",
     "Side",
+    "Margin Mode",
     "Entry Price",
     "Exit Price",
     "Current Mark Price",
@@ -731,6 +746,7 @@ export function exportDemoTradesToCsv(state: DemoTradeState): string {
     trade.sessionId,
     trade.symbol,
     trade.side.toUpperCase(),
+    (trade.marginMode ?? "isolated").toUpperCase(),
     trade.entryPrice,
     trade.exitPrice ?? "",
     trade.markPrice,
@@ -854,7 +870,7 @@ function closePositionQuantity(
       side: position.side,
       avgEntryPrice: position.entryPrice,
       quantityRemaining: position.remainingQuantity,
-      isolatedMarginRemaining: position.remainingMargin,
+      isolatedMarginRemaining: calculateLiquidationCollateral(nextState, position),
       maintenanceMarginRate: nextState.settings.maintenanceMarginRate
     });
   }
@@ -869,10 +885,13 @@ function liquidateOpenPosition(state: DemoTradeState, markPrice: number, now: st
   const position = nextState.openPosition;
   if (!position) return state;
 
-  const marginLoss = toDecimal(position.remainingMargin);
-  const action = createAction("liquidated", "Liquidation closed the remaining position.", now, markPrice, -toNumber(marginLoss));
-  nextState.realizedPnl = roundMoney(toNumber(sub(toDecimal(nextState.realizedPnl), marginLoss)));
-  position.realizedPnl = roundMoney(toNumber(sub(toDecimal(position.realizedPnl), marginLoss)));
+  const collateralLoss = toDecimal(calculateLiquidationCollateral(nextState, position));
+  const isolatedMarginLoss = toDecimal(position.remainingMargin);
+  const freeCollateralLoss = collateralLoss > isolatedMarginLoss ? sub(collateralLoss, isolatedMarginLoss) : 0n;
+  const action = createAction("liquidated", "Liquidation closed the remaining position.", now, markPrice, -toNumber(collateralLoss));
+  nextState.availableBalance = Math.max(0, roundMoney(toNumber(sub(toDecimal(nextState.availableBalance), freeCollateralLoss))));
+  nextState.realizedPnl = roundMoney(toNumber(sub(toDecimal(nextState.realizedPnl), collateralLoss)));
+  position.realizedPnl = roundMoney(toNumber(sub(toDecimal(position.realizedPnl), collateralLoss)));
   position.unrealizedPnl = 0;
   position.returnPercent = position.initialMargin > 0 ? roundPercent((position.realizedPnl / position.initialMargin) * 100) : -100;
   position.remainingQuantity = 0;
@@ -906,7 +925,7 @@ function markPosition(state: DemoTradeState, markPrice: number, now: string): De
     side: state.openPosition.side,
     avgEntryPrice: state.openPosition.entryPrice,
     quantityRemaining: state.openPosition.remainingQuantity,
-    isolatedMarginRemaining: state.openPosition.remainingMargin,
+    isolatedMarginRemaining: calculateLiquidationCollateral(state, state.openPosition),
     maintenanceMarginRate: state.settings.maintenanceMarginRate
   });
   state.openPosition.updatedAt = now;
@@ -923,6 +942,13 @@ function refreshBalances(state: DemoTradeState, now: string): DemoTradeState {
 function calculateInputMargin(input: Pick<OpenDemoTradeInput, "sizeMode" | "amount" | "leverage">): DecimalValue {
   const amount = toDecimal(input.amount);
   return input.sizeMode === "margin" ? amount : div(amount, toDecimal(input.leverage));
+}
+
+function calculateLiquidationCollateral(state: DemoTradeState, position: DemoOpenPosition): number {
+  if ((position.marginMode ?? "isolated") === "cross") {
+    return roundMoney(Math.max(0, state.availableBalance + position.remainingMargin));
+  }
+  return position.remainingMargin;
 }
 
 function calculateEquity(state: DemoTradeState): number {
@@ -959,6 +985,11 @@ function normalizeTakeProfits(
 
 function normalizeSymbol(symbol: string): "BTCUSDT" | string {
   return symbol.replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
+
+function normalizeMarginMode(value: unknown): DemoMarginMode | null {
+  if (value === undefined || value === null || value === "") return "isolated";
+  return value === "isolated" || value === "cross" ? value : null;
 }
 
 function createAction(

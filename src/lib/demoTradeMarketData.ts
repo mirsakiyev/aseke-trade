@@ -14,6 +14,10 @@ export interface DemoTradeTicker {
   source: string;
 }
 
+export interface DemoTradePriceStream {
+  close: () => void;
+}
+
 export type DemoTradeTimeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "6h" | "12h" | "1d" | "1w" | "1M";
 
 export const demoTradeTimeframes: Array<{ value: DemoTradeTimeframe; label: string }> = [
@@ -39,6 +43,7 @@ export const demoTradeSymbols = [
 ];
 
 const binanceUsBaseUrl = "https://api.binance.us/api/v3";
+const binanceUsStreamBaseUrl = "wss://stream.binance.us:9443/ws";
 
 export async function fetchDemoTradeCandles(
   symbol = "BTCUSDT",
@@ -69,6 +74,53 @@ export async function fetchDemoTradeTicker(symbol = "BTCUSDT"): Promise<DemoTrad
     price,
     timestamp: new Date().toISOString(),
     source: "Binance.US public market data"
+  };
+}
+
+export function subscribeDemoTradePriceStream(
+  symbol: string,
+  onTicker: (ticker: DemoTradeTicker) => void,
+  onError?: () => void
+): DemoTradePriceStream | null {
+  if (typeof WebSocket === "undefined") return null;
+
+  const safeSymbol = normalizeDemoSymbol(symbol);
+  const socket = new WebSocket(`${binanceUsStreamBaseUrl}/${safeSymbol.toLowerCase()}@trade`);
+  let isClosedByCaller = false;
+
+  socket.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(String(event.data)) as unknown;
+      if (!isRecord(payload)) return;
+
+      const price = Number(payload.p);
+      const tradeTime = Number(payload.T);
+      if (!Number.isFinite(price) || price <= 0) return;
+
+      onTicker({
+        symbol: "BTCUSDT",
+        price,
+        timestamp: Number.isFinite(tradeTime) ? new Date(tradeTime).toISOString() : new Date().toISOString(),
+        source: "Binance.US live trade stream"
+      });
+    } catch {
+      onError?.();
+    }
+  };
+
+  socket.onerror = () => {
+    if (!isClosedByCaller) onError?.();
+  };
+
+  socket.onclose = () => {
+    if (!isClosedByCaller) onError?.();
+  };
+
+  return {
+    close: () => {
+      isClosedByCaller = true;
+      socket.close();
+    }
   };
 }
 

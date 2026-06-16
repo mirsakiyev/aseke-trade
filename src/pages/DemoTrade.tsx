@@ -4,7 +4,6 @@ import {
   LineChart,
   Minus,
   Plus,
-  RefreshCw,
   RotateCcw,
   Save,
   Trash2
@@ -27,6 +26,7 @@ import {
   updateDemoStopLoss,
   updateDemoTakeProfits,
   type DemoOpenPosition,
+  type DemoMarginMode,
   type DemoTradeSide,
   type DemoTradeState
 } from "../lib/demoTradeMath";
@@ -35,7 +35,9 @@ import {
   demoTradeTimeframes,
   fetchDemoTradeCandles,
   fetchDemoTradeTicker,
+  subscribeDemoTradePriceStream,
   type DemoTradeCandle,
+  type DemoTradeTicker,
   type DemoTradeTimeframe
 } from "../lib/demoTradeMarketData";
 import {
@@ -56,6 +58,7 @@ type DemoOrderType = "market" | "limit";
 
 interface PendingLimitOrder {
   side: DemoTradeSide;
+  marginMode: DemoMarginMode;
   amount: string;
   leverage: string;
   stopLoss: string;
@@ -67,7 +70,7 @@ const emptyTakeProfits: TakeProfitDraft[] = [
   { id: "tp-1", price: "", closePercent: "100" }
 ];
 
-const DEMO_TRADE_LIVE_REFRESH_MS = 2000;
+const DEMO_TRADE_LIVE_REFRESH_MS = 1000;
 const DEMO_TRADE_CANDLE_SYNC_MS = 10000;
 
 export function DemoTrade() {
@@ -76,17 +79,16 @@ export function DemoTrade() {
     createInitialDemoTradeState({ sessionId: "guest-session" })
   );
   const [isHydrated, setIsHydrated] = useState(false);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [candles, setCandles] = useState<DemoTradeCandle[]>([]);
   const [timeframe, setTimeframe] = useState<DemoTradeTimeframe>("1h");
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [marketSource, setMarketSource] = useState("Binance.US public market data");
   const [marketError, setMarketError] = useState<string | null>(null);
   const [isMarketLoading, setIsMarketLoading] = useState(true);
-  const [side, setSide] = useState<DemoTradeSide>("long");
   const [orderType, setOrderType] = useState<DemoOrderType>("market");
   const [limitPrice, setLimitPrice] = useState("");
   const [pendingLimitOrder, setPendingLimitOrder] = useState<PendingLimitOrder | null>(null);
+  const [marginMode, setMarginMode] = useState<DemoMarginMode>("isolated");
   const [amount, setAmount] = useState("");
   const [leverage, setLeverage] = useState("5");
   const [isBracketEnabled, setIsBracketEnabled] = useState(false);
@@ -105,27 +107,29 @@ export function DemoTrade() {
   const stats = useMemo(() => calculateDemoTradeStats(demoState), [demoState]);
   const equityTone = stats.equity >= demoState.startingBalance ? "positive" : "negative";
   const activeSymbol = demoTradeSymbols[0];
-  const selectTradeSide = useCallback((nextSide: DemoTradeSide) => {
-    setSide(nextSide);
-  }, []);
 
   const persistDemoState = useCallback((nextState: DemoTradeState) => {
     if (!isHydrated) return;
 
-    setSaveState("saving");
     const save = user
       ? saveRegisteredDemoTradeState(user.id, nextState)
       : Promise.resolve(saveGuestDemoTradeState(nextState));
 
-    void save
-      .then(() => setSaveState("saved"))
-      .catch(() => setSaveState("error"));
+    void save.catch(() => undefined);
   }, [isHydrated, user]);
 
   const commitDemoState = useCallback((nextState: DemoTradeState) => {
     setDemoState(nextState);
     persistDemoState(nextState);
   }, [persistDemoState]);
+
+  const applyLiveTicker = useCallback((ticker: DemoTradeTicker, updateSource = true) => {
+    setCurrentPrice(ticker.price);
+    if (updateSource) setMarketSource(ticker.source);
+    setCandles((items) => applyLivePriceToCandles(items, ticker.price, timeframe, Date.parse(ticker.timestamp)));
+    setDemoState((state) => applyMarketPrice(state, ticker.price));
+    setMarketError(null);
+  }, [timeframe]);
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -161,15 +165,12 @@ export function DemoTrade() {
   useEffect(() => {
     if (!isHydrated) return;
 
-    setSaveState("saving");
     const saveTimer = window.setTimeout(() => {
       const save = user
         ? saveRegisteredDemoTradeState(user.id, demoState)
         : Promise.resolve(saveGuestDemoTradeState(demoState));
 
-      save
-        .then(() => setSaveState("saved"))
-        .catch(() => setSaveState("error"));
+      void save.catch(() => undefined);
     }, 450);
 
     return () => window.clearTimeout(saveTimer);
@@ -188,7 +189,7 @@ export function DemoTrade() {
         fetchDemoTradeCandles(activeSymbol.symbol, timeframe),
         fetchDemoTradeTicker(activeSymbol.symbol)
       ]);
-      setCandles(applyLivePriceToCandles(nextCandles, ticker.price));
+      setCandles(applyLivePriceToCandles(nextCandles, ticker.price, timeframe, Date.parse(ticker.timestamp)));
       setCurrentPrice(ticker.price);
       setMarketSource(ticker.source);
       setDemoState((state) => applyMarketPrice(state, ticker.price));
@@ -201,14 +202,14 @@ export function DemoTrade() {
 
   useEffect(() => {
     void loadMarketData();
+    const liveStream = subscribeDemoTradePriceStream(
+      activeSymbol.symbol,
+      (ticker) => applyLiveTicker(ticker),
+      () => undefined
+    );
     const priceTimer = window.setInterval(() => {
       fetchDemoTradeTicker(activeSymbol.symbol)
-        .then((ticker) => {
-          setCurrentPrice(ticker.price);
-          setMarketSource(ticker.source);
-          setCandles((items) => applyLivePriceToCandles(items, ticker.price));
-          setDemoState((state) => applyMarketPrice(state, ticker.price));
-        })
+        .then((ticker) => applyLiveTicker(ticker, false))
         .catch(() => setMarketError("Live BTC price update failed. Retrying..."));
     }, DEMO_TRADE_LIVE_REFRESH_MS);
     const candleTimer = window.setInterval(() => {
@@ -218,10 +219,11 @@ export function DemoTrade() {
     }, DEMO_TRADE_CANDLE_SYNC_MS);
 
     return () => {
+      liveStream?.close();
       window.clearInterval(priceTimer);
       window.clearInterval(candleTimer);
     };
-  }, [activeSymbol.symbol, loadMarketData, timeframe]);
+  }, [activeSymbol.symbol, applyLiveTicker, loadMarketData, timeframe]);
 
   useEffect(() => {
     const position = demoState.openPosition;
@@ -245,7 +247,7 @@ export function DemoTrade() {
     );
   }, [demoState.openPosition?.tradeId]);
 
-  const openTrade = (requestedSide = side) => {
+  const openTrade = (requestedSide: DemoTradeSide) => {
     const entryPrice = currentPrice ?? candles[candles.length - 1]?.close ?? 0;
     const submittedBracket = buildSubmittedBracket(isBracketEnabled, stopLoss, takeProfits);
 
@@ -263,6 +265,7 @@ export function DemoTrade() {
 
       setPendingLimitOrder({
         side: requestedSide,
+        marginMode,
         amount,
         leverage,
         stopLoss: String(submittedBracket.stopLoss),
@@ -282,6 +285,7 @@ export function DemoTrade() {
       sessionId: demoState.sessionId,
       symbol: activeSymbol.symbol,
       side: requestedSide,
+      marginMode,
       sizeMode: "notional",
       amount: parseNumber(amount),
       leverage: parseNumber(leverage),
@@ -301,18 +305,19 @@ export function DemoTrade() {
 
   useEffect(() => {
     if (!pendingLimitOrder || !currentPrice || demoState.openPosition) return;
-    const triggerPrice = parseNumber(pendingLimitOrder.limitPrice);
-    if (!Number.isFinite(triggerPrice) || triggerPrice <= 0 || currentPrice > triggerPrice) return;
+    const pendingLimitPrice = parseNumber(pendingLimitOrder.limitPrice);
+    if (!Number.isFinite(pendingLimitPrice) || pendingLimitPrice <= 0 || currentPrice > pendingLimitPrice) return;
 
     const result = openDemoPosition(demoState, {
       userId: user?.id ?? null,
       sessionId: demoState.sessionId,
       symbol: activeSymbol.symbol,
       side: pendingLimitOrder.side,
+      marginMode: pendingLimitOrder.marginMode,
       sizeMode: "notional",
       amount: parseNumber(pendingLimitOrder.amount),
       leverage: parseNumber(pendingLimitOrder.leverage),
-      entryPrice: triggerPrice,
+      entryPrice: pendingLimitPrice,
       stopLoss: parseNumber(pendingLimitOrder.stopLoss),
       takeProfits: pendingLimitOrder.takeProfits.map((takeProfit) => ({
         id: takeProfit.id,
@@ -435,16 +440,6 @@ export function DemoTrade() {
             Demo Trade uses virtual funds for education and practice. It does not place real trades.
           </p>
         </div>
-        <div className="demo-title-actions">
-          <button className="ghost-button compact" type="button" onClick={() => void loadMarketData()}>
-            <RefreshCw size={16} />
-            Refresh BTC
-          </button>
-          <button className="primary-button compact" type="button" onClick={exportCsv}>
-            <Download size={16} />
-            Export CSV
-          </button>
-        </div>
       </section>
 
       {!user && (
@@ -474,9 +469,8 @@ export function DemoTrade() {
           <strong className={equityTone}>{formatCurrency(stats.equity)}</strong>
         </div>
         <div>
-          <span>Data / Save</span>
-          <strong>{saveState === "saving" ? "Saving..." : saveState === "error" ? "Save retry needed" : "Ready"}</strong>
-          <small>{marketSource}</small>
+          <span>Data source</span>
+          <strong>{marketSource}</strong>
         </div>
       </section>
 
@@ -522,8 +516,8 @@ export function DemoTrade() {
             />
           ) : (
             <TradeEntryForm
-              side={side}
               orderType={orderType}
+              marginMode={marginMode}
               amount={amount}
               leverage={leverage}
               isBracketEnabled={isBracketEnabled}
@@ -536,8 +530,8 @@ export function DemoTrade() {
               hasPendingLimitOrder={Boolean(pendingLimitOrder)}
               pendingLimitPrice={pendingLimitOrder?.limitPrice ?? ""}
               errors={formErrors}
-              onSideChange={selectTradeSide}
               onOrderTypeChange={setOrderType}
+              onMarginModeChange={setMarginMode}
               onAmountChange={setAmount}
               onLeverageChange={setLeverage}
               onBracketEnabledChange={(enabled) => {
@@ -612,8 +606,8 @@ export function DemoTrade() {
 }
 
 function TradeEntryForm({
-  side,
   orderType,
+  marginMode,
   amount,
   leverage,
   isBracketEnabled,
@@ -626,8 +620,8 @@ function TradeEntryForm({
   hasPendingLimitOrder,
   pendingLimitPrice,
   errors,
-  onSideChange,
   onOrderTypeChange,
+  onMarginModeChange,
   onAmountChange,
   onLeverageChange,
   onBracketEnabledChange,
@@ -637,8 +631,8 @@ function TradeEntryForm({
   onCancelLimitOrder,
   onOpen
 }: {
-  side: DemoTradeSide;
   orderType: DemoOrderType;
+  marginMode: DemoMarginMode;
   amount: string;
   leverage: string;
   isBracketEnabled: boolean;
@@ -651,8 +645,8 @@ function TradeEntryForm({
   hasPendingLimitOrder: boolean;
   pendingLimitPrice: string;
   errors: string[];
-  onSideChange: (side: DemoTradeSide) => void;
   onOrderTypeChange: (type: DemoOrderType) => void;
+  onMarginModeChange: (mode: DemoMarginMode) => void;
   onAmountChange: (value: string) => void;
   onLeverageChange: (value: string) => void;
   onBracketEnabledChange: (enabled: boolean) => void;
@@ -670,13 +664,14 @@ function TradeEntryForm({
   const sliderStyle = { "--size-fill": `${amountPercent}%` } as CSSProperties;
   const notional = amountValue;
   const margin = notional / parsedLeverage;
+  const liquidationCollateral = marginMode === "cross" ? availableBalance : margin;
   const quantity = currentPrice && currentPrice > 0 ? notional / currentPrice : 0;
   const longLiquidation = currentPrice
     ? calculateLiquidationPrice({
         side: "long",
         avgEntryPrice: currentPrice,
         quantityRemaining: quantity,
-        isolatedMarginRemaining: margin
+        isolatedMarginRemaining: liquidationCollateral
       })
     : null;
   const shortLiquidation = currentPrice
@@ -684,7 +679,7 @@ function TradeEntryForm({
         side: "short",
         avgEntryPrice: currentPrice,
         quantityRemaining: quantity,
-        isolatedMarginRemaining: margin
+        isolatedMarginRemaining: liquidationCollateral
       })
     : null;
 
@@ -695,7 +690,6 @@ function TradeEntryForm({
   };
 
   const openSide = (nextSide: DemoTradeSide) => {
-    onSideChange(nextSide);
     onOpen(nextSide);
   };
 
@@ -707,7 +701,15 @@ function TradeEntryForm({
       </div>
 
       <div className="futures-mode-row">
-        <span className="futures-mode-chip">Isolated</span>
+        <select
+          className="futures-mode-chip"
+          value={marginMode}
+          onChange={(event) => onMarginModeChange(event.target.value as DemoMarginMode)}
+          aria-label="Margin mode"
+        >
+          <option value="isolated">Isolated</option>
+          <option value="cross">Cross</option>
+        </select>
         <select className="futures-mode-chip" value={leverage} onChange={(event) => onLeverageChange(event.target.value)} aria-label="Leverage">
           {Array.from({ length: 100 }, (_, index) => index + 1).map((value) => (
             <option value={value} key={value}>
@@ -751,15 +753,6 @@ function TradeEntryForm({
       <div className="futures-available-row">
         <span>Available</span>
         <strong>{formatUsdt(availableBalance)}</strong>
-      </div>
-
-      <div className="futures-direction-toggle" aria-label="Choose trade direction">
-        <button className={side === "long" ? "long active" : "long"} type="button" onClick={() => onSideChange("long")}>
-          Long
-        </button>
-        <button className={side === "short" ? "short active" : "short"} type="button" onClick={() => onSideChange("short")}>
-          Short
-        </button>
       </div>
 
       <label className="futures-quantity-card">
@@ -1132,6 +1125,7 @@ function DemoTradeChart({
   const [isPriceScaling, setIsPriceScaling] = useState(false);
   const [priceScale, setPriceScale] = useState(1);
   const [pricePan, setPricePan] = useState(0);
+  const [crosshair, setCrosshair] = useState<{ x: number; y: number; price: number } | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; offset: number; pricePan: number; pointerId: number } | null>(null);
   const priceScaleStartRef = useRef<{ y: number; scale: number; pointerId: number } | null>(null);
   const maxOffset = Math.max(0, candles.length - visibleCount);
@@ -1160,8 +1154,12 @@ function DemoTradeChart({
   const chartWidth = axisX - padding.left;
   const chartHeight = height - padding.top - padding.bottom;
   const candleGap = chartWidth / Math.max(visibleCount, 1);
-  const candleWidth = clamp(candleGap * 0.7, 6, 18);
+  const candleWidth = clamp(candleGap * 0.76, 7, 20);
+  const isFastTimeframe = timeframe === "1m" || timeframe === "5m";
+  const minBodyHeight = isFastTimeframe ? 5 : 3;
+  const minWickHeight = isFastTimeframe ? 12 : 5;
   const yForPrice = (price: number) => padding.top + ((paddedMax - price) / (paddedMax - paddedMin)) * chartHeight;
+  const priceForY = (y: number) => paddedMax - ((y - padding.top) / chartHeight) * (paddedMax - paddedMin);
   const priceTicks = Array.from({ length: 8 }, (_, index) => paddedMax - ((paddedMax - paddedMin) / 7) * index);
   const verticalGridCount = Math.min(10, Math.max(4, Math.floor(visibleCount / 10)));
 
@@ -1195,6 +1193,17 @@ function DemoTradeChart({
     setIsRightDragging(true);
   };
 
+  const updateCrosshair = (event: PointerEvent<SVGSVGElement>) => {
+    if (dragStartRef.current || priceScaleStartRef.current) return;
+
+    const pointer = getSvgPointer(event, width, height);
+    const x = clamp(pointer.x, padding.left, axisX);
+    const y = clamp(pointer.y, padding.top, height - padding.bottom);
+    const isInsidePlot = pointer.x >= padding.left && pointer.x <= axisX && pointer.y >= padding.top && pointer.y <= height - padding.bottom;
+
+    setCrosshair(isInsidePlot ? { x, y, price: priceForY(y) } : null);
+  };
+
   const moveRightDrag = (event: PointerEvent<SVGSVGElement>) => {
     if (priceScaleStartRef.current) {
       event.preventDefault();
@@ -1211,6 +1220,11 @@ function DemoTradeChart({
     setPricePan(dragStartRef.current.pricePan + deltaY * pricePerPixel);
   };
 
+  const handleChartPointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    updateCrosshair(event);
+    moveRightDrag(event);
+  };
+
   const stopRightDrag = (event?: PointerEvent<SVGSVGElement>) => {
     if (event && dragStartRef.current && event.currentTarget.hasPointerCapture(dragStartRef.current.pointerId)) {
       event.currentTarget.releasePointerCapture(dragStartRef.current.pointerId);
@@ -1222,6 +1236,11 @@ function DemoTradeChart({
     priceScaleStartRef.current = null;
     setIsRightDragging(false);
     setIsPriceScaling(false);
+  };
+
+  const leaveChart = (event: PointerEvent<SVGSVGElement>) => {
+    stopRightDrag(event);
+    setCrosshair(null);
   };
   const chartClassName = [
     "demo-trade-chart",
@@ -1264,10 +1283,10 @@ function DemoTradeChart({
           aria-label="Custom BTC USDT demo trading chart"
           onContextMenu={(event) => event.preventDefault()}
           onPointerDown={startRightDrag}
-          onPointerMove={moveRightDrag}
+          onPointerMove={handleChartPointerMove}
           onPointerUp={stopRightDrag}
           onPointerCancel={stopRightDrag}
-          onPointerLeave={stopRightDrag}
+          onPointerLeave={leaveChart}
         >
           <defs>
             <clipPath id="demo-trade-chart-plot">
@@ -1298,17 +1317,27 @@ function DemoTradeChart({
               const closeY = yForPrice(candle.close);
               const highY = yForPrice(candle.high);
               const lowY = yForPrice(candle.low);
-              const isUp = candle.close >= candle.open;
-              const bodyHeight = Math.max(3, Math.abs(openY - closeY));
+              const previousClose = visibleCandles[index - 1]?.close ?? candle.open;
+              const isUp = candle.close === candle.open ? candle.close >= previousClose : candle.close > candle.open;
+              const candleShape = buildCandleShape({
+                openY,
+                closeY,
+                highY,
+                lowY,
+                minBodyHeight,
+                minWickHeight,
+                chartTop: padding.top,
+                chartBottom: height - padding.bottom
+              });
               return (
                 <g className={isUp ? "candle up" : "candle down"} key={`${candle.timestamp}-${index}`}>
-                  <line className="candle-wick" x1={x} x2={x} y1={highY} y2={lowY} />
+                  <line className="candle-wick" x1={x} x2={x} y1={candleShape.wickY1} y2={candleShape.wickY2} />
                   <rect
                     className="candle-body"
                     x={x - candleWidth / 2}
-                    y={Math.min(openY, closeY) - (bodyHeight === 3 ? 1.5 : 0)}
+                    y={candleShape.bodyY}
                     width={candleWidth}
-                    height={bodyHeight}
+                    height={candleShape.bodyHeight}
                     rx="1.5"
                   />
                 </g>
@@ -1339,6 +1368,16 @@ function DemoTradeChart({
               </g>
             );
           })}
+          {crosshair && (
+            <g className="chart-crosshair" aria-hidden="true">
+              <line className="chart-crosshair-line" x1={padding.left} x2={axisX} y1={crosshair.y} y2={crosshair.y} />
+              <line className="chart-crosshair-line" x1={crosshair.x} x2={crosshair.x} y1={padding.top} y2={height - padding.bottom} />
+              <rect className="chart-crosshair-price" x={axisX + 8} y={crosshair.y - 14} width="86" height="28" rx="4" />
+              <text className="chart-crosshair-price-text" x={axisX + 16} y={crosshair.y + 4}>
+                {formatChartPrice(crosshair.price)}
+              </text>
+            </g>
+          )}
         </svg>
       ) : (
         <div className="demo-chart-empty">
@@ -1477,11 +1516,30 @@ function ErrorList({ errors }: { errors: string[] }) {
   );
 }
 
-function applyLivePriceToCandles(candles: DemoTradeCandle[], price: number): DemoTradeCandle[] {
+function applyLivePriceToCandles(
+  candles: DemoTradeCandle[],
+  price: number,
+  timeframe: DemoTradeTimeframe,
+  timestamp = Date.now()
+): DemoTradeCandle[] {
   if (!candles.length || !Number.isFinite(price) || price <= 0) return candles;
 
   const nextCandles = [...candles];
   const latest = nextCandles[nextCandles.length - 1];
+  const bucketStart = getCandleBucketStart(timestamp, timeframe);
+
+  if (bucketStart > latest.timestamp) {
+    nextCandles.push({
+      timestamp: bucketStart,
+      open: latest.close,
+      high: Math.max(latest.close, price),
+      low: Math.min(latest.close, price),
+      close: price,
+      volume: 0
+    });
+    return nextCandles.slice(-240);
+  }
+
   nextCandles[nextCandles.length - 1] = {
     ...latest,
     close: price,
@@ -1491,13 +1549,92 @@ function applyLivePriceToCandles(candles: DemoTradeCandle[], price: number): Dem
   return nextCandles;
 }
 
+function getCandleBucketStart(timestamp: number, timeframe: DemoTradeTimeframe): number {
+  const safeTimestamp = Number.isFinite(timestamp) ? timestamp : Date.now();
+
+  if (timeframe === "1M") {
+    const date = new Date(safeTimestamp);
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
+  }
+
+  if (timeframe === "1w") {
+    const date = new Date(safeTimestamp);
+    const daysSinceMonday = (date.getUTCDay() + 6) % 7;
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - daysSinceMonday);
+  }
+
+  const duration = demoTimeframeDurationMs[timeframe] ?? demoTimeframeDurationMs["1h"];
+  return Math.floor(safeTimestamp / duration) * duration;
+}
+
+const demoTimeframeDurationMs: Record<Exclude<DemoTradeTimeframe, "1M" | "1w">, number> = {
+  "1m": 60 * 1000,
+  "5m": 5 * 60 * 1000,
+  "15m": 15 * 60 * 1000,
+  "1h": 60 * 60 * 1000,
+  "4h": 4 * 60 * 60 * 1000,
+  "6h": 6 * 60 * 60 * 1000,
+  "12h": 12 * 60 * 60 * 1000,
+  "1d": 24 * 60 * 60 * 1000
+};
+
+function buildCandleShape({
+  openY,
+  closeY,
+  highY,
+  lowY,
+  minBodyHeight,
+  minWickHeight,
+  chartTop,
+  chartBottom
+}: {
+  openY: number;
+  closeY: number;
+  highY: number;
+  lowY: number;
+  minBodyHeight: number;
+  minWickHeight: number;
+  chartTop: number;
+  chartBottom: number;
+}) {
+  const rawBodyHeight = Math.abs(openY - closeY);
+  const bodyHeight = Math.max(minBodyHeight, rawBodyHeight);
+  const bodyCenter = (openY + closeY) / 2;
+  const bodyY = clamp(bodyCenter - bodyHeight / 2, chartTop, chartBottom - bodyHeight);
+  const renderedBodyCenter = bodyY + bodyHeight / 2;
+  const wickY1 = clamp(
+    Math.min(highY, lowY, bodyY, renderedBodyCenter - minWickHeight / 2),
+    chartTop,
+    chartBottom
+  );
+  const wickY2 = clamp(
+    Math.max(highY, lowY, bodyY + bodyHeight, renderedBodyCenter + minWickHeight / 2),
+    chartTop,
+    chartBottom
+  );
+
+  return {
+    bodyY,
+    bodyHeight,
+    wickY1,
+    wickY2
+  };
+}
+
+function getSvgPointer(event: PointerEvent<SVGSVGElement>, width: number, height: number) {
+  const bounds = event.currentTarget.getBoundingClientRect();
+  return {
+    x: ((event.clientX - bounds.left) / Math.max(1, bounds.width)) * width,
+    y: ((event.clientY - bounds.top) / Math.max(1, bounds.height)) * height
+  };
+}
+
 function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: number | null) {
   const lines: Array<{ label: string; price: number; tone: string }> = [];
   if (currentPrice) lines.push({ label: "Mark", price: currentPrice, tone: "mark" });
   if (!position) return lines;
 
-  const hasBracketLines = position.stopLoss > 0 || position.takeProfits.length > 0;
-  if (hasBracketLines) lines.push({ label: "Entry", price: position.entryPrice, tone: "entry" });
+  lines.push({ label: "Entry", price: position.entryPrice, tone: "entry" });
   if (position.stopLoss > 0) lines.push({ label: "SL", price: position.stopLoss, tone: "danger" });
   if (position.liquidationPrice) lines.push({ label: "Liq", price: position.liquidationPrice, tone: "liquidation" });
   position.takeProfits.forEach((takeProfit, index) => {
@@ -1577,6 +1714,8 @@ function formatDateTime(value: string): string {
 }
 
 function defaultVisibleCandles(timeframe: DemoTradeTimeframe): number {
+  if (timeframe === "1m") return 62;
+  if (timeframe === "5m") return 74;
   if (timeframe === "1M") return 48;
   if (timeframe === "1w") return 72;
   if (timeframe === "1d") return 80;

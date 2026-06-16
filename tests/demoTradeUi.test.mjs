@@ -51,13 +51,22 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /futurePaddingCandles/);
   assert.match(pageSource, /pricePan/);
   assert.match(pageSource, /priceScaleStartRef/);
+  assert.match(pageSource, /crosshair/);
+  assert.match(pageSource, /updateCrosshair/);
+  assert.match(pageSource, /getSvgPointer/);
+  assert.match(pageSource, /chart-crosshair-price/);
   assert.match(pageSource, /line\.tone !== "liquidation"/);
-  assert.match(pageSource, /hasBracketLines/);
+  assert.match(pageSource, /label: "Entry", price: position\.entryPrice/);
+  assert.match(pageSource, /subscribeDemoTradePriceStream/);
+  assert.match(pageSource, /applyLiveTicker/);
+  assert.match(pageSource, /getCandleBucketStart/);
   assert.match(pageSource, /startRightDrag/);
   assert.match(pageSource, /Minus/);
-  assert.match(pageSource, /DEMO_TRADE_LIVE_REFRESH_MS = 2000/);
+  assert.match(pageSource, /DEMO_TRADE_LIVE_REFRESH_MS = 1000/);
   assert.match(pageSource, /DEMO_TRADE_CANDLE_SYNC_MS = 10000/);
   assert.match(pageSource, /applyLivePriceToCandles/);
+  assert.match(pageSource, /buildCandleShape/);
+  assert.match(pageSource, /minWickHeight/);
   assert.match(marketDataSource, /"6h"/);
   assert.match(marketDataSource, /"12h"/);
   assert.match(marketDataSource, /"1M"/);
@@ -71,6 +80,10 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /BTCUSDT Perpetual/);
   assert.match(pageSource, /Limit orders are available for registered users only/);
   assert.match(pageSource, /Limit Price/);
+  assert.match(pageSource, /marginMode/);
+  assert.match(pageSource, /Margin mode/);
+  assert.match(pageSource, /Cross/);
+  assert.match(pageSource, /liquidationCollateral/);
   assert.match(pageSource, /isBracketEnabled/);
   assert.match(pageSource, /stopLoss: 0/);
   assert.match(pageSource, /floorTo/);
@@ -80,6 +93,11 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.doesNotMatch(pageSource, /Chase Limit/);
   assert.doesNotMatch(pageSource, /Position Size/);
   assert.doesNotMatch(pageSource, />S<\/span>/);
+  assert.doesNotMatch(pageSource, /futures-direction-toggle/);
+  assert.doesNotMatch(pageSource, /Refresh BTC/);
+  assert.doesNotMatch(pageSource, /Data \/ Save/);
+  assert.doesNotMatch(pageSource, /Saving\.\.\.|Ready/);
+  assert.doesNotMatch(pageSource, /Trigger Price|pendingTriggerOrder|isTriggerPriceReached/);
   assert.match(pageSource, /function PositionManager/);
   assert.match(pageSource, /function CurrentTradeRow/);
   assert.match(pageSource, /current-trade-row/);
@@ -102,6 +120,9 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
 test("BTC market data provider is isolated and uses public REST data", () => {
   assert.match(marketDataSource, /fetchDemoTradeCandles/);
   assert.match(marketDataSource, /fetchDemoTradeTicker/);
+  assert.match(marketDataSource, /subscribeDemoTradePriceStream/);
+  assert.match(marketDataSource, /WebSocket/);
+  assert.match(marketDataSource, /@trade/);
   assert.match(marketDataSource, /DemoTradeTimeframe = "1m" \| "5m" \| "15m" \| "1h" \| "4h" \| "6h" \| "12h" \| "1d" \| "1w" \| "1M"/);
   assert.match(marketDataSource, /api\.binance\.us\/api\/v3/);
   assert.doesNotMatch(marketDataSource, /apiKey|secret|TradingView/);

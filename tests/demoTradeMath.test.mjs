@@ -86,6 +86,16 @@ test("leverage 100x opens a high leverage isolated margin position", () => {
   assertClose(state.availableBalance, 990);
 });
 
+test("cross margin uses account collateral for liquidation distance", () => {
+  const isolated = openPosition({ sizeMode: "notional", amount: 5000, stopLoss: 0, takeProfits: [] });
+  const cross = openPosition({ sizeMode: "notional", amount: 5000, marginMode: "cross", stopLoss: 0, takeProfits: [] });
+
+  assert.equal(isolated.openPosition.marginMode, "isolated");
+  assert.equal(cross.openPosition.marginMode, "cross");
+  assertClose(isolated.openPosition.liquidationPrice, 90.45);
+  assertClose(cross.openPosition.liquidationPrice, 80.4);
+});
+
 test("opening without SL or TPs keeps bracket orders unset", () => {
   const state = openPosition({ sizeMode: "notional", amount: 500, stopLoss: 0, takeProfits: [] });
   assert.equal(state.openPosition.stopLoss, 0);
@@ -288,6 +298,20 @@ test("liquidation closes remaining position", () => {
   assertClose(state.currentBalance, 900);
 });
 
+test("cross liquidation consumes free wallet collateral", () => {
+  const state = demoTrade.applyMarketPrice(
+    openPosition({ sizeMode: "notional", amount: 5000, marginMode: "cross", stopLoss: 0, takeProfits: [] }),
+    80.4,
+    "2026-06-16T12:02:00.000Z"
+  );
+
+  assert.equal(state.openPosition, null);
+  assert.equal(state.tradeHistory[0].status, "LIQUIDATED");
+  assertClose(state.availableBalance, 0);
+  assertClose(state.currentBalance, 0);
+  assertClose(state.realizedPnl, -1000);
+});
+
 test("leverage update recalculates margin and liquidation price", () => {
   const result = demoTrade.updateDemoLeverage(openPosition({ takeProfits: [] }), 5);
   assert.equal(result.ok, true);
@@ -315,7 +339,8 @@ test("reset balance clears history and open trade after confirmation", () => {
 test("CSV export contains expected fields", () => {
   const state = demoTrade.closeOpenPosition(openPosition({ takeProfits: [] }), 110);
   const csv = demoTrade.exportDemoTradesToCsv(state);
-  assert.match(csv, /Trade ID,User ID,Session ID,Symbol,Side,Entry Price/);
+  assert.match(csv, /Trade ID,User ID,Session ID,Symbol,Side,Margin Mode,Entry Price/);
+  assert.match(csv, /ISOLATED/);
   assert.match(csv, /BTCUSDT/);
   assert.match(csv, /MANUALLY_CLOSED/);
 });
