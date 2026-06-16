@@ -16,7 +16,7 @@ import {
   applyMarketPrice,
   calculateLiquidationPrice,
   calculateDemoTradeStats,
-  closeOpenPosition,
+  closeOpenPositionByPercent,
   createInitialDemoTradeState,
   demoTradeCsvFilename,
   exportDemoTradesToCsv,
@@ -85,6 +85,7 @@ export function DemoTrade() {
   const [pendingLimitOrder, setPendingLimitOrder] = useState<PendingLimitOrder | null>(null);
   const [amount, setAmount] = useState("");
   const [leverage, setLeverage] = useState("5");
+  const [isBracketEnabled, setIsBracketEnabled] = useState(false);
   const [stopLoss, setStopLoss] = useState("");
   const [takeProfits, setTakeProfits] = useState<TakeProfitDraft[]>(emptyTakeProfits);
   const [formErrors, setFormErrors] = useState<string[]>([]);
@@ -93,24 +94,15 @@ export function DemoTrade() {
   const [positionStopLoss, setPositionStopLoss] = useState("");
   const [positionLeverage, setPositionLeverage] = useState("5");
   const [positionTakeProfits, setPositionTakeProfits] = useState<TakeProfitDraft[]>([]);
+  const [manualClosePercent, setManualClosePercent] = useState("100");
   const [positionErrors, setPositionErrors] = useState<string[]>([]);
 
   const stats = useMemo(() => calculateDemoTradeStats(demoState), [demoState]);
   const equityTone = stats.equity >= demoState.startingBalance ? "positive" : "negative";
   const activeSymbol = demoTradeSymbols[0];
-  const resetBracketDefaults = useCallback((nextSide: DemoTradeSide, price = currentPrice) => {
-    if (!price) return;
-    const defaultStop = nextSide === "long" ? price * 0.98 : price * 1.02;
-    const defaultTp1 = nextSide === "long" ? price * 1.02 : price * 0.98;
-    setStopLoss(formatInputPrice(defaultStop));
-    setTakeProfits([
-      { id: "tp-1", price: formatInputPrice(defaultTp1), closePercent: "100" }
-    ]);
-  }, [currentPrice]);
   const selectTradeSide = useCallback((nextSide: DemoTradeSide) => {
     setSide(nextSide);
-    resetBracketDefaults(nextSide);
-  }, [resetBracketDefaults]);
+  }, []);
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -208,20 +200,17 @@ export function DemoTrade() {
   }, [activeSymbol.symbol, loadMarketData, timeframe]);
 
   useEffect(() => {
-    if (!currentPrice || stopLoss) return;
-    resetBracketDefaults(side, currentPrice);
-  }, [currentPrice, resetBracketDefaults, side, stopLoss]);
-
-  useEffect(() => {
     const position = demoState.openPosition;
     if (!position) {
       setPositionTakeProfits([]);
       setPositionStopLoss("");
+      setManualClosePercent("100");
       return;
     }
 
-    setPositionStopLoss(String(position.stopLoss));
+    setPositionStopLoss(position.stopLoss > 0 ? String(position.stopLoss) : "");
     setPositionLeverage(String(position.leverage));
+    setManualClosePercent("100");
     setPositionTakeProfits(
       position.takeProfits.map((takeProfit) => ({
         id: takeProfit.id,
@@ -233,7 +222,7 @@ export function DemoTrade() {
 
   const openTrade = (requestedSide = side) => {
     const entryPrice = currentPrice ?? candles[candles.length - 1]?.close ?? 0;
-    const submittedBracket = buildSubmittedBracket(requestedSide, side, entryPrice, stopLoss, takeProfits);
+    const submittedBracket = buildSubmittedBracket(isBracketEnabled, stopLoss, takeProfits);
 
     if (orderType === "limit") {
       const nextLimitPrice = parseNumber(limitPrice);
@@ -357,8 +346,16 @@ export function DemoTrade() {
   };
 
   const closePosition = () => {
-    if (!demoState.openPosition || !currentPrice) return;
-    setDemoState(closeOpenPosition(demoState, currentPrice));
+    if (!demoState.openPosition) return;
+    const exitPrice = currentPrice ?? demoState.openPosition.markPrice;
+    const result = closeOpenPositionByPercent(demoState, exitPrice, parseNumber(manualClosePercent));
+    if (!result.ok) {
+      setPositionErrors(result.errors);
+      return;
+    }
+    setPositionErrors([]);
+    setManualClosePercent("100");
+    setDemoState(result.state);
   };
 
   const requestBalanceReset = () => {
@@ -453,6 +450,7 @@ export function DemoTrade() {
             timeframe={timeframe}
             onTimeframeChange={setTimeframe}
           />
+          {demoState.openPosition && <CurrentTradeRow position={demoState.openPosition} />}
         </article>
 
         <aside className="section-panel demo-ticket-panel">
@@ -464,10 +462,12 @@ export function DemoTrade() {
               stopLoss={positionStopLoss}
               leverage={positionLeverage}
               takeProfits={positionTakeProfits}
+              closePercent={manualClosePercent}
               errors={positionErrors}
               onStopLossChange={setPositionStopLoss}
               onLeverageChange={setPositionLeverage}
               onTakeProfitsChange={setPositionTakeProfits}
+              onClosePercentChange={setManualClosePercent}
               onUpdateStop={updateStop}
               onUpdateLeverage={updateLeverage}
               onUpdateTakeProfits={updateTps}
@@ -479,6 +479,7 @@ export function DemoTrade() {
               orderType={orderType}
               amount={amount}
               leverage={leverage}
+              isBracketEnabled={isBracketEnabled}
               limitPrice={limitPrice}
               stopLoss={stopLoss}
               takeProfits={takeProfits}
@@ -492,6 +493,10 @@ export function DemoTrade() {
               onOrderTypeChange={setOrderType}
               onAmountChange={setAmount}
               onLeverageChange={setLeverage}
+              onBracketEnabledChange={(enabled) => {
+                setIsBracketEnabled(enabled);
+                if (enabled && takeProfits.length === 0) setTakeProfits(emptyTakeProfits);
+              }}
               onLimitPriceChange={setLimitPrice}
               onStopLossChange={setStopLoss}
               onTakeProfitsChange={setTakeProfits}
@@ -529,7 +534,6 @@ export function DemoTrade() {
         <PerformanceStats stats={stats} />
       </section>
 
-      <OpenPositionPanel position={demoState.openPosition} />
       <TradeHistoryTable trades={demoState.tradeHistory} onExport={exportCsv} />
 
       {showResetModal && (
@@ -565,6 +569,7 @@ function TradeEntryForm({
   orderType,
   amount,
   leverage,
+  isBracketEnabled,
   limitPrice,
   stopLoss,
   takeProfits,
@@ -578,6 +583,7 @@ function TradeEntryForm({
   onOrderTypeChange,
   onAmountChange,
   onLeverageChange,
+  onBracketEnabledChange,
   onLimitPriceChange,
   onStopLossChange,
   onTakeProfitsChange,
@@ -588,6 +594,7 @@ function TradeEntryForm({
   orderType: DemoOrderType;
   amount: string;
   leverage: string;
+  isBracketEnabled: boolean;
   limitPrice: string;
   stopLoss: string;
   takeProfits: TakeProfitDraft[];
@@ -601,6 +608,7 @@ function TradeEntryForm({
   onOrderTypeChange: (type: DemoOrderType) => void;
   onAmountChange: (value: string) => void;
   onLeverageChange: (value: string) => void;
+  onBracketEnabledChange: (enabled: boolean) => void;
   onLimitPriceChange: (value: string) => void;
   onStopLossChange: (value: string) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
@@ -634,7 +642,8 @@ function TradeEntryForm({
     : null;
 
   const setAmountFromPercent = (nextPercent: string) => {
-    const nextAmount = maxOpenableAmount * (parseNumber(nextPercent) / 100);
+    const nextPercentValue = clamp(parseNumber(nextPercent), 0, 100);
+    const nextAmount = Math.min(maxOpenableAmount, maxOpenableAmount * (nextPercentValue / 100));
     onAmountChange(formatAmountInput(nextAmount));
   };
 
@@ -659,7 +668,6 @@ function TradeEntryForm({
             </option>
           ))}
         </select>
-        <span className="futures-mode-chip">S</span>
       </div>
 
       <div className="futures-order-tabs" aria-label="Order type">
@@ -751,16 +759,20 @@ function TradeEntryForm({
         </span>
       </div>
 
-      <details className="futures-bracket-block">
+      <details className="futures-bracket-block" open={isBracketEnabled} onToggle={(event) => onBracketEnabledChange(event.currentTarget.open)}>
         <summary>
           <span aria-hidden="true" />
           <strong>TP/SL</strong>
         </summary>
-        <label>
-          Stop Loss
-          <input type="number" min="0" step="0.01" value={stopLoss} onChange={(event) => onStopLossChange(event.target.value)} />
-        </label>
-        <TakeProfitEditor takeProfits={takeProfits} onChange={onTakeProfitsChange} />
+        {isBracketEnabled && (
+          <>
+            <label>
+              Stop Loss
+              <input type="number" min="0" step="0.01" value={stopLoss} onChange={(event) => onStopLossChange(event.target.value)} />
+            </label>
+            <TakeProfitEditor takeProfits={takeProfits} onChange={onTakeProfitsChange} />
+          </>
+        )}
       </details>
 
       <div className="futures-action-row">
@@ -801,10 +813,12 @@ function PositionManager({
   stopLoss,
   leverage,
   takeProfits,
+  closePercent,
   errors,
   onStopLossChange,
   onLeverageChange,
   onTakeProfitsChange,
+  onClosePercentChange,
   onUpdateStop,
   onUpdateLeverage,
   onUpdateTakeProfits,
@@ -814,31 +828,25 @@ function PositionManager({
   stopLoss: string;
   leverage: string;
   takeProfits: TakeProfitDraft[];
+  closePercent: string;
   errors: string[];
   onStopLossChange: (value: string) => void;
   onLeverageChange: (value: string) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
+  onClosePercentChange: (value: string) => void;
   onUpdateStop: () => void;
   onUpdateLeverage: () => void;
   onUpdateTakeProfits: () => void;
   onClose: () => void;
 }) {
+  const closePercentValue = clamp(parseNumber(closePercent), 0, 100);
+  const closeRatio = closePercentValue / 100;
+  const closingQuantity = position.remainingQuantity * closeRatio;
+  const remainingAfterClose = position.remainingQuantity - closingQuantity;
+  const closeSliderStyle = { "--size-fill": `${closePercentValue}%` } as CSSProperties;
+
   return (
     <div className="demo-ticket-stack">
-      <dl className="demo-position-metrics">
-        <Metric label="Side" value={position.side.toUpperCase()} tone={position.side === "long" ? "positive" : "negative"} />
-        <Metric label="Entry Price" value={formatCurrency(position.entryPrice)} />
-        <Metric label="Mark Price" value={formatCurrency(position.markPrice)} />
-        <Metric label="Remaining Qty" value={`${position.remainingQuantity.toFixed(6)} BTC`} />
-        <Metric label="Remaining Margin" value={formatCurrency(position.remainingMargin)} />
-        <Metric label="Liquidation Price" value={position.liquidationPrice ? formatCurrency(position.liquidationPrice) : "N/A"} />
-        <Metric
-          label="Unrealized PnL"
-          value={formatCurrency(position.unrealizedPnl)}
-          tone={position.unrealizedPnl >= 0 ? "positive" : "negative"}
-        />
-      </dl>
-
       <div className="demo-inline-edit">
         <label>
           Stop Loss
@@ -873,10 +881,57 @@ function PositionManager({
         Save TP Changes
       </button>
 
+      <div className="manual-close-block">
+        <div className="manual-close-heading">
+          <strong>Market close</strong>
+          <span>{closePercentValue.toFixed(closePercentValue % 1 ? 2 : 0)}%</span>
+        </div>
+        <label>
+          Close Size (%)
+          <input
+            type="number"
+            min="1"
+            max="100"
+            step="1"
+            value={closePercent}
+            onChange={(event) => onClosePercentChange(event.target.value)}
+          />
+        </label>
+        <div className="futures-percent-control">
+          <input
+            type="range"
+            min="1"
+            max="100"
+            step="1"
+            value={Math.max(1, Math.round(closePercentValue || 1))}
+            style={closeSliderStyle}
+            onChange={(event) => onClosePercentChange(event.target.value)}
+            aria-label="Manual close size percent"
+          />
+          <div className="futures-percent-marks" aria-hidden="true">
+            <span>1%</span>
+            <span>25%</span>
+            <span>50%</span>
+            <span>75%</span>
+            <span>100%</span>
+          </div>
+        </div>
+        <dl className="manual-close-metrics">
+          <div>
+            <dt>Closing Qty</dt>
+            <dd>{closingQuantity.toFixed(6)} BTC</dd>
+          </div>
+          <div>
+            <dt>Remaining</dt>
+            <dd>{Math.max(0, remainingAfterClose).toFixed(6)} BTC</dd>
+          </div>
+        </dl>
+        <button className="primary-button danger-button" type="button" onClick={onClose}>
+          Close at Market
+        </button>
+      </div>
+
       <ErrorList errors={errors} />
-      <button className="primary-button danger-button" type="button" onClick={onClose}>
-        Manual Close at Market
-      </button>
     </div>
   );
 }
@@ -958,12 +1013,16 @@ function DemoTradeChart({
   const [isRightDragging, setIsRightDragging] = useState(false);
   const [isPriceScaling, setIsPriceScaling] = useState(false);
   const [priceScale, setPriceScale] = useState(1);
-  const dragStartRef = useRef<{ x: number; offset: number; pointerId: number } | null>(null);
+  const [pricePan, setPricePan] = useState(0);
+  const dragStartRef = useRef<{ x: number; y: number; offset: number; pricePan: number; pointerId: number } | null>(null);
   const priceScaleStartRef = useRef<{ y: number; scale: number; pointerId: number } | null>(null);
   const maxOffset = Math.max(0, candles.length - visibleCount);
-  const safeOffset = Math.min(offset, maxOffset);
-  const end = Math.max(0, candles.length - safeOffset);
-  const visibleCandles = candles.slice(Math.max(0, end - visibleCount), end);
+  const futurePaddingCandles = Math.min(90, Math.max(24, Math.floor(visibleCount * 0.5)));
+  const safeOffset = clamp(offset, -futurePaddingCandles, maxOffset);
+  const futureSlots = Math.max(0, -safeOffset);
+  const dataWindowCount = Math.max(1, visibleCount - futureSlots);
+  const end = Math.max(0, candles.length - Math.max(safeOffset, 0));
+  const visibleCandles = candles.slice(Math.max(0, end - dataWindowCount), end);
   const overlayLines = buildOverlayLines(position, currentPrice);
   const autoscaleOverlayPrices = overlayLines
     .filter((line) => line.tone !== "liquidation")
@@ -972,31 +1031,32 @@ function DemoTradeChart({
   const minPrice = prices.length ? Math.min(...prices) : 0;
   const maxPrice = prices.length ? Math.max(...prices) : 1;
   const range = Math.max(maxPrice - minPrice, 1);
-  const priceMidpoint = (minPrice + maxPrice) / 2;
+  const priceMidpoint = (minPrice + maxPrice) / 2 + pricePan;
   const scaledRange = range * priceScale;
   const paddedMin = priceMidpoint - scaledRange * 0.62;
   const paddedMax = priceMidpoint + scaledRange * 0.62;
   const width = 1040;
-  const height = 500;
+  const height = 660;
   const padding = { top: 24, right: 118, bottom: 34, left: 22 };
   const axisX = width - padding.right;
   const chartWidth = axisX - padding.left;
   const chartHeight = height - padding.top - padding.bottom;
-  const candleGap = chartWidth / Math.max(visibleCandles.length, 1);
+  const candleGap = chartWidth / Math.max(visibleCount, 1);
   const candleWidth = clamp(candleGap * 0.7, 6, 18);
   const yForPrice = (price: number) => padding.top + ((paddedMax - price) / (paddedMax - paddedMin)) * chartHeight;
   const priceTicks = Array.from({ length: 8 }, (_, index) => paddedMax - ((paddedMax - paddedMin) / 7) * index);
-  const verticalGridCount = Math.min(10, Math.max(4, Math.floor(visibleCandles.length / 10)));
+  const verticalGridCount = Math.min(10, Math.max(4, Math.floor(visibleCount / 10)));
 
   useEffect(() => {
     setVisibleCount(defaultVisibleCandles(timeframe));
     setOffset(0);
     setPriceScale(1);
+    setPricePan(0);
   }, [timeframe]);
 
   useEffect(() => {
-    setOffset((value) => Math.min(value, Math.max(0, candles.length - visibleCount)));
-  }, [candles.length, visibleCount]);
+    setOffset((value) => clamp(value, -futurePaddingCandles, Math.max(0, candles.length - visibleCount)));
+  }, [candles.length, futurePaddingCandles, visibleCount]);
 
   const zoomBy = (amount: number) => {
     setVisibleCount((count) => clamp(count + amount, 28, Math.min(160, Math.max(candles.length, 40))));
@@ -1013,7 +1073,7 @@ function DemoTradeChart({
       setIsPriceScaling(true);
       return;
     }
-    dragStartRef.current = { x: event.clientX, offset: safeOffset, pointerId: event.pointerId };
+    dragStartRef.current = { x: event.clientX, y: event.clientY, offset: safeOffset, pricePan, pointerId: event.pointerId };
     setIsRightDragging(true);
   };
 
@@ -1027,7 +1087,10 @@ function DemoTradeChart({
     if (!dragStartRef.current) return;
     event.preventDefault();
     const deltaCandles = Math.round((event.clientX - dragStartRef.current.x) / Math.max(5, candleGap));
-    setOffset(clamp(dragStartRef.current.offset + deltaCandles, 0, Math.max(0, candles.length - visibleCount)));
+    const pricePerPixel = scaledRange / Math.max(1, chartHeight);
+    const deltaY = event.clientY - dragStartRef.current.y;
+    setOffset(clamp(dragStartRef.current.offset + deltaCandles, -futurePaddingCandles, Math.max(0, candles.length - visibleCount)));
+    setPricePan(dragStartRef.current.pricePan + deltaY * pricePerPixel);
   };
 
   const stopRightDrag = (event?: PointerEvent<SVGSVGElement>) => {
@@ -1170,30 +1233,29 @@ function DemoTradeChart({
   );
 }
 
-function OpenPositionPanel({ position }: { position: DemoOpenPosition | null }) {
+function CurrentTradeRow({ position }: { position: DemoOpenPosition }) {
   return (
-    <section className="section-panel open-position-panel">
-      <div className="section-heading compact-heading">
-        <div>
-          <p className="eyebrow">Open position</p>
-          <h2>{position ? `${position.side.toUpperCase()} BTC/USDT` : "No open demo position"}</h2>
-        </div>
+    <div className="current-trade-row">
+      <div className="current-trade-heading">
+        <span>Current trade</span>
+        <strong className={position.side === "long" ? "positive" : "negative"}>
+          {position.side.toUpperCase()} BTC/USDT
+        </strong>
       </div>
-      {position ? (
-        <dl className="signal-level-grid">
-          <Metric label="Entry Price" value={formatCurrency(position.entryPrice)} />
-          <Metric label="Mark Price" value={formatCurrency(position.markPrice)} />
-          <Metric label="Initial Margin" value={formatCurrency(position.initialMargin)} />
-          <Metric label="Remaining Margin" value={formatCurrency(position.remainingMargin)} />
-          <Metric label="Leverage" value={`${position.leverage}x`} />
-          <Metric label="Stop Loss" value={formatCurrency(position.stopLoss)} />
-          <Metric label="Liquidation" value={position.liquidationPrice ? formatCurrency(position.liquidationPrice) : "N/A"} />
-          <Metric label="Status" value={position.status} />
-        </dl>
-      ) : (
-        <p className="muted">Open a virtual BTC trade to see entry, SL, TP, liquidation, and PnL details here.</p>
-      )}
-    </section>
+      <dl className="current-trade-metrics">
+        <Metric label="Entry" value={formatCurrency(position.entryPrice)} />
+        <Metric label="Mark" value={formatCurrency(position.markPrice)} />
+        <Metric label="Qty" value={`${position.remainingQuantity.toFixed(6)} BTC`} />
+        <Metric label="Margin" value={formatCurrency(position.remainingMargin)} />
+        <Metric label="Liq" value={position.liquidationPrice ? formatCurrency(position.liquidationPrice) : "N/A"} />
+        <Metric
+          label="uPnL"
+          value={formatCurrency(position.unrealizedPnl)}
+          tone={position.unrealizedPnl >= 0 ? "positive" : "negative"}
+        />
+        <Metric label="Status" value={position.status} />
+      </dl>
+    </div>
   );
 }
 
@@ -1302,8 +1364,9 @@ function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: numb
   if (currentPrice) lines.push({ label: "Mark", price: currentPrice, tone: "mark" });
   if (!position) return lines;
 
-  lines.push({ label: "Entry", price: position.entryPrice, tone: "entry" });
-  lines.push({ label: "SL", price: position.stopLoss, tone: "danger" });
+  const hasBracketLines = position.stopLoss > 0 || position.takeProfits.length > 0;
+  if (hasBracketLines) lines.push({ label: "Entry", price: position.entryPrice, tone: "entry" });
+  if (position.stopLoss > 0) lines.push({ label: "SL", price: position.stopLoss, tone: "danger" });
   if (position.liquidationPrice) lines.push({ label: "Liq", price: position.liquidationPrice, tone: "liquidation" });
   position.takeProfits.forEach((takeProfit, index) => {
     lines.push({ label: `TP${index + 1}`, price: takeProfit.price, tone: takeProfit.isHit ? "hit" : "target" });
@@ -1317,22 +1380,14 @@ function parseNumber(value: string): number {
 }
 
 function buildSubmittedBracket(
-  requestedSide: DemoTradeSide,
-  activeSide: DemoTradeSide,
-  entryPrice: number,
+  isBracketEnabled: boolean,
   stopLoss: string,
   takeProfits: TakeProfitDraft[]
 ) {
-  if (requestedSide !== activeSide && entryPrice > 0) {
+  if (!isBracketEnabled) {
     return {
-      stopLoss: requestedSide === "long" ? entryPrice * 0.98 : entryPrice * 1.02,
-      takeProfits: [
-        {
-          id: "tp-1",
-          price: requestedSide === "long" ? entryPrice * 1.02 : entryPrice * 0.98,
-          closePercent: 100
-        }
-      ]
+      stopLoss: 0,
+      takeProfits: []
     };
   }
 
@@ -1373,9 +1428,11 @@ function formatUsdt(value: number): string {
 
 function formatAmountInput(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "";
-  if (value >= 100) return value.toFixed(0);
-  if (value >= 1) return value.toFixed(2);
-  return value.toFixed(4);
+  const digits = value >= 1 ? 2 : 4;
+  const flooredValue = floorTo(value, digits);
+  if (flooredValue <= 0) return "";
+  if (flooredValue >= 100 && Number.isInteger(flooredValue)) return flooredValue.toFixed(0);
+  return flooredValue.toFixed(digits);
 }
 
 function formatDateTime(value: string): string {
@@ -1388,6 +1445,7 @@ function formatDateTime(value: string): string {
 }
 
 function defaultVisibleCandles(timeframe: DemoTradeTimeframe): number {
+  if (timeframe === "1M") return 48;
   if (timeframe === "1w") return 72;
   if (timeframe === "1d") return 80;
   return 90;
@@ -1395,4 +1453,11 @@ function defaultVisibleCandles(timeframe: DemoTradeTimeframe): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function floorTo(value: number, digits: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const factor = 10 ** digits;
+  const normalized = Number(value.toFixed(8));
+  return Math.floor(normalized * factor) / factor;
 }

@@ -86,6 +86,15 @@ test("leverage 100x opens a high leverage isolated margin position", () => {
   assertClose(state.availableBalance, 990);
 });
 
+test("opening without SL or TPs keeps bracket orders unset", () => {
+  const state = openPosition({ sizeMode: "notional", amount: 500, stopLoss: 0, takeProfits: [] });
+  assert.equal(state.openPosition.stopLoss, 0);
+  assert.deepEqual(state.openPosition.takeProfits, []);
+
+  const marked = demoTrade.applyMarketPrice(state, 95, "2026-06-16T12:02:00.000Z");
+  assert.equal(marked.openPosition.status, "OPEN");
+});
+
 test("liquidation price for long uses ASEKE demo isolated-margin formula", () => {
   const price = demoTrade.calculateLiquidationPrice({
     side: "long",
@@ -170,6 +179,61 @@ test("manual close updates balance and status", () => {
   assert.equal(state.tradeHistory[0].status, "MANUALLY_CLOSED");
   assertClose(state.currentBalance, 1100);
   assertClose(state.realizedPnl, 100);
+});
+
+test("manual partial close releases margin and keeps the remainder open", () => {
+  const result = demoTrade.closeOpenPositionByPercent(
+    openPosition({ takeProfits: [] }),
+    110,
+    20,
+    "2026-06-16T12:02:00.000Z"
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.state.openPosition.status, "PARTIALLY_CLOSED");
+  assertClose(result.state.openPosition.remainingQuantity, 8);
+  assertClose(result.state.openPosition.remainingMargin, 80);
+  assertClose(result.state.openPosition.realizedPnl, 20);
+  assertClose(result.state.availableBalance, 940);
+  assertClose(demoTrade.calculateDemoTradeStats(result.state).equity, 1100);
+
+  const finalClose = demoTrade.closeOpenPositionByPercent(
+    result.state,
+    110,
+    100,
+    "2026-06-16T12:03:00.000Z"
+  );
+  assert.equal(finalClose.ok, true);
+  assert.equal(finalClose.state.openPosition, null);
+  assert.equal(finalClose.state.tradeHistory[0].status, "MANUALLY_CLOSED");
+  assertClose(finalClose.state.realizedPnl, 100);
+  assertClose(finalClose.state.currentBalance, 1100);
+});
+
+test("notional sizing allows the full reduced available balance", () => {
+  const input = {
+    sessionId: "test-session",
+    userId: "user-1",
+    symbol: "BTCUSDT",
+    side: "long",
+    sizeMode: "notional",
+    amount: 4520.1,
+    leverage: 5,
+    entryPrice: 100,
+    stopLoss: 0,
+    takeProfits: []
+  };
+  const result = demoTrade.openDemoPosition(createState(904.02), input, "2026-06-16T12:01:00.000Z");
+  assert.equal(result.ok, true);
+  assertClose(result.state.openPosition.initialMargin, 904.02);
+  assertClose(result.state.availableBalance, 0);
+
+  const tooLarge = demoTrade.openDemoPosition(createState(904.02), {
+    ...input,
+    amount: 4520.11
+  }, "2026-06-16T12:01:00.000Z");
+  assert.equal(tooLarge.ok, false);
+  assert.ok(tooLarge.errors.includes("Trade is larger than your available demo balance allows."));
 });
 
 test("stop-loss hit closes remaining position", () => {

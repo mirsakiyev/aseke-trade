@@ -183,7 +183,6 @@ export function validateDemoTradeInput(state: DemoTradeState, input: OpenDemoTra
   if (input.side !== "long" && input.side !== "short") errors.push("Choose Long or Short.");
   if (!isPositiveDecimal(amount)) errors.push("Trade size must be greater than zero.");
   if (!isPositiveDecimal(entryPrice)) errors.push("Entry price must be greater than zero.");
-  if (!isPositiveDecimal(stopLoss)) errors.push("Stop loss must be greater than zero.");
   if (input.sizeMode !== "margin" && input.sizeMode !== "notional") {
     errors.push("Choose whether the amount is margin or position size.");
   }
@@ -252,7 +251,7 @@ export function openDemoPosition(
     leverage: normalizedInput.leverage,
     initialQuantity: roundQuantity(toNumber(quantity)),
     remainingQuantity: roundQuantity(toNumber(quantity)),
-    stopLoss: roundPrice(normalizedInput.stopLoss),
+    stopLoss: isPositiveDecimal(toDecimal(normalizedInput.stopLoss)) ? roundPrice(normalizedInput.stopLoss) : 0,
     takeProfits: normalizedInput.takeProfits.map((takeProfit, index) => ({
       id: takeProfit.id ?? `tp-${index + 1}`,
       price: roundPrice(takeProfit.price),
@@ -446,6 +445,46 @@ export function closeOpenPosition(
     message,
     now
   );
+}
+
+export function closeOpenPositionByPercent(
+  state: DemoTradeState,
+  exitPrice: number,
+  closePercent = 100,
+  now = new Date().toISOString()
+): DemoTradeResult {
+  if (!state.openPosition) return { ok: false, errors: ["No open position to close."], state };
+  if (!Number.isFinite(exitPrice) || exitPrice <= 0) {
+    return { ok: false, errors: ["Market price is unavailable."], state };
+  }
+  if (!Number.isFinite(closePercent) || closePercent <= 0) {
+    return { ok: false, errors: ["Close size must be greater than 0%."], state };
+  }
+  if (closePercent > 100 + EPSILON) {
+    return { ok: false, errors: ["Close size cannot be above 100%."], state };
+  }
+
+  const percentToClose = Math.min(closePercent, 100);
+  const closeQuantity = percentToClose >= 100
+    ? state.openPosition.remainingQuantity
+    : toNumber(mul(toDecimal(state.openPosition.remainingQuantity), div(toDecimal(percentToClose), toDecimal(100))));
+  const actionType: DemoTradeActionType = percentToClose >= 100 ? "manual close" : "partial close";
+  const message = percentToClose >= 100
+    ? "Position closed manually."
+    : `Closed ${roundPercent(percentToClose)}% of the remaining position manually.`;
+
+  return {
+    ok: true,
+    state: closePositionQuantity(
+      state,
+      exitPrice,
+      closeQuantity,
+      "MANUALLY_CLOSED",
+      actionType,
+      message,
+      now
+    )
+  };
 }
 
 export function resetDemoTradeState(
@@ -803,6 +842,7 @@ function calculateEquity(state: DemoTradeState): number {
 }
 
 function isStopLossHit(position: DemoOpenPosition, markPrice: number): boolean {
+  if (!Number.isFinite(position.stopLoss) || position.stopLoss <= 0) return false;
   return position.side === "long" ? markPrice <= position.stopLoss : markPrice >= position.stopLoss;
 }
 
