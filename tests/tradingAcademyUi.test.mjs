@@ -28,6 +28,16 @@ test("academy dashboard uses compact AML history and direct premium support", ()
   assert.doesNotMatch(dashboardSource, /supportForm|isSupportSubmitting|Send Support Request|Join Community/);
 });
 
+test("trading academy admin omits premium support ticket queue", () => {
+  assert.match(adminSource, /type AcademyAdminTab = "signals" \| "aml"/);
+  assert.match(adminSource, /\(\["signals", "aml"\] as AcademyAdminTab\[\]\)/);
+  assert.match(adminSource, /Manage Academy signals and AML check requests\./);
+  assert.doesNotMatch(adminSource, /fetchAdminPremiumSupportRequests/);
+  assert.doesNotMatch(adminSource, /premium_support_requests/);
+  assert.doesNotMatch(adminSource, /Premium Support Requests|premium support tickets/);
+  assert.doesNotMatch(adminSource, /SupportRequestAdminRow/);
+});
+
 test("trading signal card renders live title and updated stop loss state", () => {
   assert.match(dashboardSource, /getSignalDisplayTitle\(signal\)/);
   assert.match(dashboardSource, /function SignalStopLossLevel/);
@@ -69,7 +79,14 @@ test("leaderboard renders public avatars with fallback support", () => {
 
 test("academy dashboard includes a subscriber risk calculator", () => {
   assert.match(dashboardSource, /RiskCalculatorPanel/);
-  assert.match(dashboardSource, /<h2 className="title-with-leading-icon">\s*<Calculator size=\{28\}/);
+  assert.match(dashboardSource, /const \[isRiskCalculatorExpanded, setIsRiskCalculatorExpanded\] = useState\(false\)/);
+  assert.match(dashboardSource, /className="risk-calculator-toggle"/);
+  assert.match(dashboardSource, /aria-expanded=\{isRiskCalculatorExpanded\}/);
+  assert.match(dashboardSource, /onClick=\{\(\) => setIsRiskCalculatorExpanded\(\(expanded\) => !expanded\)\}/);
+  assert.match(dashboardSource, /\{isRiskCalculatorExpanded && \(/);
+  assert.match(dashboardSource, /risk-calculator-toggle-title[\s\S]*<Calculator size=\{28\}/);
+  assert.match(dashboardSource, /Open calculator/);
+  assert.match(dashboardSource, /Hide calculator/);
   assert.doesNotMatch(dashboardSource, /Position plan/);
   assert.match(dashboardSource, /form\.direction === "long" \? "long active" : "long"/);
   assert.match(dashboardSource, /form\.direction === "short" \? "short active" : "short"/);

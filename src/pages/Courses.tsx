@@ -27,7 +27,7 @@ export function Courses() {
 
   return (
     <main className="page page-stack">
-      <section className="page-title-row">
+      <section className="page-title-row compact-title-row">
         <div>
           <p className="eyebrow">Courses</p>
           <h1>Structured crypto education for better trading decisions</h1>

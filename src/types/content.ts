@@ -394,8 +394,6 @@ export interface AmlCheckRequest {
   completed_at: string | null;
 }
 
-export type PremiumSupportPriority = "low" | "normal" | "high" | "urgent";
-export type PremiumSupportStatus = "open" | "in_review" | "answered" | "closed";
 export type SupportRequestStatus = "open" | "in_progress" | "resolved" | "closed";
 export type SupportRequestCategory =
   | "Account"
@@ -404,21 +402,6 @@ export type SupportRequestCategory =
   | "Technical Issue"
   | "General Question"
   | "Other";
-
-export interface PremiumSupportRequest {
-  id: string;
-  user_id: string;
-  subject: string;
-  message: string;
-  category: string | null;
-  priority: PremiumSupportPriority;
-  status: PremiumSupportStatus;
-  admin_response: string | null;
-  admin_notes: string | null;
-  reviewed_by_admin_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 export interface SupportRequest {
   id: string;

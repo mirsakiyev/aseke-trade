@@ -1,6 +1,5 @@
 import type {
   AmlCheckRequest,
-  PremiumSupportRequest,
   TradingAcademyLeaderboardRow,
   TradingSignal
 } from "../types/content";
@@ -113,18 +112,6 @@ export async function submitAmlCheck(input: {
   }
 
   return (data as SubmitAmlCheckResponse).result;
-}
-
-export async function fetchAdminPremiumSupportRequests(): Promise<PremiumSupportRequest[]> {
-  if (!supabase) return [];
-
-  const { data, error } = await supabase
-    .from("premium_support_requests")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error("Premium support requests could not be loaded.");
-  return (data ?? []) as PremiumSupportRequest[];
 }
 
 async function functionErrorMessage(error: { message?: string; context?: unknown }): Promise<string> {

@@ -52,7 +52,7 @@ export function Guides() {
 
   return (
     <main className="page page-stack">
-      <section className="page-title-row">
+      <section className="page-title-row compact-title-row">
         <div>
           <p className="eyebrow">Guides and Tutorials</p>
           <h1>Crypto guides for safer market decisions</h1>

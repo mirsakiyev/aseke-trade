@@ -1,5 +1,7 @@
 import {
   Calculator,
+  ChevronDown,
+  ChevronUp,
   Crown,
   Headphones,
   LineChart,
@@ -304,7 +306,7 @@ export function TradingAcademyDashboard() {
 
   return (
     <main className="page page-stack trading-academy-dashboard">
-      <section className="page-title-row">
+      <section className="page-title-row compact-title-row">
         <div>
           <p className="eyebrow">Trading Academy</p>
           <h1>Academy dashboard</h1>
@@ -653,24 +655,50 @@ function RiskCalculatorPanel({
   onTakeProfitChange: (takeProfitId: string, price: string) => void;
   result: RiskCalculatorResult | null;
 }) {
+  const [isRiskCalculatorExpanded, setIsRiskCalculatorExpanded] = useState(false);
+
   return (
-    <section className="section-panel risk-calculator-panel">
-      <div className="lesson-title-line">
-        <div>
-          <h2 className="title-with-leading-icon">
+    <section className="section-panel risk-calculator-panel" aria-label="Risk Calculator">
+      <button
+        className="risk-calculator-toggle"
+        type="button"
+        aria-expanded={isRiskCalculatorExpanded}
+        aria-controls="risk-calculator-content"
+        onClick={() => setIsRiskCalculatorExpanded((expanded) => !expanded)}
+      >
+        <span className="risk-calculator-toggle-copy">
+          <span className="title-with-leading-icon risk-calculator-toggle-title">
             <Calculator size={28} aria-hidden="true" />
             Risk Calculator
-          </h2>
-        </div>
-      </div>
+          </span>
+          <span className="muted">
+            Size a position from account balance, stop loss, leverage, and take-profit targets.
+          </span>
+        </span>
+        <span className="status-pill">
+          {isRiskCalculatorExpanded ? (
+            <>
+              <ChevronUp size={15} />
+              Hide calculator
+            </>
+          ) : (
+            <>
+              <ChevronDown size={15} />
+              Open calculator
+            </>
+          )}
+        </span>
+      </button>
 
-      {isLocked ? (
-        <div className="compact-empty-state">
-          <Crown size={20} aria-hidden="true" />
-          <p className="muted">Risk Calculator is available to Trading Academy subscribers.</p>
-        </div>
-      ) : (
-        <div className="risk-calculator-layout">
+      {isRiskCalculatorExpanded && (
+        <div id="risk-calculator-content">
+          {isLocked ? (
+            <div className="compact-empty-state">
+              <Crown size={20} aria-hidden="true" />
+              <p className="muted">Risk Calculator is available to Trading Academy subscribers.</p>
+            </div>
+          ) : (
+            <div className="risk-calculator-layout">
           <form className="risk-calculator-form risk-input-panel stack-form" onSubmit={onSubmit}>
             <div className="risk-field-group">
               <span className="risk-field-label">Direction</span>
@@ -885,6 +913,8 @@ function RiskCalculatorPanel({
           </form>
 
           <RiskCalculatorResults result={result} />
+            </div>
+          )}
         </div>
       )}
     </section>

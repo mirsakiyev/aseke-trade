@@ -2,7 +2,6 @@ import {
   CheckCircle2,
   Edit3,
   Flag,
-  Headphones,
   LineChart,
   Plus,
   RefreshCw,
@@ -17,7 +16,6 @@ import { LoadingState } from "../components/LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import {
   fetchAdminAmlCheckRequests,
-  fetchAdminPremiumSupportRequests,
   fetchTradingSignals
 } from "../lib/tradingAcademyApi";
 import {
@@ -44,8 +42,6 @@ import { supabase } from "../lib/supabase";
 import type {
   AmlCheckRequest,
   AmlCheckStatus,
-  PremiumSupportRequest,
-  PremiumSupportStatus,
   TradingSignal,
   TradingSignalDirection,
   TradingSignalOriginalSnapshot,
@@ -54,7 +50,7 @@ import type {
   TradingSignalUpdate
 } from "../types/content";
 
-type AcademyAdminTab = "signals" | "aml" | "support";
+type AcademyAdminTab = "signals" | "aml";
 
 interface SignalTakeProfitForm {
   id: string;
@@ -76,7 +72,6 @@ interface SignalFormState {
 }
 
 const amlStatuses: AmlCheckStatus[] = ["pending", "in_review", "completed", "rejected", "refunded"];
-const supportStatuses: PremiumSupportStatus[] = ["open", "in_review", "answered", "closed"];
 const chartImageTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxChartImageBytes = 5 * 1024 * 1024;
 const leverageOptions = Array.from({ length: 100 }, (_, index) => index + 1);
@@ -86,7 +81,6 @@ export function AdminTradingAcademy() {
   const [activeTab, setActiveTab] = useState<AcademyAdminTab>("signals");
   const [signals, setSignals] = useState<TradingSignal[]>([]);
   const [amlRequests, setAmlRequests] = useState<AmlCheckRequest[]>([]);
-  const [supportRequests, setSupportRequests] = useState<PremiumSupportRequest[]>([]);
   const [signalForm, setSignalForm] = useState<SignalFormState>(() => createBlankSignalForm());
   const [editingSignalId, setEditingSignalId] = useState<string | null>(null);
   const [chartFile, setChartFile] = useState<File | null>(null);
@@ -103,14 +97,12 @@ export function AdminTradingAcademy() {
     setMessage(null);
 
     try {
-      const [nextSignals, nextAmlRequests, nextSupportRequests] = await Promise.all([
+      const [nextSignals, nextAmlRequests] = await Promise.all([
         fetchTradingSignals({ includeInactive: true }),
-        fetchAdminAmlCheckRequests(),
-        fetchAdminPremiumSupportRequests()
+        fetchAdminAmlCheckRequests()
       ]);
       setSignals(nextSignals);
       setAmlRequests(nextAmlRequests);
-      setSupportRequests(nextSupportRequests);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Trading Academy admin data could not be loaded.");
     } finally {
@@ -371,11 +363,11 @@ export function AdminTradingAcademy() {
 
   return (
     <main className="page page-stack">
-      <section className="page-title-row">
+      <section className="page-title-row compact-title-row">
         <div>
           <p className="eyebrow">Admin Panel</p>
           <h1>Trading Academy tools</h1>
-          <p className="muted">Manage Academy signals, AML check requests, and premium support tickets.</p>
+          <p className="muted">Manage Academy signals and AML check requests.</p>
         </div>
         <div className="inline-actions">
           <Link className="ghost-button" to="/admin">
@@ -395,7 +387,7 @@ export function AdminTradingAcademy() {
       {message && <p className="soft-notice">{message}</p>}
 
       <section className="tab-bar" aria-label="Trading Academy admin sections">
-        {(["signals", "aml", "support"] as AcademyAdminTab[]).map((tab) => (
+        {(["signals", "aml"] as AcademyAdminTab[]).map((tab) => (
           <button
             className={activeTab === tab ? "filter-pill active" : "filter-pill"}
             type="button"
@@ -608,24 +600,6 @@ export function AdminTradingAcademy() {
                     <span>Paid AML checks will appear here.</span>
                   </div>
                   <SearchCheck size={18} />
-                </li>
-              )}
-            </AdminList>
-          )}
-
-          {activeTab === "support" && (
-            <AdminList title="Premium Support Requests">
-              {supportRequests.length ? (
-                supportRequests.map((request) => (
-                  <SupportRequestAdminRow request={request} onUpdated={refreshAdminData} key={request.id} />
-                ))
-              ) : (
-                <li>
-                  <div>
-                    <strong>No support requests</strong>
-                    <span>Premium support tickets will appear here.</span>
-                  </div>
-                  <Headphones size={18} />
                 </li>
               )}
             </AdminList>
@@ -936,65 +910,6 @@ function AmlRequestAdminRow({ request, onUpdated }: { request: AmlCheckRequest; 
           ))}
         </select>
         <input value={adminResult} onChange={(event) => setAdminResult(event.target.value)} placeholder="Result" />
-        <input value={adminNotes} onChange={(event) => setAdminNotes(event.target.value)} placeholder="Admin notes" />
-        <button className="ghost-button compact" type="button" onClick={() => void updateRequest()} disabled={isSaving}>
-          {isSaving ? "Saving" : "Update"}
-        </button>
-      </div>
-    </li>
-  );
-}
-
-function SupportRequestAdminRow({
-  request,
-  onUpdated
-}: {
-  request: PremiumSupportRequest;
-  onUpdated: () => Promise<void>;
-}) {
-  const { user } = useAuth();
-  const [status, setStatus] = useState<PremiumSupportStatus>(request.status);
-  const [response, setResponse] = useState(request.admin_response ?? "");
-  const [adminNotes, setAdminNotes] = useState(request.admin_notes ?? "");
-  const [isSaving, setIsSaving] = useState(false);
-
-  const updateRequest = async () => {
-    if (!supabase || !user || isSaving) return;
-
-    setIsSaving(true);
-    const { error } = await supabase
-      .from("premium_support_requests")
-      .update({
-        status,
-        admin_response: sanitizePlainText(response, 2000) || null,
-        admin_notes: sanitizePlainText(adminNotes, 2000) || null,
-        reviewed_by_admin_id: user.id
-      })
-      .eq("id", request.id);
-
-    setIsSaving(false);
-    if (!error) await onUpdated();
-  };
-
-  return (
-    <li className="admin-review-row">
-      <div>
-        <strong>{request.subject}</strong>
-        <span>
-          User {request.user_id.slice(0, 8)} - {request.priority} - {request.status.replace("_", " ")} -{" "}
-          {formatDateTime(request.created_at)}
-        </span>
-        <span>{request.message}</span>
-      </div>
-      <div className="admin-inline-form">
-        <select value={status} onChange={(event) => setStatus(event.target.value as PremiumSupportStatus)}>
-          {supportStatuses.map((item) => (
-            <option value={item} key={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <input value={response} onChange={(event) => setResponse(event.target.value)} placeholder="Response" />
         <input value={adminNotes} onChange={(event) => setAdminNotes(event.target.value)} placeholder="Admin notes" />
         <button className="ghost-button compact" type="button" onClick={() => void updateRequest()} disabled={isSaving}>
           {isSaving ? "Saving" : "Update"}

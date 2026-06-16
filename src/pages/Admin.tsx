@@ -413,7 +413,7 @@ export function Admin() {
 
   return (
     <main className="page page-stack">
-      <section className="page-title-row">
+      <section className="page-title-row compact-title-row">
         <div>
           <p className="eyebrow">Admin Panel</p>
           <h1>Content and access management</h1>
