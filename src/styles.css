@@ -5540,7 +5540,7 @@ select:focus {
 
 .demo-trade-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.75fr);
+  grid-template-columns: minmax(0, 1.75fr) minmax(300px, 0.62fr);
   gap: 1rem;
   align-items: start;
 }
@@ -5576,11 +5576,12 @@ select:focus {
 .demo-trade-chart {
   display: block;
   width: 100%;
-  min-height: 320px;
+  min-height: 350px;
   border: 1px solid rgba(229, 228, 226, 0.12);
   border-radius: 8px;
   background: rgba(3, 5, 7, 0.82);
   cursor: grab;
+  touch-action: none;
   user-select: none;
 }
 
@@ -5740,6 +5741,256 @@ select:focus {
 }
 
 .futures-ticket {
+  gap: 0.58rem;
+}
+
+.futures-contract-row,
+.futures-available-row,
+.futures-side-notional {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.futures-contract-row strong {
+  color: var(--platinum);
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.futures-contract-row span,
+.futures-available-row span,
+.futures-side-notional span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.futures-available-row strong,
+.futures-side-notional strong {
+  color: var(--platinum);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.futures-mode-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(74px, 0.82fr) minmax(68px, 0.74fr);
+  gap: 0.42rem;
+}
+
+.futures-mode-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 0.62rem;
+  border: 1px solid rgba(229, 228, 226, 0.1);
+  border-radius: 7px;
+  background: rgba(36, 43, 52, 0.84);
+  color: var(--platinum);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+select.futures-mode-chip {
+  width: 100%;
+  appearance: auto;
+}
+
+.futures-order-tabs,
+.futures-direction-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+}
+
+.futures-order-tabs {
+  min-height: 34px;
+  border-bottom: 1px solid rgba(229, 228, 226, 0.1);
+}
+
+.futures-order-tabs button,
+.futures-direction-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.77rem;
+  font-weight: 850;
+}
+
+.futures-order-tabs button.active {
+  position: relative;
+  color: var(--platinum);
+}
+
+.futures-order-tabs button.active::after {
+  position: absolute;
+  right: 0;
+  bottom: -9px;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--platinum);
+  content: "";
+}
+
+.futures-order-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.futures-direction-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 0.18rem;
+  border: 1px solid rgba(229, 228, 226, 0.1);
+  border-radius: 8px;
+  background: rgba(229, 228, 226, 0.035);
+}
+
+.futures-direction-toggle button {
+  min-height: 30px;
+  border-radius: 7px;
+}
+
+.futures-direction-toggle button.active.long {
+  background: rgba(17, 196, 124, 0.14);
+  color: #83f0bd;
+}
+
+.futures-direction-toggle button.active.short {
+  background: rgba(255, 78, 112, 0.14);
+  color: #ff9aae;
+}
+
+.futures-quantity-card {
+  gap: 0.42rem !important;
+}
+
+.futures-quantity-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 40px;
+  border: 1px solid rgba(229, 228, 226, 0.1);
+  border-radius: 7px;
+  background: rgba(36, 43, 52, 0.76);
+}
+
+.futures-quantity-input-row input {
+  min-height: 38px !important;
+  border: 0;
+  background: transparent;
+}
+
+.futures-quantity-input-row strong {
+  padding: 0 0.64rem;
+  color: var(--platinum);
+  font-size: 0.86rem;
+  font-weight: 950;
+}
+
+.futures-percent-control {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.futures-percent-control input[type="range"] {
+  width: 100%;
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+  background: linear-gradient(
+    90deg,
+    rgba(229, 228, 226, 0.95) 0 var(--size-fill),
+    rgba(229, 228, 226, 0.16) var(--size-fill) 100%
+  );
+}
+
+.futures-percent-control input[type="range"]::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #05070a;
+  border-radius: 50%;
+  appearance: none;
+  background: var(--platinum);
+  box-shadow: 0 0 0 1px rgba(229, 228, 226, 0.6);
+}
+
+.futures-percent-control input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #05070a;
+  border-radius: 50%;
+  background: var(--platinum);
+}
+
+.futures-percent-marks {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  color: rgba(184, 196, 207, 0.7);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.futures-percent-marks span:nth-child(2),
+.futures-percent-marks span:nth-child(3),
+.futures-percent-marks span:nth-child(4) {
+  text-align: center;
+}
+
+.futures-percent-marks span:last-child,
+.futures-side-notional span:last-child {
+  text-align: right;
+}
+
+.futures-bracket-block {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.2rem;
+  border-top: 1px solid rgba(229, 228, 226, 0.1);
+}
+
+.futures-bracket-block summary {
+  display: flex;
+  align-items: center;
+  gap: 0.48rem;
+  min-height: 30px;
+  color: var(--platinum);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  list-style: none;
+}
+
+.futures-bracket-block summary::-webkit-details-marker {
+  display: none;
+}
+
+.futures-bracket-block summary span {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(229, 228, 226, 0.34);
+  border-radius: 3px;
+}
+
+.futures-bracket-block[open] summary span {
+  background: rgba(126, 224, 167, 0.18);
+  box-shadow: inset 0 0 0 3px rgba(5, 7, 10, 0.94);
+}
+
+.futures-bracket-block > label,
+.futures-bracket-block .tp-builder {
+  margin-top: 0.42rem;
+}
+
+.futures-action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.62rem;
 }
 
@@ -5867,6 +6118,12 @@ select:focus {
   font-size: 0.88rem;
 }
 
+.futures-ticket select.futures-mode-chip {
+  min-height: 32px;
+  padding: 0 0.62rem;
+  font-size: 0.78rem;
+}
+
 .tp-draft-row,
 .demo-inline-edit {
   display: grid;
@@ -5910,19 +6167,27 @@ select:focus {
 }
 
 .futures-estimate-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .futures-estimate-grid > div {
-  padding: 0.58rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .futures-estimate-grid dd {
-  font-size: 0.86rem;
+  font-size: 0.82rem;
+}
+
+.futures-estimate-grid dt {
+  font-size: 0.72rem;
 }
 
 .futures-submit {
   min-height: 42px;
+  border-radius: 999px;
+  font-size: 0.88rem;
 }
 
 .futures-submit.long {

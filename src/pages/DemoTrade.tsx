@@ -9,11 +9,9 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
-  Trash2,
-  TrendingDown,
-  TrendingUp
+  Trash2
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -91,6 +89,21 @@ export function DemoTrade() {
   const stats = useMemo(() => calculateDemoTradeStats(demoState), [demoState]);
   const equityTone = stats.equity >= demoState.startingBalance ? "positive" : "negative";
   const activeSymbol = demoTradeSymbols[0];
+  const resetBracketDefaults = useCallback((nextSide: DemoTradeSide, price = currentPrice) => {
+    if (!price) return;
+    const defaultStop = nextSide === "long" ? price * 0.98 : price * 1.02;
+    const defaultTp1 = nextSide === "long" ? price * 1.02 : price * 0.98;
+    const defaultTp2 = nextSide === "long" ? price * 1.04 : price * 0.96;
+    setStopLoss(formatInputPrice(defaultStop));
+    setTakeProfits([
+      { id: "tp-1", price: formatInputPrice(defaultTp1), closePercent: "50" },
+      { id: "tp-2", price: formatInputPrice(defaultTp2), closePercent: "50" }
+    ]);
+  }, [currentPrice]);
+  const selectTradeSide = useCallback((nextSide: DemoTradeSide) => {
+    setSide(nextSide);
+    resetBracketDefaults(nextSide);
+  }, [resetBracketDefaults]);
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -183,15 +196,8 @@ export function DemoTrade() {
 
   useEffect(() => {
     if (!currentPrice || stopLoss) return;
-    const defaultStop = side === "long" ? currentPrice * 0.98 : currentPrice * 1.02;
-    const defaultTp1 = side === "long" ? currentPrice * 1.02 : currentPrice * 0.98;
-    const defaultTp2 = side === "long" ? currentPrice * 1.04 : currentPrice * 0.96;
-    setStopLoss(formatInputPrice(defaultStop));
-    setTakeProfits([
-      { id: "tp-1", price: formatInputPrice(defaultTp1), closePercent: "50" },
-      { id: "tp-2", price: formatInputPrice(defaultTp2), closePercent: "50" }
-    ]);
-  }, [currentPrice, side, stopLoss]);
+    resetBracketDefaults(side, currentPrice);
+  }, [currentPrice, resetBracketDefaults, side, stopLoss]);
 
   useEffect(() => {
     const position = demoState.openPosition;
@@ -212,23 +218,41 @@ export function DemoTrade() {
     );
   }, [demoState.openPosition?.tradeId]);
 
-  const openTrade = () => {
+  const openTrade = (requestedSide = side) => {
     const entryPrice = currentPrice ?? candles[candles.length - 1]?.close ?? 0;
+    const isOppositeSideSubmit = requestedSide !== side && entryPrice > 0;
+    const submittedStopLoss = isOppositeSideSubmit
+      ? requestedSide === "long" ? entryPrice * 0.98 : entryPrice * 1.02
+      : parseNumber(stopLoss);
+    const submittedTakeProfits = isOppositeSideSubmit
+      ? [
+          {
+            id: "tp-1",
+            price: requestedSide === "long" ? entryPrice * 1.02 : entryPrice * 0.98,
+            closePercent: 50
+          },
+          {
+            id: "tp-2",
+            price: requestedSide === "long" ? entryPrice * 1.04 : entryPrice * 0.96,
+            closePercent: 50
+          }
+        ]
+      : takeProfits.map((takeProfit) => ({
+          id: takeProfit.id,
+          price: parseNumber(takeProfit.price),
+          closePercent: parseNumber(takeProfit.closePercent)
+        }));
     const result = openDemoPosition(demoState, {
       userId: user?.id ?? null,
       sessionId: demoState.sessionId,
       symbol: activeSymbol.symbol,
-      side,
+      side: requestedSide,
       sizeMode,
       amount: parseNumber(amount),
       leverage: parseNumber(leverage),
       entryPrice,
-      stopLoss: parseNumber(stopLoss),
-      takeProfits: takeProfits.map((takeProfit) => ({
-        id: takeProfit.id,
-        price: parseNumber(takeProfit.price),
-        closePercent: parseNumber(takeProfit.closePercent)
-      }))
+      stopLoss: submittedStopLoss,
+      takeProfits: submittedTakeProfits
     });
 
     if (!result.ok) {
@@ -416,8 +440,9 @@ export function DemoTrade() {
               stopLoss={stopLoss}
               takeProfits={takeProfits}
               currentPrice={currentPrice}
+              availableBalance={demoState.availableBalance}
               errors={formErrors}
-              onSideChange={setSide}
+              onSideChange={selectTradeSide}
               onSizeModeChange={setSizeMode}
               onAmountChange={setAmount}
               onLeverageChange={setLeverage}
@@ -495,6 +520,7 @@ function TradeEntryForm({
   stopLoss,
   takeProfits,
   currentPrice,
+  availableBalance,
   errors,
   onSideChange,
   onSizeModeChange,
@@ -511,6 +537,7 @@ function TradeEntryForm({
   stopLoss: string;
   takeProfits: TakeProfitDraft[];
   currentPrice: number | null;
+  availableBalance: number;
   errors: string[];
   onSideChange: (side: DemoTradeSide) => void;
   onSizeModeChange: (mode: DemoTradeSizeMode) => void;
@@ -518,103 +545,177 @@ function TradeEntryForm({
   onLeverageChange: (value: string) => void;
   onStopLossChange: (value: string) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
-  onOpen: () => void;
+  onOpen: (side: DemoTradeSide) => void;
 }) {
-  const notional = sizeMode === "margin" ? parseNumber(amount) * parseNumber(leverage) : parseNumber(amount);
-  const margin = sizeMode === "margin" ? parseNumber(amount) : notional / Math.max(1, parseNumber(leverage));
+  const parsedLeverage = Math.max(1, Math.trunc(parseNumber(leverage)) || 1);
+  const amountValue = parseNumber(amount);
+  const maxMargin = Math.max(0, availableBalance);
+  const maxOpenableAmount = sizeMode === "margin" ? maxMargin : maxMargin * parsedLeverage;
+  const amountPercent = maxOpenableAmount > 0 ? clamp((amountValue / maxOpenableAmount) * 100, 0, 100) : 0;
+  const sliderStyle = { "--size-fill": `${amountPercent}%` } as CSSProperties;
+  const notional = sizeMode === "margin" ? amountValue * parsedLeverage : amountValue;
+  const margin = sizeMode === "margin" ? amountValue : notional / parsedLeverage;
   const quantity = currentPrice && currentPrice > 0 ? notional / currentPrice : 0;
-  const estimatedLiquidation = currentPrice
+  const longLiquidation = currentPrice
     ? calculateLiquidationPrice({
-        side,
+        side: "long",
+        avgEntryPrice: currentPrice,
+        quantityRemaining: quantity,
+        isolatedMarginRemaining: margin
+      })
+    : null;
+  const shortLiquidation = currentPrice
+    ? calculateLiquidationPrice({
+        side: "short",
         avgEntryPrice: currentPrice,
         quantityRemaining: quantity,
         isolatedMarginRemaining: margin
       })
     : null;
 
+  const setAmountFromPercent = (nextPercent: string) => {
+    const nextAmount = maxOpenableAmount * (parseNumber(nextPercent) / 100);
+    onAmountChange(formatAmountInput(nextAmount));
+  };
+
+  const openSide = (nextSide: DemoTradeSide) => {
+    onSideChange(nextSide);
+    onOpen(nextSide);
+  };
+
   return (
     <div className="demo-ticket-stack futures-ticket">
-      <div className="futures-ticket-header">
-        <div>
-          <span>BTCUSDT Perpetual</span>
-          <strong>Isolated · Market</strong>
-        </div>
-        <span className="futures-leverage-badge">{parseNumber(leverage) || 1}x</span>
+      <div className="futures-contract-row">
+        <strong>BTCUSDT Perpetual</strong>
+        <span>Market</span>
       </div>
 
-      <div className="demo-side-toggle" aria-label="Choose trade direction">
+      <div className="futures-mode-row">
+        <span className="futures-mode-chip">Isolated</span>
+        <select className="futures-mode-chip" value={leverage} onChange={(event) => onLeverageChange(event.target.value)} aria-label="Leverage">
+          {Array.from({ length: 100 }, (_, index) => index + 1).map((value) => (
+            <option value={value} key={value}>
+              {value}X
+            </option>
+          ))}
+        </select>
+        <select className="futures-mode-chip" value={sizeMode} onChange={(event) => onSizeModeChange(event.target.value as DemoTradeSizeMode)} aria-label="Amount mode">
+          <option value="margin">Margin</option>
+          <option value="notional">Size</option>
+        </select>
+      </div>
+
+      <div className="futures-order-tabs" aria-label="Order type">
+        <button type="button" disabled>
+          Limit
+        </button>
+        <button className="active" type="button">
+          Market
+        </button>
+        <button type="button" disabled>
+          Chase Limit
+        </button>
+      </div>
+
+      <div className="futures-available-row">
+        <span>Available</span>
+        <strong>{formatUsdt(availableBalance)}</strong>
+      </div>
+
+      <div className="futures-direction-toggle" aria-label="Choose trade direction">
         <button className={side === "long" ? "long active" : "long"} type="button" onClick={() => onSideChange("long")}>
-          <TrendingUp size={16} />
-          Buy / Long
+          Long
         </button>
         <button className={side === "short" ? "short active" : "short"} type="button" onClick={() => onSideChange("short")}>
-          <TrendingDown size={16} />
-          Sell / Short
+          Short
         </button>
       </div>
 
-      <div className="futures-size-toggle" aria-label="Choose size input mode">
-        <button className={sizeMode === "margin" ? "active" : ""} type="button" onClick={() => onSizeModeChange("margin")}>
-          Margin
-        </button>
-        <button className={sizeMode === "notional" ? "active" : ""} type="button" onClick={() => onSizeModeChange("notional")}>
-          Position Size
-        </button>
+      <label className="futures-quantity-card">
+        <span>Quantity (USDT)</span>
+        <div className="futures-quantity-input-row">
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={amount}
+            onChange={(event) => onAmountChange(event.target.value)}
+            placeholder="Max. openable quantity"
+          />
+          <strong>{Math.round(amountPercent)}%</strong>
+        </div>
+      </label>
+
+      <div className="futures-percent-control">
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={Math.round(amountPercent)}
+          style={sliderStyle}
+          onChange={(event) => setAmountFromPercent(event.target.value)}
+          aria-label="Position size percent"
+        />
+        <div className="futures-percent-marks" aria-hidden="true">
+          <span>0%</span>
+          <span>25%</span>
+          <span>50%</span>
+          <span>75%</span>
+          <span>100%</span>
+        </div>
       </div>
 
-      <div className="futures-ticket-grid">
-        <label>
-          Entry Price
-          <input value={currentPrice ? formatInputPrice(currentPrice) : ""} disabled />
-        </label>
+      <div className="futures-side-notional">
+        <span>
+          Buy <strong>{formatUsdt(notional)}</strong>
+        </span>
+        <span>
+          Sell <strong>{formatUsdt(notional)}</strong>
+        </span>
+      </div>
 
-        <label>
-          Leverage
-          <select value={leverage} onChange={(event) => onLeverageChange(event.target.value)}>
-            {Array.from({ length: 100 }, (_, index) => index + 1).map((value) => (
-              <option value={value} key={value}>
-                {value}x
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          {sizeMode === "margin" ? "Margin USDT" : "Position USDT"}
-          <input type="number" min="0" step="1" value={amount} onChange={(event) => onAmountChange(event.target.value)} />
-        </label>
-
+      <details className="futures-bracket-block">
+        <summary>
+          <span aria-hidden="true" />
+          <strong>TP/SL</strong>
+        </summary>
         <label>
           Stop Loss
           <input type="number" min="0" step="0.01" value={stopLoss} onChange={(event) => onStopLossChange(event.target.value)} />
         </label>
-      </div>
+        <TakeProfitEditor takeProfits={takeProfits} onChange={onTakeProfitsChange} />
+      </details>
 
-      <TakeProfitEditor takeProfits={takeProfits} onChange={onTakeProfitsChange} />
+      <div className="futures-action-row">
+        <button className="primary-button futures-submit long" type="button" onClick={() => openSide("long")} disabled={!currentPrice}>
+          Open Long
+        </button>
+        <button className="primary-button futures-submit short" type="button" onClick={() => openSide("short")} disabled={!currentPrice}>
+          Open Short
+        </button>
+      </div>
 
       <dl className="demo-estimate-grid futures-estimate-grid">
         <div>
-          <dt>Notional</dt>
-          <dd>{formatCurrency(notional)}</dd>
-        </div>
-        <div>
           <dt>Margin</dt>
-          <dd>{formatCurrency(margin)}</dd>
+          <dd>{formatUsdt(margin)}</dd>
         </div>
         <div>
-          <dt>Qty</dt>
-          <dd>{quantity > 0 ? `${quantity.toFixed(6)} BTC` : "N/A"}</dd>
+          <dt>Notional</dt>
+          <dd>{formatUsdt(notional)}</dd>
         </div>
         <div>
-          <dt>Est. Liq</dt>
-          <dd>{estimatedLiquidation ? formatCurrency(estimatedLiquidation) : "N/A"}</dd>
+          <dt>Long Liquidation Price</dt>
+          <dd>{longLiquidation ? formatUsdt(longLiquidation) : "-- USDT"}</dd>
+        </div>
+        <div>
+          <dt>Short Liquidation Price</dt>
+          <dd>{shortLiquidation ? formatUsdt(shortLiquidation) : "-- USDT"}</dd>
         </div>
       </dl>
 
       <ErrorList errors={errors} />
-      <button className={side === "long" ? "primary-button futures-submit long" : "primary-button futures-submit short"} type="button" onClick={onOpen} disabled={!currentPrice}>
-        {side === "long" ? "Open Long" : "Open Short"}
-      </button>
     </div>
   );
 }
@@ -791,14 +892,14 @@ function DemoTradeChart({
   const range = Math.max(maxPrice - minPrice, 1);
   const paddedMin = minPrice - range * 0.12;
   const paddedMax = maxPrice + range * 0.12;
-  const width = 980;
-  const height = 460;
+  const width = 1040;
+  const height = 500;
   const padding = { top: 24, right: 118, bottom: 34, left: 22 };
   const axisX = width - padding.right;
   const chartWidth = axisX - padding.left;
   const chartHeight = height - padding.top - padding.bottom;
   const candleGap = chartWidth / Math.max(visibleCandles.length, 1);
-  const candleWidth = clamp(candleGap * 0.64, 5, 16);
+  const candleWidth = clamp(candleGap * 0.7, 6, 18);
   const yForPrice = (price: number) => padding.top + ((paddedMax - price) / (paddedMax - paddedMin)) * chartHeight;
   const priceTicks = Array.from({ length: 8 }, (_, index) => paddedMax - ((paddedMax - paddedMin) / 7) * index);
   const verticalGridCount = Math.min(10, Math.max(4, Math.floor(visibleCandles.length / 10)));
@@ -831,7 +932,7 @@ function DemoTradeChart({
   const moveRightDrag = (event: PointerEvent<SVGSVGElement>) => {
     if (!dragStartRef.current) return;
     event.preventDefault();
-    const deltaCandles = Math.round((dragStartRef.current.x - event.clientX) / Math.max(6, candleGap * 0.55));
+    const deltaCandles = Math.round((event.clientX - dragStartRef.current.x) / Math.max(5, candleGap));
     setOffset(clamp(dragStartRef.current.offset + deltaCandles, 0, Math.max(0, candles.length - visibleCount)));
   };
 
@@ -1135,6 +1236,19 @@ function formatCurrency(value: number): string {
     currency: "USD",
     maximumFractionDigits: 2
   });
+}
+
+function formatUsdt(value: number): string {
+  return `${value.toLocaleString("en-US", {
+    maximumFractionDigits: 2
+  })} USDT`;
+}
+
+function formatAmountInput(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (value >= 100) return value.toFixed(0);
+  if (value >= 1) return value.toFixed(2);
+  return value.toFixed(4);
 }
 
 function formatDateTime(value: string): string {

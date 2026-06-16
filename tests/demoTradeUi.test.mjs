@@ -44,6 +44,7 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /onContextMenu=\{\(event\) => event\.preventDefault\(\)\}/);
   assert.match(pageSource, /onPointerDown=\{startRightDrag\}/);
   assert.match(pageSource, /setPointerCapture/);
+  assert.match(pageSource, /event\.clientX - dragStartRef\.current\.x/);
   assert.match(pageSource, /startRightDrag/);
   assert.match(pageSource, /ArrowLeft|ArrowRight|Minus/);
   assert.doesNotMatch(pageSource, /Zoom In|Zoom Out|Pan Left|Pan Right/);
@@ -53,7 +54,9 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /function TradeEntryForm/);
   assert.match(pageSource, /futures-ticket/);
   assert.match(pageSource, /BTCUSDT Perpetual/);
-  assert.match(pageSource, /Est\. Liq/);
+  assert.match(pageSource, /Position size percent/);
+  assert.match(pageSource, /Long Liquidation Price/);
+  assert.match(pageSource, /Open Short/);
   assert.match(pageSource, /function PositionManager/);
   assert.match(pageSource, /openDemoPosition/);
   assert.match(pageSource, /updateDemoStopLoss/);
