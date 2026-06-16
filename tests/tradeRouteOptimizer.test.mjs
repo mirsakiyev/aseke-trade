@@ -231,7 +231,8 @@ test("puzzle page renders the Trade Route Optimizer instead of the old trivia su
 
   assert.match(pageSource, /TradeRouteOptimizer/);
   assert.doesNotMatch(pageSource, /loadPuzzle|submitPuzzle|Your answer|Submit answer/);
-  assert.match(componentSource, /Simulated educational puzzle\. Not financial advice\./);
+  assert.match(componentSource, /className="page-title-row compact-title-row trade-optimizer-title-row"/);
+  assert.match(componentSource, /The preview estimates final USDT after fees/);
   assert.match(componentSource, /Lock In Route/);
   assert.match(componentSource, /Sign in to earn XP from daily puzzles\./);
   assert.match(componentSource, /submitTradeRouteOptimizerCompletion/);

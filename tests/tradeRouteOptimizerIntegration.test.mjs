@@ -40,3 +40,10 @@ test("route optimizer reference prices use server-side CoinGecko with public fal
   assert.match(clientSource, /last-known-good/);
   assert.match(clientSource, /createFallbackReferenceAssetPrices/);
 });
+
+test("route optimizer uses the standard compact top section", async () => {
+  const optimizerSource = await readFile(new URL("../src/components/TradeRouteOptimizer.tsx", import.meta.url), "utf8");
+
+  assert.match(optimizerSource, /className="page-title-row compact-title-row trade-optimizer-title-row"/);
+  assert.doesNotMatch(optimizerSource, /puzzle-title-row/);
+});

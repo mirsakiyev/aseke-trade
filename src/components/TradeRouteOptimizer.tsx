@@ -209,7 +209,7 @@ export function TradeRouteOptimizer({ userId, onXpAwarded }: TradeRouteOptimizer
 
   return (
     <>
-      <section className="page-title-row puzzle-title-row trade-optimizer-title-row">
+      <section className="page-title-row compact-title-row trade-optimizer-title-row">
         <div>
           <p className="eyebrow">Puzzle</p>
           <div className="trade-title-line">
@@ -220,19 +220,9 @@ export function TradeRouteOptimizer({ userId, onXpAwarded }: TradeRouteOptimizer
             </span>
           </div>
           <p className="muted">
-            Buy low, move smart, sell high. Fees can turn a winning route into a losing one.
+            Buy on one market, transfer, then sell elsewhere. The preview estimates final USDT after fees,
+            network cost, and slippage before you lock in.
           </p>
-          <div className="trade-how-it-works" aria-label="How the route puzzle works">
-            <span>Choose an asset</span>
-            <span>Buy on one market</span>
-            <span>Pick a transfer route</span>
-            <span>Sell somewhere else</span>
-          </div>
-          <p className="muted trade-how-it-works-copy">
-            The preview estimates your final USDT after trading fees, network cost, and slippage. Lock in once to
-            reveal the optimal route and today's XP result.
-          </p>
-          <p className="trade-sim-note">Simulated educational puzzle. Not financial advice.</p>
         </div>
         <span className="quiz-title-mark" aria-hidden="true">
           <Route size={34} />

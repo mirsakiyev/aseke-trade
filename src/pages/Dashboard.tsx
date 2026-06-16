@@ -4,8 +4,6 @@ import {
   Bell,
   BookMarked,
   Camera,
-  ChevronDown,
-  ChevronUp,
   Crown,
   Edit3,
   GraduationCap,
@@ -457,30 +455,18 @@ export function Dashboard() {
                 <KeyRound size={18} />
               </span>
               <div>
-                <h3 id="change-password-title">Change Password</h3>
-                <p className="muted">
-                  Update your account password. For security, enter your current password before choosing a new one.
-                </p>
+                <h3 id="change-password-title">
+                  <button
+                    className="profile-password-title-link"
+                    type="button"
+                    onClick={togglePasswordSection}
+                    aria-expanded={isPasswordSectionExpanded}
+                    aria-controls="password-change-content"
+                  >
+                    Change Password
+                  </button>
+                </h3>
               </div>
-              <button
-                className="ghost-button compact profile-password-toggle"
-                type="button"
-                onClick={togglePasswordSection}
-                aria-expanded={isPasswordSectionExpanded}
-                aria-controls="password-change-content"
-              >
-                {isPasswordSectionExpanded ? (
-                  <>
-                    <ChevronUp size={16} />
-                    Hide form
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown size={16} />
-                    Open form
-                  </>
-                )}
-              </button>
             </div>
 
             {isPasswordSectionExpanded && (

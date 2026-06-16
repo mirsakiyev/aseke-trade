@@ -98,10 +98,9 @@ test("dashboard profile keeps the change password form collapsed by default", ()
   for (const expected of [
     "Change Password",
     "const [isPasswordSectionExpanded, setIsPasswordSectionExpanded] = useState(false)",
+    "profile-password-title-link",
     "aria-expanded={isPasswordSectionExpanded}",
     "aria-controls=\"password-change-content\"",
-    "Open form",
-    "Hide form",
     "{isPasswordSectionExpanded &&",
     "Current Password",
     "New Password",
@@ -116,5 +115,7 @@ test("dashboard profile keeps the change password form collapsed by default", ()
   ]) {
     assert.match(dashboardSource, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.doesNotMatch(dashboardSource, /Open form|Hide form/);
+  assert.doesNotMatch(dashboardSource, /Update your account password\. For security/);
   assert.match(dashboardSource, /setCurrentPassword\(""\)[\s\S]*setNewPassword\(""\)[\s\S]*setConfirmNewPassword\(""\)/);
 });

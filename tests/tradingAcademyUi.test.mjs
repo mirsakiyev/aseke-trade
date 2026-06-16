@@ -5,6 +5,7 @@ import { test } from "node:test";
 const adminSource = await readFile(new URL("../src/pages/AdminTradingAcademy.tsx", import.meta.url), "utf8");
 const dashboardSource = await readFile(new URL("../src/pages/TradingAcademyDashboard.tsx", import.meta.url), "utf8");
 const chartsSource = await readFile(new URL("../src/pages/Charts.tsx", import.meta.url), "utf8");
+const stylesSource = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 const cryptoMarketsSource = await readFile(new URL("../src/lib/cryptoMarkets.ts", import.meta.url), "utf8");
 const marketIndicesSource = await readFile(new URL("../src/lib/marketIndices.ts", import.meta.url), "utf8");
 const netlifyMarketIndicesSource = await readFile(new URL("../netlify/functions/market-indices.ts", import.meta.url), "utf8");
@@ -128,6 +129,7 @@ test("charts market picker is a compact toolbar above the TradingView chart", ()
   assert.match(chartsSource, /className="chart-market-toolbar"/);
   assert.match(chartsSource, /<details className="coin-picker">/);
   assert.match(chartsSource, /<summary>Select Crypto<\/summary>/);
+  assert.doesNotMatch(stylesSource, /\.charts-page\s*\{[^}]*padding-top/s);
   assert.doesNotMatch(chartsSource, /coreChartAssets\.map/);
   assert.doesNotMatch(chartsSource, /Core cryptocurrency chart selector/);
   assert.doesNotMatch(chartsSource, /Top 200/);
