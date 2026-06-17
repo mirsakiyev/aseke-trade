@@ -15,11 +15,16 @@ const statuses: StatusFilter[] = [
   "all",
   "pending",
   "submitted",
+  "detected",
+  "confirming",
   "verifying",
   "confirmed",
+  "credited",
   "underpaid",
+  "overpaid",
   "expired",
   "failed",
+  "rejected",
   "duplicate"
 ];
 

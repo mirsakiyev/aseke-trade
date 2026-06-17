@@ -1,0 +1,2 @@
+-- No-op tombstone retained so remote migration history can stay in sync
+-- after the feature was retired from the codebase.

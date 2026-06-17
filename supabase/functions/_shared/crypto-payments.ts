@@ -13,6 +13,10 @@ const ETH_USDT_CONTRACT = "0xdac17f958d2ee523a2206206994597c13d831ec7";
 const ETH_USDC_CONTRACT = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const MIN_DEPOSIT_CENTS = 1000;
+const PAYMENT_AMOUNT_NONCE_MAX = 4_999;
+const CLAIM_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const CLAIM_RATE_LIMIT_MAX_ATTEMPTS = 20;
+const ACTIVE_PAYMENT_STATUSES: PaymentStatus[] = ["pending", "submitted", "detected", "confirming", "verifying"];
 
 export type SupportedAsset = "USDT" | "USDC";
 export type SupportedNetwork = "TRC20" | "ERC20";
@@ -21,12 +25,16 @@ export type PremiumPlanId = "premium_1_month" | "premium_1_year";
 export type PaymentStatus =
   | "pending"
   | "submitted"
+  | "detected"
+  | "confirming"
   | "verifying"
   | "confirmed"
+  | "credited"
   | "underpaid"
   | "overpaid"
   | "expired"
   | "failed"
+  | "rejected"
   | "duplicate";
 
 export interface PaymentMethodConfig {
@@ -56,11 +64,18 @@ export interface CryptoPaymentRow {
   payment_method_id: string;
   expected_amount: string | number;
   received_amount: string | number | null;
+  amount_nonce_units: number;
   asset: SupportedAsset;
   network: SupportedNetwork;
   receive_address: string;
   tx_hash: string | null;
   status: PaymentStatus;
+  verification_event_index: number | null;
+  verification_token_contract: string | null;
+  verification_recipient_address: string | null;
+  verification_confirmations: number | null;
+  verification_checked_at: string | null;
+  rejected_reason: string | null;
   expires_at: string;
   submitted_at: string | null;
   confirmed_at: string | null;
@@ -78,10 +93,20 @@ interface CryptoPaymentMethodRow {
 }
 
 interface VerificationResult {
-  status: "valid" | "underpaid" | "failed" | "waiting";
+  status: "valid" | "underpaid" | "overpaid" | "failed" | "waiting";
   receivedAmount?: string;
   confirmations?: number;
+  eventIndex?: number;
+  tokenContract?: string;
+  recipientAddress?: string;
   reason?: string;
+}
+
+interface CryptoTransferEvent {
+  units: bigint;
+  eventIndex: number;
+  tokenContract: string;
+  recipientAddress: string;
 }
 
 interface PremiumPlanConfig {
@@ -264,6 +289,58 @@ export function requireServiceRole(request: Request): void {
   }
 }
 
+export async function enforceCryptoClaimRateLimit(supabase: SupabaseClient, userId: string): Promise<void> {
+  const windowStart = new Date(Date.now() - CLAIM_RATE_LIMIT_WINDOW_MS).toISOString();
+  const { count, error } = await supabase
+    .from("crypto_payment_claim_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("attempted_user_id", userId)
+    .gte("created_at", windowStart);
+
+  if (error) {
+    throw new ApiError(500, "claim_rate_limit_failed", "Transaction claim rate limit could not be checked.");
+  }
+
+  if ((count ?? 0) >= CLAIM_RATE_LIMIT_MAX_ATTEMPTS) {
+    throw new ApiError(429, "claim_rate_limited", "Too many transaction checks. Try again shortly.");
+  }
+}
+
+export async function logCryptoClaimAttempt(
+  supabase: SupabaseClient,
+  input: {
+    attemptedUserId: string | null;
+    payment?: Pick<CryptoPaymentRow, "id" | "user_id" | "asset" | "network"> | null;
+    txHash?: string | null;
+    status: string;
+    reason?: string | null;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    metadata?: Record<string, unknown>;
+  }
+): Promise<void> {
+  const { error } = await supabase.from("crypto_payment_claim_attempts").insert({
+    attempted_user_id: input.attemptedUserId,
+    payment_id: input.payment?.id ?? null,
+    payment_user_id: input.payment?.user_id ?? null,
+    asset: input.payment?.asset ?? null,
+    network: input.payment?.network ?? null,
+    tx_hash: input.txHash ?? null,
+    status: input.status,
+    reason: input.reason ?? null,
+    ip_address: input.ipAddress ?? null,
+    user_agent: input.userAgent ?? null,
+    metadata: input.metadata ?? {}
+  });
+
+  if (error) {
+    console.error("Crypto claim audit log insert failed", {
+      detail: supabaseErrorMessage(error),
+      error
+    });
+  }
+}
+
 export function normalizeAssetNetwork(asset: unknown, network: unknown): {
   asset: SupportedAsset;
   network: SupportedNetwork;
@@ -408,14 +485,53 @@ export function normalizeDepositAmount(amount: unknown): {
     throw new ApiError(400, "deposit_too_small", "Minimum deposit is 10 USD.");
   }
 
-  const [wholePart, fractionPart = ""] = value.split(".");
-  const whole = wholePart.replace(/^0+(?=\d)/, "") || "0";
-  const fraction = fractionPart.replace(/0+$/, "");
-
   return {
-    expectedAmount: fraction ? `${whole}.${fraction}` : `${whole}.00`,
+    expectedAmount: centsToStableAmount(amountCents),
     amountCents
   };
+}
+
+export async function reserveUniqueExpectedAmount(
+  supabase: SupabaseClient,
+  method: CryptoPaymentMethodRow,
+  config: PaymentMethodConfig,
+  baseExpectedAmount: string | number
+): Promise<{ expectedAmount: string; amountNonceUnits: number }> {
+  // Shared receiving wallets cannot prove ownership from a tx hash alone.
+  // A tiny server-selected amount nonce binds the on-chain transfer to this intent without changing cent-level billing.
+  const baseUnits = decimalToUnits(baseExpectedAmount, config.decimals);
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const amountNonceUnits = secureRandomInt(1, PAYMENT_AMOUNT_NONCE_MAX);
+    const expectedAmount = unitsToDecimalString(baseUnits + BigInt(amountNonceUnits), config.decimals);
+    const { data, error } = await supabase
+      .from("crypto_payments")
+      .select("id")
+      .eq("payment_method_id", method.id)
+      .eq("asset", method.asset)
+      .eq("network", method.network)
+      .eq("receive_address", method.receive_address)
+      .eq("expected_amount", expectedAmount)
+      .in("status", ACTIVE_PAYMENT_STATUSES)
+      .limit(1);
+
+    if (error) {
+      throw new ApiError(500, "amount_reservation_failed", "Payment amount could not be reserved.");
+    }
+
+    if (!data?.length) {
+      return { expectedAmount, amountNonceUnits };
+    }
+  }
+
+  throw new ApiError(503, "amount_reservation_exhausted", "Payment amount could not be reserved. Try again.");
+}
+
+function secureRandomInt(min: number, max: number): number {
+  const range = max - min + 1;
+  const random = new Uint32Array(1);
+  crypto.getRandomValues(random);
+  return min + (random[0] % range);
 }
 
 export async function resolveCheckoutItem(
@@ -526,7 +642,8 @@ export async function resolveCheckoutItem(
 
 export async function verifyPaymentById(
   supabase: SupabaseClient,
-  paymentId: string
+  paymentId: string,
+  attemptedUserId: string | null = null
 ): Promise<CryptoPaymentRow> {
   const { data, error } = await supabase
     .from("crypto_payments")
@@ -539,25 +656,32 @@ export async function verifyPaymentById(
   }
 
   const payment = data as CryptoPaymentRow;
-  if (payment.status === "confirmed") {
-    await finalizeConfirmedPayment(supabase, payment);
+  if (payment.status === "credited") {
     return payment;
+  }
+
+  if (payment.status === "confirmed") {
+    return finalizeConfirmedPayment(supabase, payment);
   }
 
   if (!payment.tx_hash) {
     throw new ApiError(400, "tx_hash_required", "Submit a transaction hash before verification.");
   }
 
-  const duplicate = await findDuplicateTxHash(supabase, payment);
-  if (duplicate) {
-    return updatePaymentStatus(supabase, payment.id, "duplicate");
-  }
-
   const method = paymentMethodConfigs.find(
     (config) => config.asset === payment.asset && config.network === payment.network
   );
   if (!method) {
-    return updatePaymentStatus(supabase, payment.id, "failed");
+    await logCryptoClaimAttempt(supabase, {
+      attemptedUserId,
+      payment,
+      txHash: payment.tx_hash,
+      status: "failed",
+      reason: "Unsupported payment method during verification."
+    });
+    return updatePaymentStatus(supabase, payment.id, "failed", {
+      rejected_reason: "Unsupported payment method."
+    });
   }
 
   const verification =
@@ -566,30 +690,109 @@ export async function verifyPaymentById(
       : await verifyEthereumPayment(payment, method);
 
   if (verification.status === "waiting") {
-    return updatePaymentStatus(supabase, payment.id, "verifying", {
-      received_amount: verification.receivedAmount ?? null
+    return updatePaymentStatus(supabase, payment.id, verification.receivedAmount ? "confirming" : "verifying", {
+      received_amount: verification.receivedAmount ?? null,
+      verification_confirmations: verification.confirmations ?? null,
+      verification_checked_at: new Date().toISOString(),
+      rejected_reason: verification.reason ?? null
     });
   }
 
   if (verification.status === "underpaid") {
+    await logCryptoClaimAttempt(supabase, {
+      attemptedUserId,
+      payment,
+      txHash: payment.tx_hash,
+      status: "underpaid",
+      reason: verification.reason ?? "On-chain transfer amount is lower than the exact payment intent amount.",
+      metadata: { receivedAmount: verification.receivedAmount }
+    });
     return updatePaymentStatus(supabase, payment.id, "underpaid", {
-      received_amount: verification.receivedAmount ?? null
+      received_amount: verification.receivedAmount ?? null,
+      verification_confirmations: verification.confirmations ?? null,
+      verification_checked_at: new Date().toISOString(),
+      rejected_reason: verification.reason ?? "Payment amount is too low."
+    });
+  }
+
+  if (verification.status === "overpaid") {
+    await logCryptoClaimAttempt(supabase, {
+      attemptedUserId,
+      payment,
+      txHash: payment.tx_hash,
+      status: "overpaid",
+      reason: verification.reason ?? "On-chain transfer amount is higher than the exact payment intent amount.",
+      metadata: { receivedAmount: verification.receivedAmount }
+    });
+    return updatePaymentStatus(supabase, payment.id, "overpaid", {
+      received_amount: verification.receivedAmount ?? null,
+      verification_confirmations: verification.confirmations ?? null,
+      verification_checked_at: new Date().toISOString(),
+      rejected_reason: verification.reason ?? "Payment amount is too high."
     });
   }
 
   if (verification.status === "failed") {
-    return updatePaymentStatus(supabase, payment.id, "failed");
+    await logCryptoClaimAttempt(supabase, {
+      attemptedUserId,
+      payment,
+      txHash: payment.tx_hash,
+      status: "rejected",
+      reason: verification.reason ?? "Transaction does not match this payment intent."
+    });
+    return updatePaymentStatus(supabase, payment.id, "rejected", {
+      verification_checked_at: new Date().toISOString(),
+      rejected_reason: verification.reason ?? "Transaction does not match this payment intent."
+    });
+  }
+
+  const processed = await recordProcessedTransaction(supabase, payment, verification);
+  if (!processed) {
+    await logCryptoClaimAttempt(supabase, {
+      attemptedUserId,
+      payment,
+      txHash: payment.tx_hash,
+      status: "duplicate",
+      reason: "Verified blockchain event was already processed for another payment."
+    });
+    return updatePaymentStatus(supabase, payment.id, "duplicate", {
+      verification_event_index: verification.eventIndex ?? null,
+      verification_token_contract: verification.tokenContract ?? null,
+      verification_recipient_address: verification.recipientAddress ?? null,
+      verification_confirmations: verification.confirmations ?? null,
+      verification_checked_at: new Date().toISOString(),
+      rejected_reason: "This blockchain transfer event was already credited."
+    });
   }
 
   const confirmed = await updatePaymentStatus(supabase, payment.id, "confirmed", {
     received_amount: verification.receivedAmount ?? payment.expected_amount,
-    confirmed_at: new Date().toISOString()
+    confirmed_at: new Date().toISOString(),
+    verification_event_index: verification.eventIndex ?? null,
+    verification_token_contract: verification.tokenContract ?? null,
+    verification_recipient_address: verification.recipientAddress ?? null,
+    verification_confirmations: verification.confirmations ?? null,
+    verification_checked_at: new Date().toISOString(),
+    rejected_reason: null
   });
-  await finalizeConfirmedPayment(supabase, confirmed);
-  return confirmed;
+
+  await logCryptoClaimAttempt(supabase, {
+    attemptedUserId,
+    payment: confirmed,
+    txHash: confirmed.tx_hash,
+    status: "confirmed",
+    reason: "Transaction matched the authenticated user's payment intent.",
+    metadata: {
+      eventIndex: verification.eventIndex,
+      confirmations: verification.confirmations,
+      tokenContract: verification.tokenContract
+    }
+  });
+
+  return finalizeConfirmedPayment(supabase, confirmed);
 }
 
-async function finalizeConfirmedPayment(supabase: SupabaseClient, payment: CryptoPaymentRow): Promise<void> {
+async function finalizeConfirmedPayment(supabase: SupabaseClient, payment: CryptoPaymentRow): Promise<CryptoPaymentRow> {
   if (payment.payment_type === "deposit") {
     const { error } = await supabase.rpc("credit_crypto_deposit", {
       target_payment_id: payment.id
@@ -599,7 +802,7 @@ async function finalizeConfirmedPayment(supabase: SupabaseClient, payment: Crypt
       throw new ApiError(500, "deposit_credit_failed", "Account balance could not be credited.");
     }
 
-    return;
+    return fetchPaymentById(supabase, payment.id);
   }
 
   if (payment.product_type === "premium") {
@@ -611,34 +814,74 @@ async function finalizeConfirmedPayment(supabase: SupabaseClient, payment: Crypt
       throw new ApiError(500, "premium_subscription_failed", "Trading Academy access could not be activated.");
     }
 
-    return;
+    return fetchPaymentById(supabase, payment.id);
   }
 
   await grantAccessFromPayment(supabase, payment);
+  return fetchPaymentById(supabase, payment.id);
 }
 
-async function findDuplicateTxHash(supabase: SupabaseClient, payment: CryptoPaymentRow): Promise<boolean> {
-  if (!payment.tx_hash) return false;
-
+async function fetchPaymentById(supabase: SupabaseClient, paymentId: string): Promise<CryptoPaymentRow> {
   const { data, error } = await supabase
     .from("crypto_payments")
-    .select("id")
-    .eq("tx_hash", payment.tx_hash)
-    .neq("id", payment.id)
-    .limit(1);
+    .select("*")
+    .eq("id", paymentId)
+    .single();
 
-  if (error) {
-    throw new ApiError(500, "duplicate_check_failed", "Transaction reuse check failed.");
+  if (error || !data) {
+    throw new ApiError(500, "payment_reload_failed", "Payment could not be reloaded.");
   }
 
-  return Boolean(data?.length);
+  return data as CryptoPaymentRow;
+}
+
+async function recordProcessedTransaction(
+  supabase: SupabaseClient,
+  payment: CryptoPaymentRow,
+  verification: VerificationResult
+): Promise<boolean> {
+  if (!payment.tx_hash || verification.eventIndex === undefined || !verification.tokenContract || !verification.recipientAddress) {
+    throw new ApiError(500, "verified_event_missing", "Verified blockchain event details are incomplete.");
+  }
+
+  const { error } = await supabase.from("crypto_processed_transactions").insert({
+    payment_id: payment.id,
+    user_id: payment.user_id,
+    asset: payment.asset,
+    network: payment.network,
+    tx_hash: payment.tx_hash,
+    event_index: verification.eventIndex,
+    token_contract: verification.tokenContract,
+    receive_address: verification.recipientAddress,
+    amount: verification.receivedAmount ?? payment.expected_amount,
+    confirmations: verification.confirmations ?? 0
+  });
+
+  if (!error) return true;
+  if (error.code === "23505") return false;
+
+  throw new ApiError(500, "processed_transaction_insert_failed", "Verified transaction could not be recorded.");
 }
 
 async function updatePaymentStatus(
   supabase: SupabaseClient,
   paymentId: string,
   status: PaymentStatus,
-  extras: Partial<Pick<CryptoPaymentRow, "received_amount" | "confirmed_at" | "submitted_at" | "tx_hash">> = {}
+  extras: Partial<
+    Pick<
+      CryptoPaymentRow,
+      | "received_amount"
+      | "confirmed_at"
+      | "submitted_at"
+      | "tx_hash"
+      | "verification_event_index"
+      | "verification_token_contract"
+      | "verification_recipient_address"
+      | "verification_confirmations"
+      | "verification_checked_at"
+      | "rejected_reason"
+    >
+  > = {}
 ): Promise<CryptoPaymentRow> {
   const { data, error } = await supabase
     .from("crypto_payments")
@@ -733,24 +976,41 @@ async function verifyEthereumPayment(
   const currentBlockHex = await etherscanProxy("eth_blockNumber");
   const currentBlock = typeof currentBlockHex === "string" ? hexToNumber(currentBlockHex) : null;
   const confirmations = blockNumber && currentBlock ? currentBlock - blockNumber + 1 : 0;
-  const receivedUnits = getEthereumReceivedUnits(receipt.logs ?? [], method, payment.receive_address);
+  const expectedUnits = decimalToUnits(payment.expected_amount, method.decimals);
+  const transferEvents = getEthereumTransferEvents(receipt.logs ?? [], method, payment.receive_address);
 
-  if (receivedUnits === null) {
+  if (!transferEvents.length) {
     return { status: "failed", reason: "No matching ERC20 transfer to ASEKE TRADE address." };
   }
 
-  const receivedAmount = unitsToDecimalString(receivedUnits, method.decimals);
+  // Exact amount matching is required while wallets are shared; accepting >= would let a copied tx hash satisfy
+  // another user's intent if the amount was close enough.
+  const exactTransfer = transferEvents.find((event) => event.units === expectedUnits);
+  if (!exactTransfer) {
+    const largestTransfer = transferEvents.reduce((largest, event) => (event.units > largest.units ? event : largest));
+    const receivedAmount = unitsToDecimalString(largestTransfer.units, method.decimals);
+    return {
+      status: largestTransfer.units < expectedUnits ? "underpaid" : "overpaid",
+      receivedAmount,
+      confirmations,
+      reason: "Transfer amount does not exactly match this payment intent."
+    };
+  }
+
+  const receivedAmount = unitsToDecimalString(exactTransfer.units, method.decimals);
 
   if (confirmations < method.minConfirmations) {
     return { status: "waiting", receivedAmount, confirmations };
   }
 
-  const expectedUnits = decimalToUnits(payment.expected_amount, method.decimals);
-  if (receivedUnits < expectedUnits) {
-    return { status: "underpaid", receivedAmount, confirmations };
-  }
-
-  return { status: "valid", receivedAmount, confirmations };
+  return {
+    status: "valid",
+    receivedAmount,
+    confirmations,
+    eventIndex: exactTransfer.eventIndex,
+    tokenContract: exactTransfer.tokenContract,
+    recipientAddress: exactTransfer.recipientAddress
+  };
 }
 
 async function verifyTronPayment(
@@ -769,8 +1029,9 @@ async function verifyTronPayment(
     return { status: "failed", reason: "TRON transaction failed." };
   }
 
-  const receivedUnits = await getTronReceivedUnits(txInfo.log ?? [], payment.receive_address);
-  if (receivedUnits === null) {
+  const expectedUnits = decimalToUnits(payment.expected_amount, method.decimals);
+  const transferEvents = await getTronTransferEvents(txInfo.log ?? [], method, payment.receive_address);
+  if (!transferEvents.length) {
     return { status: "failed", reason: "No matching TRC20 transfer to ASEKE TRADE address." };
   }
 
@@ -779,18 +1040,34 @@ async function verifyTronPayment(
   const transactionBlock = Number(txInfo.blockNumber ?? 0);
   const confirmations =
     currentBlock > 0 && transactionBlock > 0 ? currentBlock - transactionBlock + 1 : method.minConfirmations;
-  const receivedAmount = unitsToDecimalString(receivedUnits, method.decimals);
+  // Exact amount matching is required while wallets are shared; accepting >= would let a copied tx hash satisfy
+  // another user's intent if the amount was close enough.
+  const exactTransfer = transferEvents.find((event) => event.units === expectedUnits);
+  if (!exactTransfer) {
+    const largestTransfer = transferEvents.reduce((largest, event) => (event.units > largest.units ? event : largest));
+    const receivedAmount = unitsToDecimalString(largestTransfer.units, method.decimals);
+    return {
+      status: largestTransfer.units < expectedUnits ? "underpaid" : "overpaid",
+      receivedAmount,
+      confirmations,
+      reason: "Transfer amount does not exactly match this payment intent."
+    };
+  }
+
+  const receivedAmount = unitsToDecimalString(exactTransfer.units, method.decimals);
 
   if (confirmations < method.minConfirmations) {
     return { status: "waiting", receivedAmount, confirmations };
   }
 
-  const expectedUnits = decimalToUnits(payment.expected_amount, method.decimals);
-  if (receivedUnits < expectedUnits) {
-    return { status: "underpaid", receivedAmount, confirmations };
-  }
-
-  return { status: "valid", receivedAmount, confirmations };
+  return {
+    status: "valid",
+    receivedAmount,
+    confirmations,
+    eventIndex: exactTransfer.eventIndex,
+    tokenContract: exactTransfer.tokenContract,
+    recipientAddress: exactTransfer.recipientAddress
+  };
 }
 
 async function etherscanProxy(action: string, txHash?: string): Promise<Record<string, unknown> | string | null> {
@@ -850,34 +1127,43 @@ async function tronPost(path: string, body: Record<string, unknown>): Promise<Re
   return response.json();
 }
 
-function getEthereumReceivedUnits(
+function getEthereumTransferEvents(
   logs: Array<Record<string, any>>,
   method: PaymentMethodConfig,
   receiveAddress: string
-): bigint | null {
+): CryptoTransferEvent[] {
   const tokenAddress = method.tokenContract.toLowerCase();
   const recipientTopic = `0x${"0".repeat(24)}${receiveAddress.toLowerCase().replace(/^0x/, "")}`;
-  let received = 0n;
+  const transfers: CryptoTransferEvent[] = [];
 
-  for (const log of logs) {
+  for (const [index, log] of logs.entries()) {
     const topics = Array.isArray(log.topics) ? log.topics.map((topic: unknown) => String(topic).toLowerCase()) : [];
     if (String(log.address ?? "").toLowerCase() !== tokenAddress) continue;
     if (topics[0] !== `0x${TRANSFER_TOPIC}`) continue;
     if (topics[2] !== recipientTopic) continue;
     if (log.removed === true) continue;
 
-    received += hexToBigInt(String(log.data ?? "0x0"));
+    transfers.push({
+      units: hexToBigInt(String(log.data ?? "0x0")),
+      eventIndex: eventIndexFromLog(log, index),
+      tokenContract: tokenAddress,
+      recipientAddress: receiveAddress.toLowerCase()
+    });
   }
 
-  return received > 0n ? received : null;
+  return transfers.filter((event) => event.units > 0n);
 }
 
-async function getTronReceivedUnits(logs: Array<Record<string, any>>, receiveAddress: string): Promise<bigint | null> {
+async function getTronTransferEvents(
+  logs: Array<Record<string, any>>,
+  method: PaymentMethodConfig,
+  receiveAddress: string
+): Promise<CryptoTransferEvent[]> {
   const recipientHex = (await tronBase58ToHexAddress(receiveAddress)).slice(2).toLowerCase();
   const recipientTopic = `${"0".repeat(24)}${recipientHex}`;
-  let received = 0n;
+  const transfers: CryptoTransferEvent[] = [];
 
-  for (const log of logs) {
+  for (const [index, log] of logs.entries()) {
     const topics = Array.isArray(log.topics) ? log.topics.map((topic: unknown) => String(topic).toLowerCase()) : [];
     const logAddress = String(log.address ?? "").replace(/^0x/i, "").toLowerCase();
 
@@ -885,10 +1171,28 @@ async function getTronReceivedUnits(logs: Array<Record<string, any>>, receiveAdd
     if (topics[0]?.replace(/^0x/i, "") !== TRANSFER_TOPIC) continue;
     if (topics[2]?.replace(/^0x/i, "") !== recipientTopic) continue;
 
-    received += hexToBigInt(String(log.data ?? "0"));
+    transfers.push({
+      units: hexToBigInt(String(log.data ?? "0")),
+      eventIndex: eventIndexFromLog(log, index),
+      tokenContract: method.tokenContract,
+      recipientAddress: receiveAddress
+    });
   }
 
-  return received > 0n ? received : null;
+  return transfers.filter((event) => event.units > 0n);
+}
+
+function eventIndexFromLog(log: Record<string, any>, fallbackIndex: number): number {
+  const candidates = [log.logIndex, log.transactionLogIndex, log.event_index, log.eventIndex];
+  for (const candidate of candidates) {
+    if (typeof candidate === "number" && Number.isInteger(candidate) && candidate >= 0) return candidate;
+    if (typeof candidate === "string") {
+      const parsed = candidate.startsWith("0x") ? Number.parseInt(candidate, 16) : Number.parseInt(candidate, 10);
+      if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+    }
+  }
+
+  return fallbackIndex;
 }
 
 function decimalToUnits(value: string | number, decimals: number): bigint {

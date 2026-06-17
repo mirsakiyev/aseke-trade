@@ -1,10 +1,12 @@
 import {
   ApiError,
+  enforceCryptoClaimRateLimit,
   getAuthenticatedUser,
   getServiceClient,
   handleError,
   handleOptions,
   jsonResponse,
+  logCryptoClaimAttempt,
   normalizeTxHash,
   verifyPaymentById,
   type CryptoPaymentRow
@@ -21,8 +23,12 @@ Deno.serve(async (request) => {
 
     const supabase = getServiceClient();
     const user = await getAuthenticatedUser(request, supabase);
+    await enforceCryptoClaimRateLimit(supabase, user.id);
+
     const body = (await request.json()) as Record<string, unknown>;
     const paymentId = String(body.payment_id ?? "").trim();
+    const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    const userAgent = request.headers.get("user-agent");
 
     if (!paymentId) {
       throw new ApiError(400, "payment_id_required", "Payment ID is required.");
@@ -40,39 +46,46 @@ Deno.serve(async (request) => {
     }
 
     const payment = data as CryptoPaymentRow;
-    if (payment.status === "confirmed") {
+    if (payment.status === "confirmed" || payment.status === "credited") {
       return jsonResponse({ payment });
     }
 
-    if (new Date(payment.expires_at).getTime() < Date.now() && !payment.tx_hash) {
+    if (new Date(payment.expires_at).getTime() < Date.now()) {
       const expiredPayment = await updateSubmittedPayment(supabase, payment.id, { status: "expired" });
+      await logCryptoClaimAttempt(supabase, {
+        attemptedUserId: user.id,
+        payment,
+        txHash: payment.tx_hash,
+        status: "expired",
+        reason: "Payment intent expired before claim.",
+        ipAddress,
+        userAgent
+      });
       return jsonResponse({ payment: expiredPayment });
     }
 
     const txHash = normalizeTxHash(body.tx_hash ?? payment.tx_hash, payment.network);
-    const { data: duplicateRows, error: duplicateError } = await supabase
-      .from("crypto_payments")
-      .select("id,status")
-      .eq("tx_hash", txHash)
-      .neq("id", payment.id)
-      .limit(1);
 
-    if (duplicateError) {
-      throw new ApiError(500, "duplicate_check_failed", "Transaction reuse check failed.");
-    }
-
-    if (duplicateRows?.length) {
-      const duplicatePayment = await updateSubmittedPayment(supabase, payment.id, { status: "duplicate" });
-      return jsonResponse({ payment: duplicatePayment });
-    }
-
+    // The raw tx hash is public data. Do not decide ownership here and do not permanently block
+    // another intent just because this row saw the hash first; the verifier must bind a matched
+    // on-chain transfer event to the authenticated user's pre-created payment intent.
     await updateSubmittedPayment(supabase, payment.id, {
       tx_hash: txHash,
-      status: "verifying",
+      status: "submitted",
       submitted_at: payment.submitted_at ?? new Date().toISOString()
     });
 
-    const verifiedPayment = await verifyPaymentById(supabase, payment.id);
+    await logCryptoClaimAttempt(supabase, {
+      attemptedUserId: user.id,
+      payment,
+      txHash,
+      status: "submitted",
+      reason: "Authenticated user submitted transaction hash for an owned payment intent.",
+      ipAddress,
+      userAgent
+    });
+
+    const verifiedPayment = await verifyPaymentById(supabase, payment.id, user.id);
     return jsonResponse({ payment: verifiedPayment });
   } catch (error) {
     return handleError(error);

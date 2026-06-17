@@ -5201,7 +5201,7 @@ select:focus {
 
 .current-trade-row {
   display: grid;
-  grid-template-columns: minmax(82px, 0.82fr) minmax(0, 7fr);
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 0.45rem;
   align-items: stretch;
   width: 100%;
@@ -5214,6 +5214,7 @@ select:focus {
   align-content: center;
   gap: 0.18rem;
   min-width: 0;
+  min-height: 3.15rem;
   padding: 0.44rem 0.5rem;
   border: 1px solid rgba(229, 228, 226, 0.1);
   border-radius: 7px;
@@ -5229,12 +5230,19 @@ select:focus {
 }
 
 .current-trade-heading strong {
-  overflow: hidden;
+  display: grid;
+  gap: 0.04rem;
+  overflow: visible;
   color: var(--platinum);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 950;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.05;
+  white-space: normal;
+}
+
+.current-trade-heading strong span:last-child {
+  color: var(--platinum);
+  font-size: 0.68rem;
 }
 
 .manual-close-heading strong {
@@ -5243,20 +5251,20 @@ select:focus {
   font-weight: 950;
 }
 
-.current-trade-metrics,
 .manual-close-metrics {
   display: grid;
   gap: 0.45rem;
 }
 
 .current-trade-metrics {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  display: contents;
   min-width: 0;
 }
 
 .current-trade-metrics > div,
 .manual-close-metrics > div {
   min-width: 0;
+  min-height: 3.15rem;
   padding: 0.44rem 0.5rem;
   border: 1px solid rgba(229, 228, 226, 0.1);
   border-radius: 7px;
@@ -5274,7 +5282,6 @@ select:focus {
   white-space: nowrap;
 }
 
-.current-trade-metrics dd,
 .manual-close-metrics dd {
   overflow: hidden;
   margin: 0.12rem 0 0;
@@ -5283,6 +5290,17 @@ select:focus {
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.current-trade-metrics dd {
+  overflow: visible;
+  margin: 0.12rem 0 0;
+  color: var(--platinum);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.14;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .demo-trade-chart {
@@ -6917,10 +6935,6 @@ select.futures-mode-chip {
   }
 
   .current-trade-row {
-    grid-template-columns: 1fr;
-  }
-
-  .current-trade-metrics {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
@@ -7065,8 +7079,11 @@ select.futures-mode-chip {
 
   .demo-stats-grid,
   .demo-position-metrics,
-  .futures-estimate-grid,
-  .current-trade-metrics {
+  .futures-estimate-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .current-trade-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

@@ -205,12 +205,16 @@ export interface Purchase {
 export type CryptoPaymentStatus =
   | "pending"
   | "submitted"
+  | "detected"
+  | "confirming"
   | "verifying"
   | "confirmed"
+  | "credited"
   | "underpaid"
   | "overpaid"
   | "expired"
   | "failed"
+  | "rejected"
   | "duplicate";
 
 export type CryptoAsset = "USDT" | "USDC";
@@ -233,11 +237,18 @@ export interface CryptoPayment {
   payment_method_id: string;
   expected_amount: string | number;
   received_amount: string | number | null;
+  amount_nonce_units: number;
   asset: CryptoAsset;
   network: CryptoNetwork;
   receive_address: string;
   tx_hash: string | null;
   status: CryptoPaymentStatus;
+  verification_event_index: number | null;
+  verification_token_contract: string | null;
+  verification_recipient_address: string | null;
+  verification_confirmations: number | null;
+  verification_checked_at: string | null;
+  rejected_reason: string | null;
   expires_at: string;
   submitted_at: string | null;
   confirmed_at: string | null;

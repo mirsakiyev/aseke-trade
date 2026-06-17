@@ -91,12 +91,16 @@ export const cryptoPaymentMethods: PaymentMethodChoice[] = [
 export const cryptoStatusMessages: Record<CryptoPaymentStatus, string> = {
   pending: "Payment request ready",
   submitted: "Transaction submitted",
+  detected: "Matching transfer detected",
+  confirming: "Waiting for blockchain confirmations",
   verifying: "Checking blockchain confirmations",
   confirmed: "Payment completed",
+  credited: "Payment completed",
   underpaid: "Payment received, but the amount is lower than required.",
   overpaid: "Payment received above the expected amount.",
   expired: "This payment request expired. Create a new request before sending funds.",
   failed: "This transaction could not be verified.",
+  rejected: "This transaction does not match this payment request.",
   duplicate: "This transaction hash was already used."
 };
 
@@ -113,8 +117,8 @@ export function formatStableAmount(amount: string | number, asset: CryptoAsset):
 }
 
 export function statusTone(status: CryptoPaymentStatus): "premium" | "free" | "danger" {
-  if (status === "confirmed") return "free";
-  if (["failed", "expired", "underpaid", "duplicate"].includes(status)) return "danger";
+  if (status === "confirmed" || status === "credited") return "free";
+  if (["failed", "expired", "underpaid", "overpaid", "rejected", "duplicate"].includes(status)) return "danger";
   return "premium";
 }
 

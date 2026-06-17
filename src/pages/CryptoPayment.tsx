@@ -46,7 +46,7 @@ export function CryptoPayment() {
   }, []);
 
   useEffect(() => {
-    if (payment?.status === "confirmed") {
+    if (payment?.status === "confirmed" || payment?.status === "credited") {
       void refreshProfile();
     }
   }, [payment?.status, refreshProfile]);
@@ -60,7 +60,7 @@ export function CryptoPayment() {
   }, [now, payment]);
   const statusMessage = useMemo(() => {
     if (!payment) return "";
-    if (payment.status === "confirmed") {
+    if (payment.status === "confirmed" || payment.status === "credited") {
       return payment.payment_type === "deposit"
         ? "Payment completed. Your balance has been updated."
         : payment.product_type === "premium"
@@ -161,7 +161,7 @@ export function CryptoPayment() {
           </p>
         </div>
         <span className={`status-pill ${statusTone(payment.status)}`}>
-          {payment.status === "confirmed" ? <CheckCircle2 size={15} /> : <Clock3 size={15} />}
+          {payment.status === "confirmed" || payment.status === "credited" ? <CheckCircle2 size={15} /> : <Clock3 size={15} />}
           {statusMessage}
         </span>
       </section>
@@ -212,7 +212,7 @@ export function CryptoPayment() {
             )}
             <div>
               <dt>Expires in</dt>
-              <dd>{payment.status === "confirmed" ? "Confirmed" : expiresIn}</dd>
+              <dd>{payment.status === "confirmed" || payment.status === "credited" ? "Confirmed" : expiresIn}</dd>
             </div>
           </dl>
         </article>
@@ -287,5 +287,5 @@ export function CryptoPayment() {
 }
 
 function isTerminalPaymentStatus(status: CryptoPaymentRecord["status"]): boolean {
-  return ["confirmed", "underpaid", "overpaid", "expired", "failed", "duplicate"].includes(status);
+  return ["confirmed", "credited", "underpaid", "overpaid", "expired", "failed", "rejected", "duplicate"].includes(status);
 }

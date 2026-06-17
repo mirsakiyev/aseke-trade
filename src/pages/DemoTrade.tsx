@@ -1501,19 +1501,25 @@ function DemoTradeChart({
 }
 
 function CurrentTradeRow({ position }: { position: DemoOpenPosition }) {
+  const bracketSummary = formatBracketSummary(position);
+  const bracketTitle = formatBracketTitle(position);
+  const displaySymbol = formatDemoSymbol(position.symbol);
+
   return (
     <div className="current-trade-row">
       <div className="current-trade-heading">
         <span>Current trade</span>
         <strong className={position.side === "long" ? "positive" : "negative"}>
-          {position.side.toUpperCase()} BTC/USDT
+          <span>{position.side.toUpperCase()}</span>
+          <span>{displaySymbol}</span>
         </strong>
       </div>
       <dl className="current-trade-metrics">
         <Metric label="Entry" value={formatCurrency(position.entryPrice)} />
         <Metric label="Mark" value={formatCurrency(position.markPrice)} />
-        <Metric label="Qty" value={`${position.remainingQuantity.toFixed(6)} BTC`} />
+        <Metric label="Qty" value={formatPositionQuantity(position.remainingQuantity)} />
         <Metric label="Margin" value={formatCurrency(position.remainingMargin)} />
+        <Metric label="SL/TP" value={bracketSummary} title={bracketTitle} />
         <Metric label="Liq" value={position.liquidationPrice ? formatCurrency(position.liquidationPrice) : "N/A"} />
         <Metric
           label="uPnL"
@@ -1524,6 +1530,37 @@ function CurrentTradeRow({ position }: { position: DemoOpenPosition }) {
       </dl>
     </div>
   );
+}
+
+function formatDemoSymbol(symbol: string): string {
+  if (symbol.endsWith("USDT")) return `${symbol.slice(0, -4)}/USDT`;
+  return symbol;
+}
+
+function formatPositionQuantity(quantity: number): string {
+  if (!Number.isFinite(quantity) || quantity <= 0) return "0 BTC";
+  const maximumFractionDigits = quantity >= 10 ? 4 : quantity >= 1 ? 5 : 6;
+  return `${quantity.toLocaleString("en-US", { maximumFractionDigits })} BTC`;
+}
+
+function formatBracketSummary(position: DemoOpenPosition): string {
+  const stopLoss = position.stopLoss > 0 ? `SL ${formatCompactTradePrice(position.stopLoss)}` : "SL --";
+  const openTakeProfits = position.takeProfits.filter((takeProfit) => takeProfit.price > 0 && !takeProfit.isHit);
+
+  if (!openTakeProfits.length) return `${stopLoss} / TP --`;
+
+  const visibleTakeProfits = openTakeProfits.slice(0, 2).map((takeProfit) => formatCompactTradePrice(takeProfit.price));
+  const hiddenCount = openTakeProfits.length - visibleTakeProfits.length;
+  return `${stopLoss} / TP ${visibleTakeProfits.join(", ")}${hiddenCount > 0 ? ` +${hiddenCount}` : ""}`;
+}
+
+function formatBracketTitle(position: DemoOpenPosition): string {
+  const stopLoss = position.stopLoss > 0 ? `SL ${formatCurrency(position.stopLoss)}` : "SL not set";
+  const takeProfits = position.takeProfits
+    .filter((takeProfit) => takeProfit.price > 0)
+    .map((takeProfit, index) => `TP${index + 1} ${formatCurrency(takeProfit.price)}${takeProfit.isHit ? " hit" : ""}`);
+
+  return [stopLoss, takeProfits.length ? takeProfits.join(" | ") : "TP not set"].join(" | ");
 }
 
 function PerformanceStats({ stats }: { stats: ReturnType<typeof calculateDemoTradeStats> }) {
@@ -1606,11 +1643,13 @@ function TradeHistoryTable({ trades, onExport }: { trades: DemoTradeState["trade
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: "positive" | "negative" }) {
+function Metric({ label, value, tone, title }: { label: string; value: string; tone?: "positive" | "negative"; title?: string }) {
   return (
     <div>
       <dt>{label}</dt>
-      <dd className={tone}>{value}</dd>
+      <dd className={tone} title={title ?? value}>
+        {value}
+      </dd>
     </div>
   );
 }
@@ -1848,6 +1887,21 @@ function formatCurrency(value: number): string {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 2
+  });
+}
+
+function formatCompactTradePrice(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "--";
+  if (value >= 10000) {
+    return `$${(value / 1000).toLocaleString("en-US", {
+      maximumFractionDigits: 1
+    })}K`;
+  }
+
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: value >= 1000 ? 0 : 4
   });
 }
 

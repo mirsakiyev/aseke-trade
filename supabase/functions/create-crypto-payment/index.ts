@@ -7,6 +7,7 @@ import {
   jsonResponse,
   normalizeDepositAmount,
   normalizeAssetNetwork,
+  reserveUniqueExpectedAmount,
   resolveCheckoutItem
 } from "../_shared/crypto-payments.ts";
 
@@ -38,6 +39,7 @@ Deno.serve(async (request) => {
             ...normalizeDepositAmount(body.amount)
           }
         : await resolveCheckoutItem(supabase, body);
+    const reservedAmount = await reserveUniqueExpectedAmount(supabase, method.row, method.config, item.expectedAmount);
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
     const { data, error } = await supabase
@@ -54,7 +56,8 @@ Deno.serve(async (request) => {
         fiat_amount_cents: item.amountCents,
         fiat_currency: "USD",
         payment_method_id: method.row.id,
-        expected_amount: item.expectedAmount,
+        expected_amount: reservedAmount.expectedAmount,
+        amount_nonce_units: reservedAmount.amountNonceUnits,
         asset,
         network,
         receive_address: method.row.receive_address,
