@@ -31,6 +31,7 @@ const hoverTargetSelector = [
   ".ghost-button",
   ".platinum-button",
   ".icon-button.danger",
+  ".hover-chart-trigger",
   ".filter-pill",
   ".danger-text"
 ].join(",");
@@ -52,6 +53,14 @@ const candleColors = {
 export function applyRandomHoverCharts() {
   const assignCharts = () => {
     document.querySelectorAll<HTMLElement>(hoverTargetSelector).forEach((element) => {
+      if (element.closest(".no-hover-effect")) {
+        element.dataset.hoverChartReady = "false";
+        element.style.removeProperty("--hover-chart-overlay");
+        element.style.removeProperty("--hover-chart-glow");
+        element.style.removeProperty("--hover-chart-size");
+        return;
+      }
+
       const profile = getChartProfile(element);
       const signature = `${Math.round(profile.width)}x${Math.round(profile.height)}:${profile.volatility}`;
 

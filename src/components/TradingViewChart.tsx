@@ -81,7 +81,7 @@ export function TradingViewChart({
   }, [containerId, interval, symbol]);
 
   return (
-    <article className="chart-card">
+    <article className="chart-card no-hover-effect">
       <div className="chart-card-heading">
         <div>
           <h2>{title}</h2>

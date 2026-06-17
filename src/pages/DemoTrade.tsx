@@ -512,7 +512,7 @@ export function DemoTrade() {
       {marketError && <p className="warning-box">{marketError}</p>}
 
       <section className="demo-trade-grid">
-        <article className="section-panel demo-chart-panel">
+        <article className="section-panel demo-chart-panel no-hover-effect">
           <p className="eyebrow compact-panel-label">Custom chart</p>
           <DemoTradeChart
             candles={candles}
@@ -524,7 +524,7 @@ export function DemoTrade() {
           {demoState.openPosition && <CurrentTradeRow position={demoState.openPosition} />}
         </article>
 
-        <aside className="section-panel demo-ticket-panel">
+        <aside className="section-panel demo-ticket-panel no-hover-effect">
           <p className="eyebrow compact-panel-label">{demoState.openPosition ? "Manage position" : "Trade ticket"}</p>
 
           {demoState.openPosition ? (
@@ -588,7 +588,7 @@ export function DemoTrade() {
       </section>
 
       <section className="dashboard-grid demo-summary-grid">
-        <article className="section-panel demo-balance-panel">
+        <article className="section-panel demo-balance-panel no-hover-effect">
           <div className="section-heading compact-heading">
             <div>
               <p className="eyebrow">Demo balance</p>
@@ -1565,7 +1565,7 @@ function formatBracketTitle(position: DemoOpenPosition): string {
 
 function PerformanceStats({ stats }: { stats: ReturnType<typeof calculateDemoTradeStats> }) {
   return (
-    <article className="section-panel performance-panel">
+    <article className="section-panel performance-panel no-hover-effect">
       <div className="section-heading compact-heading">
         <div>
           <p className="eyebrow">Performance stats</p>

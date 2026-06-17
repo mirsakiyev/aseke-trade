@@ -130,7 +130,7 @@ export function Charts() {
 
         <div className="chart-market-actions">
           <details className="coin-picker">
-            <summary>Select Crypto</summary>
+            <summary className="hover-chart-trigger">Select Crypto</summary>
             <div className="coin-search-panel">
               <label className="coin-search-label">
                 <Search size={17} aria-hidden="true" />

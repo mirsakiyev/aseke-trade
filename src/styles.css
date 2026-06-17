@@ -828,6 +828,35 @@ p {
   transform: translateY(0);
 }
 
+.no-hover-effect:hover,
+.no-hover-effect .section-panel:hover,
+.no-hover-effect .chart-card:hover,
+.no-hover-effect .risk-band:hover {
+  border-color: var(--line);
+  background: linear-gradient(180deg, rgba(21, 25, 31, 0.94), rgba(10, 12, 15, 0.96));
+  box-shadow: var(--shadow);
+  transform: none;
+}
+
+.no-hover-effect:hover::after,
+.no-hover-effect .section-panel:hover::after,
+.no-hover-effect .chart-card:hover::after,
+.no-hover-effect .risk-band:hover::after {
+  opacity: 0;
+  transform: translateY(0.15rem);
+}
+
+.no-hover-effect .primary-button:not(.compact):hover,
+.no-hover-effect .ghost-button:not(.compact):hover,
+.no-hover-effect .platinum-button:not(.compact):hover,
+.no-hover-effect .filter-pill:hover,
+.no-hover-effect .icon-button:hover {
+  background:
+    var(--crypto-gradient-hover),
+    rgba(229, 228, 226, 0.11);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
+}
+
 .feature-card > *,
 .content-card > *,
 .pricing-card > *,
@@ -1925,9 +1954,13 @@ button.leaderboard-badge-more:hover {
 .coin-picker[open] > summary {
   border-color: rgba(229, 228, 226, 0.42);
   background:
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 280px 76px) no-repeat,
     var(--crypto-gradient),
     rgba(229, 228, 226, 0.1);
   color: var(--platinum);
+  box-shadow:
+    inset 0 0 0 1px rgba(229, 228, 226, 0.08),
+    0 0 18px var(--hover-chart-glow, rgba(142, 202, 224, 0.16));
 }
 
 .coin-picker[open] .coin-search-panel {
@@ -6063,8 +6096,9 @@ select.futures-mode-chip {
 }
 
 .futures-submit {
-  min-height: 42px;
-  border-radius: 999px;
+  min-height: 38px;
+  padding-block: 0.58rem;
+  border-radius: 8px;
   font-size: 0.88rem;
 }
 

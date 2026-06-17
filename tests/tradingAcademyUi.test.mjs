@@ -128,7 +128,7 @@ test("academy dashboard includes a subscriber risk calculator", () => {
 test("charts market picker is a compact toolbar above the TradingView chart", () => {
   assert.match(chartsSource, /className="chart-market-toolbar"/);
   assert.match(chartsSource, /<details className="coin-picker">/);
-  assert.match(chartsSource, /<summary>Select Crypto<\/summary>/);
+  assert.match(chartsSource, /<summary className="hover-chart-trigger">Select Crypto<\/summary>/);
   assert.doesNotMatch(stylesSource, /\.charts-page\s*\{[^}]*padding-top/s);
   assert.doesNotMatch(chartsSource, /coreChartAssets\.map/);
   assert.doesNotMatch(chartsSource, /Core cryptocurrency chart selector/);

@@ -329,7 +329,7 @@ export function TradingAcademyDashboard() {
         <LoadingState label="Loading Trading Academy" />
       ) : (
         <>
-          <section className="section-panel leaderboard-panel">
+          <section className="section-panel leaderboard-panel no-hover-effect">
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Leaderboard</p>
@@ -392,7 +392,7 @@ export function TradingAcademyDashboard() {
             )}
           </section>
 
-          <section className="section-panel academy-signal-section">
+          <section className="section-panel academy-signal-section no-hover-effect">
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Past Trades</p>
@@ -453,7 +453,7 @@ export function TradingAcademyDashboard() {
           />
 
           <section className="dashboard-grid academy-tools-grid">
-            <article className="section-panel stack-form academy-tool-panel">
+            <article className="section-panel stack-form academy-tool-panel no-hover-effect">
               <div className="compact-tool-heading">
                 <span className="feature-icon">
                   <SearchCheck size={20} />
@@ -505,7 +505,7 @@ export function TradingAcademyDashboard() {
               <CompactAmlHistory requests={amlRequests} />
             </article>
 
-            <article className="section-panel stack-form academy-tool-panel premium-support-panel">
+            <article className="section-panel stack-form academy-tool-panel premium-support-panel no-hover-effect">
               <div className="compact-tool-heading">
                 <span className="feature-icon">
                   <Headphones size={20} />
@@ -655,7 +655,7 @@ function RiskCalculatorPanel({
   const [isRiskCalculatorExpanded, setIsRiskCalculatorExpanded] = useState(false);
 
   return (
-    <section className="section-panel risk-calculator-panel" aria-label="Risk Calculator">
+    <section className="section-panel risk-calculator-panel no-hover-effect" aria-label="Risk Calculator">
       <button
         className="risk-calculator-toggle"
         type="button"

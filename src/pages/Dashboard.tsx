@@ -369,7 +369,7 @@ export function Dashboard() {
       {error && <p className="warning-box">{error}</p>}
 
       <section className="dashboard-grid three profile-overview-grid">
-        <article className="section-panel dashboard-profile-card">
+        <article className="section-panel dashboard-profile-card no-hover-effect">
           <div className="avatar-profile-row">
             <div className="dashboard-avatar" aria-label="Profile avatar">
               {profile?.avatar_url ? (
@@ -526,7 +526,7 @@ export function Dashboard() {
           </section>
         </article>
 
-        <article className="section-panel inbox-panel dashboard-inbox-card">
+        <article className="section-panel inbox-panel dashboard-inbox-card no-hover-effect">
           <div className="lesson-title-line">
             <div>
               <h2>Inbox</h2>
@@ -609,7 +609,7 @@ export function Dashboard() {
           )}
         </article>
 
-        <article className="section-panel dashboard-access-card">
+        <article className="section-panel dashboard-access-card no-hover-effect">
           <span className="feature-icon">
             <WalletCards size={21} />
           </span>
@@ -626,7 +626,7 @@ export function Dashboard() {
           </div>
         </article>
 
-        <article className="section-panel level-panel compact-level-panel dashboard-level-card">
+        <article className="section-panel level-panel compact-level-panel dashboard-level-card no-hover-effect">
           <div className="level-compact-header">
             <span className="feature-icon compact-icon">
               <Award size={21} />
@@ -671,7 +671,7 @@ export function Dashboard() {
         <LoadingState label="Loading dashboard" />
       ) : (
         <section className="dashboard-grid three">
-          <article className="section-panel">
+          <article className="section-panel no-hover-effect">
             <span className="feature-icon">
               <GraduationCap size={21} />
             </span>
@@ -692,7 +692,7 @@ export function Dashboard() {
             )}
           </article>
 
-          <article className="section-panel">
+          <article className="section-panel no-hover-effect">
             <span className="feature-icon">
               <BookMarked size={21} />
             </span>
@@ -711,7 +711,7 @@ export function Dashboard() {
             )}
           </article>
 
-          <article className="section-panel">
+          <article className="section-panel no-hover-effect">
             <span className="feature-icon">
               <Crown size={21} />
             </span>
@@ -732,7 +732,7 @@ export function Dashboard() {
             )}
           </article>
 
-          <article className="section-panel">
+          <article className="section-panel no-hover-effect">
             <span className="feature-icon">
               <Crown size={21} />
             </span>
