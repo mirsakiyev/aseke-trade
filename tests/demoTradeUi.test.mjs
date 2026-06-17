@@ -43,6 +43,7 @@ test("Demo Trade page includes custom chart and no TradingView widget", () => {
 
 test("Demo Trade chart has timeframe tabs, right price scale, and compact controls", () => {
   assert.match(pageSource, /demoTradeTimeframes\.map/);
+  assert.doesNotMatch(marketDataSource, /\{ value: "1m", label: "1m" \}/);
   assert.match(pageSource, /chart-axis-panel/);
   assert.match(pageSource, /chart-price-label/);
   assert.match(pageSource, /onContextMenu=\{\(event\) => event\.preventDefault\(\)\}/);
@@ -109,6 +110,16 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /Limit Price/);
   assert.match(pageSource, /marginMode/);
   assert.match(pageSource, /Margin mode/);
+  assert.match(pageSource, /function LeverageSelector/);
+  assert.match(pageSource, /SET LEVERAGE/);
+  assert.match(pageSource, /aria-label="Set leverage"/);
+  assert.match(pageSource, /aria-label="Decrease leverage"/);
+  assert.match(pageSource, /aria-label="Increase leverage"/);
+  assert.match(pageSource, /aria-label="Leverage slider"/);
+  assert.match(pageSource, /onApply\(String\(nextLeverage\)\)/);
+  assert.match(stylesSource, /leverage-popover/);
+  assert.match(stylesSource, /leverage-stepper/);
+  assert.doesNotMatch(pageSource, /select className="futures-mode-chip" value=\{leverage\}/);
   assert.match(pageSource, /Cross/);
   assert.match(pageSource, /liquidationCollateral/);
   assert.match(pageSource, /isBracketEnabled/);

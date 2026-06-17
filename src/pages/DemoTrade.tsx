@@ -78,6 +78,8 @@ const DEMO_TRADE_LIVE_REFRESH_MS = 1000;
 const DEMO_TRADE_CANDLE_SYNC_MS = 10000;
 const PERCENT_SLIDER_THUMB_SIZE = 12;
 const DEMO_CONTRACT_BTC_SIZE = 0.0001;
+const MIN_DEMO_LEVERAGE = 1;
+const MAX_DEMO_LEVERAGE = 100;
 
 const quantityUnitLabels: Record<DemoQuantityUnit, string> = {
   usdt: "USDT",
@@ -522,7 +524,6 @@ export function DemoTrade() {
 
       <section className="demo-trade-grid">
         <article className="section-panel demo-chart-panel no-hover-effect">
-          <p className="eyebrow compact-panel-label">Custom chart</p>
           <DemoTradeChart
             candles={candles}
             currentPrice={currentPrice}
@@ -797,22 +798,19 @@ function TradeEntryForm({
       </div>
 
       <div className="futures-mode-row">
-        <select
-          className="futures-mode-chip"
-          value={marginMode}
-          onChange={(event) => onMarginModeChange(event.target.value as DemoMarginMode)}
-          aria-label="Margin mode"
-        >
-          <option value="isolated">Isolated</option>
-          <option value="cross">Cross</option>
-        </select>
-        <select className="futures-mode-chip" value={leverage} onChange={(event) => onLeverageChange(event.target.value)} aria-label="Leverage">
-          {Array.from({ length: 100 }, (_, index) => index + 1).map((value) => (
-            <option value={value} key={value}>
-              {value}X
-            </option>
-          ))}
-        </select>
+        <label className="futures-mode-field">
+          <span>Margin Mode</span>
+          <select
+            className="futures-mode-chip"
+            value={marginMode}
+            onChange={(event) => onMarginModeChange(event.target.value as DemoMarginMode)}
+            aria-label="Margin mode"
+          >
+            <option value="isolated">Isolated</option>
+            <option value="cross">Cross</option>
+          </select>
+        </label>
+        <LeverageSelector leverage={leverage} onApply={onLeverageChange} />
       </div>
 
       <div className="futures-order-tabs" aria-label="Order type">
@@ -945,6 +943,133 @@ function TradeEntryForm({
       </dl>
 
       <ErrorList errors={errors} />
+    </div>
+  );
+}
+
+function LeverageSelector({ leverage, onApply }: { leverage: string; onApply: (value: string) => void }) {
+  const appliedLeverage = normalizeLeverageValue(leverage, 5);
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftLeverage, setDraftLeverage] = useState(formatLeverageInput(appliedLeverage));
+  const selectorRef = useRef<HTMLDivElement | null>(null);
+  const parsedDraft = parseLeverageInput(draftLeverage);
+  const draftValue = normalizeLeverageValue(parsedDraft ?? appliedLeverage, appliedLeverage);
+  const sliderStyle = percentSliderStyle(
+    ((draftValue - MIN_DEMO_LEVERAGE) / (MAX_DEMO_LEVERAGE - MIN_DEMO_LEVERAGE)) * 100
+  );
+
+  const openSelector = () => {
+    setDraftLeverage(formatLeverageInput(appliedLeverage));
+    setIsOpen(true);
+  };
+
+  const closeSelector = () => {
+    setDraftLeverage(formatLeverageInput(appliedLeverage));
+    setIsOpen(false);
+  };
+
+  const setDraftValue = (value: number) => {
+    setDraftLeverage(formatLeverageInput(normalizeLeverageValue(value, appliedLeverage)));
+  };
+
+  const resolveDraft = () => {
+    setDraftValue(draftValue);
+  };
+
+  const applyDraft = () => {
+    const nextLeverage = normalizeLeverageValue(parseLeverageInput(draftLeverage) ?? appliedLeverage, appliedLeverage);
+    onApply(String(nextLeverage));
+    setDraftLeverage(formatLeverageInput(nextLeverage));
+    setIsOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event: globalThis.PointerEvent) => {
+      if (!selectorRef.current?.contains(event.target as Node)) closeSelector();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSelector();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [appliedLeverage, isOpen]);
+
+  return (
+    <div className="futures-mode-field futures-leverage-control" ref={selectorRef}>
+      <span>Leverage</span>
+      <button
+        className="futures-mode-chip futures-leverage-trigger"
+        type="button"
+        aria-label="Set leverage"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        onClick={() => (isOpen ? closeSelector() : openSelector())}
+      >
+        <strong>{formatLeverageInput(appliedLeverage)}</strong>
+        <span aria-hidden="true">▾</span>
+      </button>
+
+      {isOpen && (
+        <section className="leverage-popover" role="dialog" aria-label="Set leverage">
+          <h3>SET LEVERAGE</h3>
+          <div className="leverage-stepper">
+            <button
+              type="button"
+              onClick={() => setDraftValue(draftValue - 1)}
+              disabled={draftValue <= MIN_DEMO_LEVERAGE}
+              aria-label="Decrease leverage"
+            >
+              -
+            </button>
+            <input
+              value={draftLeverage}
+              onChange={(event) => setDraftLeverage(event.target.value.toUpperCase())}
+              onBlur={resolveDraft}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") applyDraft();
+              }}
+              aria-label="Leverage value"
+              inputMode="numeric"
+            />
+            <button
+              type="button"
+              onClick={() => setDraftValue(draftValue + 1)}
+              disabled={draftValue >= MAX_DEMO_LEVERAGE}
+              aria-label="Increase leverage"
+            >
+              +
+            </button>
+          </div>
+          <div className="leverage-slider-block">
+            <input
+              type="range"
+              min={MIN_DEMO_LEVERAGE}
+              max={MAX_DEMO_LEVERAGE}
+              step="1"
+              value={draftValue}
+              style={sliderStyle}
+              onChange={(event) => setDraftValue(Number(event.target.value))}
+              aria-label="Leverage slider"
+            />
+            <div className="leverage-range-labels" aria-hidden="true">
+              <span>1X</span>
+              <span>100X</span>
+            </div>
+          </div>
+          <button className="primary-button compact leverage-apply-button" type="button" onClick={applyDraft}>
+            Apply
+          </button>
+        </section>
+      )}
     </div>
   );
 }
@@ -1787,6 +1912,23 @@ function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: numb
     lines.push({ label: `TP${index + 1}`, price: takeProfit.price, tone: takeProfit.isHit ? "hit" : "target" });
   });
   return lines;
+}
+
+function parseLeverageInput(value: string): number | null {
+  const match = value.match(/\d+/);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeLeverageValue(value: string | number, fallback: number): number {
+  const parsed = typeof value === "number" ? value : parseLeverageInput(value);
+  const safeValue = Number.isFinite(parsed) && parsed !== null ? parsed : fallback;
+  return clamp(Math.trunc(safeValue), MIN_DEMO_LEVERAGE, MAX_DEMO_LEVERAGE);
+}
+
+function formatLeverageInput(value: string | number): string {
+  return `${normalizeLeverageValue(value, MIN_DEMO_LEVERAGE)}X`;
 }
 
 function parseNumber(value: string): number {

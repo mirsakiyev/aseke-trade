@@ -115,7 +115,7 @@ export function Premium() {
         ))}
       </section>
 
-      <section className="section-panel page-stack">
+      <section className="section-panel page-stack no-hover-effect">
         <div className="lesson-title-line">
           <div>
             <p className="eyebrow">Academy Access</p>
@@ -136,7 +136,7 @@ export function Premium() {
         </div>
       </section>
 
-      <section className="section-panel page-stack">
+      <section className="section-panel page-stack no-hover-effect">
         <div>
           <p className="eyebrow">Comparison</p>
           <h2>Basic vs Trading Academy</h2>
@@ -157,7 +157,7 @@ export function Premium() {
         </div>
       </section>
 
-      <section className="risk-band">
+      <section className="risk-band no-hover-effect">
         <div>
           <p className="eyebrow">Payment Security</p>
           <h2>Educational access, verified securely</h2>

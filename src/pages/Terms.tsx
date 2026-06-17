@@ -9,7 +9,7 @@ export function Terms() {
         </div>
       </section>
 
-      <section className="section-panel terms-panel">
+      <section className="section-panel terms-panel no-hover-effect">
         <a className="text-link" href="/terms-of-agreement.pdf" target="_blank" rel="noopener noreferrer">
           Open Terms of Agreement PDF
         </a>

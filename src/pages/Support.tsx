@@ -172,7 +172,7 @@ export function Support() {
       </section>
 
       <section className="support-content-grid">
-        <article className="section-panel support-form-panel">
+        <article className="section-panel support-form-panel no-hover-effect">
           <div>
             <p className="eyebrow">Contact</p>
             <h2>Send a support request</h2>
@@ -253,7 +253,7 @@ export function Support() {
           </form>
         </article>
 
-        <article className="section-panel support-faq-panel">
+        <article className="section-panel support-faq-panel no-hover-effect">
           <div>
             <p className="eyebrow">FAQ</p>
             <h2>Common questions</h2>

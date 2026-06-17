@@ -206,7 +206,7 @@ export function Charts() {
         isLoading={isLoadingMarketIndices}
       />
 
-      <section className="charts-learning-cta">
+      <section className="charts-learning-cta no-hover-effect">
         <div>
           <p className="eyebrow">Chart Education</p>
           <h2>Want to understand what you are seeing?</h2>
