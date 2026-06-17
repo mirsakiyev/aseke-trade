@@ -4,7 +4,7 @@ Demo Trade is an ASEKE TRADE practice simulator for BTC/USDT. It uses virtual fu
 
 ## Data Source
 
-The v1 market data provider lives in `src/lib/demoTradeMarketData.ts` and uses public Binance.US REST endpoints for BTC/USDT ticker and one-minute candles. The provider is isolated so another free data source can replace it later without rewriting the trading UI.
+The v1 market data provider lives in `src/lib/demoTradeMarketData.ts`. It tries public Binance.US REST endpoints first for BTC/USDT ticker and candles, then falls back to Binance global public market data and Coinbase public BTC/USD data. The browser also keeps a short-lived last-good cache so a temporary upstream outage does not leave returning users with an empty chart.
 
 ## Calculation Model
 

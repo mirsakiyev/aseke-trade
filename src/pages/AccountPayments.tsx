@@ -108,7 +108,7 @@ export function AccountPayments() {
       ) : (
         <>
           <section className="checkout-grid">
-            <article className="section-panel">
+            <article className="section-panel no-hover-effect">
               <p className="eyebrow">Available Balance</p>
               <h2>{accountStatus.balanceLabel}</h2>
               <p className="muted">
@@ -117,7 +117,7 @@ export function AccountPayments() {
               </p>
             </article>
 
-            <form className="section-panel stack-form" onSubmit={createDeposit}>
+            <form className="section-panel stack-form no-hover-effect" onSubmit={createDeposit}>
               <div>
                 <p className="eyebrow">Deposit Crypto</p>
                 <h2>Top up balance</h2>
@@ -183,7 +183,7 @@ export function AccountPayments() {
           {payments.length ? (
             <section className="payment-history-list">
               {payments.map((payment) => (
-                <article className="section-panel payment-history-card" key={payment.id}>
+                <article className="section-panel payment-history-card no-hover-effect" key={payment.id}>
                   <div>
                     <span className={`status-pill ${statusTone(payment.status)}`}>
                       <Clock3 size={15} />
@@ -217,7 +217,7 @@ export function AccountPayments() {
               ))}
             </section>
           ) : (
-            <section className="section-panel">
+            <section className="section-panel no-hover-effect">
               <p className="eyebrow">No Payments</p>
               <h2>No crypto payments yet</h2>
               <p className="muted">
@@ -263,7 +263,7 @@ function CryptoDepositGuide() {
   ];
 
   return (
-    <section className="section-panel deposit-guide-panel" id="crypto-deposit-guide">
+    <section className="section-panel deposit-guide-panel no-hover-effect" id="crypto-deposit-guide">
       <div>
         <p className="eyebrow">Deposit Guide</p>
         <h2>How to deposit with crypto</h2>

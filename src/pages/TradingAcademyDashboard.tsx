@@ -368,7 +368,7 @@ export function TradingAcademyDashboard() {
             )}
           </section>
 
-          <section className="section-panel academy-signal-section">
+          <section className="section-panel academy-signal-section no-hover-effect">
             <div className="lesson-title-line">
               <div>
                 <p className="eyebrow">Trading Signals</p>

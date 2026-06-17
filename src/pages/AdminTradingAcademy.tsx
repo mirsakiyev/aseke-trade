@@ -406,7 +406,7 @@ export function AdminTradingAcademy() {
         <>
           {activeTab === "signals" && (
             <section className="admin-grid signal-admin-grid">
-              <form className="section-panel stack-form signal-admin-form" onSubmit={saveSignal}>
+              <form className="section-panel stack-form signal-admin-form no-hover-effect" onSubmit={saveSignal}>
                 <div className="compact-panel-header">
                   <div>
                     <h2>{editingSignalId ? "Edit trading signal" : "Create trading signal"}</h2>
@@ -563,7 +563,7 @@ export function AdminTradingAcademy() {
                 </button>
               </form>
 
-              <AdminList title="Trading Signals">
+              <AdminList title="Trading Signals" noHover>
                 {signals.length ? (
                   signals.map((signal) => (
                     <AdminSignalRow
@@ -589,7 +589,7 @@ export function AdminTradingAcademy() {
           )}
 
           {activeTab === "aml" && (
-            <AdminList title="AML Check Requests">
+            <AdminList title="AML Check Requests" noHover>
               {amlRequests.length ? (
                 amlRequests.map((request) => (
                   <AmlRequestAdminRow request={request} onUpdated={refreshAdminData} key={request.id} />
@@ -920,9 +920,9 @@ function AmlRequestAdminRow({ request, onUpdated }: { request: AmlCheckRequest; 
   );
 }
 
-function AdminList({ title, children }: { title: string; children: ReactNode }) {
+function AdminList({ title, children, noHover = false }: { title: string; children: ReactNode; noHover?: boolean }) {
   return (
-    <article className="section-panel">
+    <article className={noHover ? "section-panel no-hover-effect" : "section-panel"}>
       <h2>{title}</h2>
       <ul className="admin-list">{children}</ul>
     </article>

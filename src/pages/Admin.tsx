@@ -462,7 +462,7 @@ export function Admin() {
         <>
           {activeTab === "guides" && (
             <section className="admin-grid admin-guides-grid">
-              <form className="section-panel stack-form compact-admin-form" onSubmit={saveGuide}>
+              <form className="section-panel stack-form compact-admin-form no-hover-effect" onSubmit={saveGuide}>
                 <h2>{editingGuideId ? "Edit guide" : "Create guide"}</h2>
                 <div className="form-row">
                   <label>
@@ -618,7 +618,7 @@ export function Admin() {
                 </button>
               </form>
 
-              <AdminList title="Guides">
+              <AdminList title="Guides" noHover>
                 {guides.map((guide) => (
                   <li key={guide.id}>
                     <div>
@@ -668,7 +668,7 @@ export function Admin() {
 
           {activeTab === "courses" && (
             <section className="admin-grid">
-              <form className="section-panel stack-form" onSubmit={saveCourse}>
+              <form className="section-panel stack-form no-hover-effect" onSubmit={saveCourse}>
                 <h2>{editingCourseId ? "Edit course" : "Create course"}</h2>
                 <label>
                   Title
@@ -774,7 +774,7 @@ export function Admin() {
                 </button>
               </form>
 
-              <AdminList title="Courses">
+              <AdminList title="Courses" noHover>
                 {courses.map((course) => (
                   <li key={course.id}>
                     <div>
@@ -820,7 +820,7 @@ export function Admin() {
 
           {activeTab === "inbox" && (
             <section className="admin-grid notification-admin-grid">
-              <form className="section-panel stack-form" onSubmit={saveNotification}>
+              <form className="section-panel stack-form no-hover-effect" onSubmit={saveNotification}>
                 <div className="compact-tool-heading">
                   <span className="feature-icon">
                     <Bell size={20} />
@@ -926,7 +926,7 @@ export function Admin() {
                 </button>
               </form>
 
-              <AdminList title="Delivery Rules">
+              <AdminList title="Delivery Rules" noHover>
                 <li>
                   <div>
                     <strong>Market Outlook</strong>
@@ -961,7 +961,7 @@ export function Admin() {
 
           {activeTab === "support" && (
             <section className="admin-grid">
-              <AdminList title="Support Requests">
+              <AdminList title="Support Requests" noHover>
                 {supportRequests.length ? (
                   supportRequests.map((request) => (
                     <SupportRequestAdminRow request={request} onUpdated={refreshAdminData} key={request.id} />
@@ -981,7 +981,7 @@ export function Admin() {
 
           {activeTab === "users" && (
             <section className="admin-grid">
-              <form className="section-panel stack-form" onSubmit={saveSubscription}>
+              <form className="section-panel stack-form no-hover-effect" onSubmit={saveSubscription}>
                 <h2>{editingSubscriptionId ? "Edit Trading Academy access" : "Issue Trading Academy access"}</h2>
                 {!editingSubscriptionId && (
                   <label>
@@ -1084,7 +1084,7 @@ export function Admin() {
                 </div>
               </form>
 
-              <AdminList title="Trading Academy Subscriptions">
+              <AdminList title="Trading Academy Subscriptions" noHover>
                 {premiumSubscriptions.map((subscription) => (
                   <li key={subscription.id}>
                     <div>
@@ -1211,9 +1211,9 @@ function SupportRequestAdminRow({
   );
 }
 
-function AdminList({ title, children }: { title: string; children: ReactNode }) {
+function AdminList({ title, children, noHover = false }: { title: string; children: ReactNode; noHover?: boolean }) {
   return (
-    <article className="section-panel">
+    <article className={noHover ? "section-panel no-hover-effect" : "section-panel"}>
       <h2>{title}</h2>
       <ul className="admin-list">{children}</ul>
     </article>

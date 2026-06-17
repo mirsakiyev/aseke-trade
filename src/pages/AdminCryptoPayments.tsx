@@ -171,7 +171,7 @@ export function AdminCryptoPayments() {
       {message && <p className="soft-notice">{message}</p>}
 
       <section className="admin-grid">
-        <form className="section-panel stack-form" onSubmit={saveWallet}>
+        <form className="section-panel stack-form no-hover-effect" onSubmit={saveWallet}>
           <div>
             <p className="eyebrow">Receiving Wallets</p>
             <h2>{walletForm.id ? "Edit wallet" : "Add wallet"}</h2>
@@ -244,7 +244,7 @@ export function AdminCryptoPayments() {
           </button>
         </form>
 
-        <article className="section-panel">
+        <article className="section-panel no-hover-effect">
           <h2>Configured wallets</h2>
           <ul className="admin-list">
             {wallets.map((wallet) => (
@@ -322,7 +322,7 @@ export function AdminCryptoPayments() {
       ) : (
         <section className="admin-payment-list">
           {filteredPayments.map((payment) => (
-            <article className="section-panel admin-payment-card" key={payment.id}>
+            <article className="section-panel admin-payment-card no-hover-effect" key={payment.id}>
               <div className="admin-payment-card-header">
                 <div>
                   <span className={`status-pill ${statusTone(payment.status)}`}>
@@ -418,7 +418,7 @@ export function AdminCryptoPayments() {
           ))}
 
           {!filteredPayments.length && (
-            <article className="section-panel">
+            <article className="section-panel no-hover-effect">
               <h2>No matching payments</h2>
               <p className="muted">Adjust filters or refresh after new checkout activity.</p>
             </article>

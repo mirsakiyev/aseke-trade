@@ -52,7 +52,7 @@ test("admin dashboard lists regular support requests with status updates", () =>
   assert.match(adminSource, /type AdminTab = "guides" \| "courses" \| "inbox" \| "support" \| "users"/);
   assert.match(adminSource, /fetchAdminSupportRequests/);
   assert.match(adminSource, /activeTab === "support"/);
-  assert.match(adminSource, /<AdminList title="Support Requests">/);
+  assert.match(adminSource, /<AdminList title="Support Requests" noHover>/);
   assert.match(adminSource, /function SupportRequestAdminRow/);
   assert.match(adminSource, /SUPPORT_STATUSES\.map/);
   assert.match(adminSource, /updateSupportRequestStatus/);

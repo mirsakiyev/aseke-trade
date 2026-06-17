@@ -150,12 +150,23 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
 
 test("BTC market data provider is isolated and uses public REST data", () => {
   assert.match(marketDataSource, /fetchDemoTradeCandles/);
+  assert.match(marketDataSource, /fetchDemoTradeCandleResult/);
+  assert.match(marketDataSource, /fetchDemoTradeMarketSnapshot/);
   assert.match(marketDataSource, /fetchDemoTradeTicker/);
   assert.match(marketDataSource, /subscribeDemoTradePriceStream/);
   assert.match(marketDataSource, /WebSocket/);
   assert.match(marketDataSource, /@trade/);
   assert.match(marketDataSource, /DemoTradeTimeframe = "1m" \| "5m" \| "15m" \| "1h" \| "4h" \| "6h" \| "12h" \| "1d" \| "1w" \| "1M"/);
   assert.match(marketDataSource, /api\.binance\.us\/api\/v3/);
+  assert.match(marketDataSource, /api\.binance\.com\/api\/v3/);
+  assert.match(marketDataSource, /api\.exchange\.coinbase\.com/);
+  assert.match(marketDataSource, /api\.coinbase\.com\/v2\/prices\/BTC-USD\/spot/);
+  assert.match(marketDataSource, /demoTradeMarketCacheKey/);
+  assert.match(marketDataSource, /readCachedTicker/);
+  assert.match(marketDataSource, /readCachedCandles/);
+  assert.match(pageSource, /fetchDemoTradeMarketSnapshot/);
+  assert.match(pageSource, /fetchDemoTradeCandleResult/);
+  assert.match(pageSource, /Showing cached data while retrying/);
   assert.doesNotMatch(marketDataSource, /apiKey|secret|TradingView/);
 });
 

@@ -169,7 +169,7 @@ export function CryptoPayment() {
       {message && <p className="warning-box">{message}</p>}
 
       <section className="payment-grid">
-        <article className="section-panel payment-instructions-panel">
+        <article className="section-panel payment-instructions-panel no-hover-effect">
           <div className="payment-qr-frame">
             <img src={paymentQrUrl(payment)} alt={`${payment.asset} ${payment.network} payment QR code`} />
           </div>
@@ -217,7 +217,7 @@ export function CryptoPayment() {
           </dl>
         </article>
 
-        <article className="section-panel payment-action-panel">
+        <article className="section-panel payment-action-panel no-hover-effect">
           <div>
             <p className="eyebrow">Receive Address</p>
             <div className="address-copy-box">

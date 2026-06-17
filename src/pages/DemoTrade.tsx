@@ -34,7 +34,8 @@ import {
 import {
   demoTradeSymbols,
   demoTradeTimeframes,
-  fetchDemoTradeCandles,
+  fetchDemoTradeCandleResult,
+  fetchDemoTradeMarketSnapshot,
   fetchDemoTradeTicker,
   subscribeDemoTradePriceStream,
   type DemoTradeCandle,
@@ -117,6 +118,7 @@ export function DemoTrade() {
   const [manualClosePercent, setManualClosePercent] = useState("100");
   const [positionAddAmount, setPositionAddAmount] = useState("");
   const [positionErrors, setPositionErrors] = useState<string[]>([]);
+  const currentPriceRef = useRef<number | null>(null);
 
   const stats = useMemo(() => calculateDemoTradeStats(demoState), [demoState]);
   const equityTone = stats.equity >= demoState.startingBalance ? "positive" : "negative";
@@ -157,8 +159,12 @@ export function DemoTrade() {
     if (updateSource) setMarketSource(ticker.source);
     setCandles((items) => applyLivePriceToCandles(items, ticker.price, timeframe, Date.parse(ticker.timestamp)));
     setDemoState((state) => applyMarketPrice(state, ticker.price));
-    setMarketError(null);
+    setMarketError(ticker.source.includes(" cached") ? "Live BTC price is temporarily unavailable. Showing cached price while retrying." : null);
   }, [timeframe]);
+
+  useEffect(() => {
+    currentPriceRef.current = currentPrice;
+  }, [currentPrice]);
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -213,15 +219,14 @@ export function DemoTrade() {
 
   const loadMarketData = useCallback(async () => {
     setMarketError(null);
+    setIsMarketLoading(true);
     try {
-      const [nextCandles, ticker] = await Promise.all([
-        fetchDemoTradeCandles(activeSymbol.symbol, timeframe),
-        fetchDemoTradeTicker(activeSymbol.symbol)
-      ]);
-      setCandles(applyLivePriceToCandles(nextCandles, ticker.price, timeframe, Date.parse(ticker.timestamp)));
-      setCurrentPrice(ticker.price);
-      setMarketSource(ticker.source);
-      setDemoState((state) => applyMarketPrice(state, ticker.price));
+      const snapshot = await fetchDemoTradeMarketSnapshot(activeSymbol.symbol, timeframe);
+      setCandles(applyLivePriceToCandles(snapshot.candles, snapshot.ticker.price, timeframe, Date.parse(snapshot.ticker.timestamp)));
+      setCurrentPrice(snapshot.ticker.price);
+      setMarketSource(snapshot.source);
+      setDemoState((state) => applyMarketPrice(state, snapshot.ticker.price));
+      setMarketError(snapshot.isCached ? "Live BTC market data is temporarily unavailable. Showing cached data while retrying." : null);
     } catch (error) {
       setMarketError(error instanceof Error ? error.message : "BTC data could not be loaded.");
     } finally {
@@ -238,12 +243,16 @@ export function DemoTrade() {
     );
     const priceTimer = window.setInterval(() => {
       fetchDemoTradeTicker(activeSymbol.symbol)
-        .then((ticker) => applyLiveTicker(ticker, false))
+        .then((ticker) => applyLiveTicker(ticker, true))
         .catch(() => setMarketError("Live BTC price update failed. Retrying..."));
     }, DEMO_TRADE_LIVE_REFRESH_MS);
     const candleTimer = window.setInterval(() => {
-      fetchDemoTradeCandles(activeSymbol.symbol, timeframe)
-        .then(setCandles)
+      fetchDemoTradeCandleResult(activeSymbol.symbol, timeframe)
+        .then((result) => {
+          const price = currentPriceRef.current;
+          setCandles(price ? applyLivePriceToCandles(result.candles, price, timeframe) : result.candles);
+          setMarketError(result.isCached ? "Live BTC candles are temporarily unavailable. Showing cached chart data while retrying." : null);
+        })
         .catch(() => setMarketError("BTC candles could not be refreshed."));
     }, DEMO_TRADE_CANDLE_SYNC_MS);
 
@@ -1594,7 +1603,7 @@ function PerformanceStats({ stats }: { stats: ReturnType<typeof calculateDemoTra
 
 function TradeHistoryTable({ trades, onExport }: { trades: DemoTradeState["tradeHistory"]; onExport: () => void }) {
   return (
-    <section className="section-panel demo-history-panel">
+    <section className="section-panel demo-history-panel no-hover-effect">
       <div className="section-heading compact-heading">
         <div>
           <p className="eyebrow">Trade history</p>
