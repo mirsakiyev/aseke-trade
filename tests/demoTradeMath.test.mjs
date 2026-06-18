@@ -246,6 +246,93 @@ test("notional sizing allows the full reduced available balance", () => {
   assert.ok(tooLarge.errors.includes("Trade is larger than your available demo balance allows."));
 });
 
+test("long limit order persists pending and triggers only when price reaches it", () => {
+  const placed = demoTrade.placeDemoLimitOrder(createState(), {
+    sessionId: "test-session",
+    userId: "user-1",
+    symbol: "BTCUSDT",
+    side: "long",
+    marginMode: "isolated",
+    sizeMode: "notional",
+    amount: 500,
+    leverage: 5,
+    entryPrice: 95,
+    limitPrice: 95,
+    currentPrice: 100,
+    stopLoss: 90,
+    takeProfits: [{ id: "tp-1", price: 110, closePercent: 100 }]
+  }, "2026-06-16T12:01:00.000Z");
+
+  assert.equal(placed.ok, true);
+  assert.equal(placed.state.openPosition, null);
+  assert.equal(placed.state.pendingLimitOrder.limitPrice, 95);
+
+  const waiting = demoTrade.applyMarketPrice(placed.state, 96, "2026-06-16T12:02:00.000Z");
+  assert.equal(waiting.openPosition, null);
+  assert.equal(waiting.pendingLimitOrder.limitPrice, 95);
+
+  const triggered = demoTrade.applyMarketPrice(waiting, 95, "2026-06-16T12:03:00.000Z");
+  assert.equal(triggered.pendingLimitOrder, null);
+  assert.equal(triggered.openPosition.entryPrice, 95);
+  assert.equal(triggered.openPosition.status, "OPEN");
+});
+
+test("short limit order triggers above market and marketable limits are rejected", () => {
+  assert.deepEqual(demoTrade.validateLimitOrderPlacement("long", 101, 100), [
+    "Long limit orders must be below the current market price. Use Market or set a lower limit price."
+  ]);
+  assert.deepEqual(demoTrade.validateLimitOrderPlacement("short", 99, 100), [
+    "Short limit orders must be above the current market price. Use Market or set a higher limit price."
+  ]);
+
+  const placed = demoTrade.placeDemoLimitOrder(createState(), {
+    sessionId: "test-session",
+    userId: "user-1",
+    symbol: "BTCUSDT",
+    side: "short",
+    marginMode: "isolated",
+    sizeMode: "notional",
+    amount: 500,
+    leverage: 5,
+    entryPrice: 105,
+    limitPrice: 105,
+    currentPrice: 100,
+    stopLoss: 110,
+    takeProfits: [{ id: "tp-1", price: 95, closePercent: 100 }]
+  }, "2026-06-16T12:01:00.000Z");
+
+  assert.equal(placed.ok, true);
+  assert.equal(demoTrade.applyMarketPrice(placed.state, 104).openPosition, null);
+
+  const triggered = demoTrade.applyMarketPrice(placed.state, 105, "2026-06-16T12:02:00.000Z");
+  assert.equal(triggered.pendingLimitOrder, null);
+  assert.equal(triggered.openPosition.side, "short");
+  assert.equal(triggered.openPosition.entryPrice, 105);
+});
+
+test("pending limit order can be canceled", () => {
+  const placed = demoTrade.placeDemoLimitOrder(createState(), {
+    sessionId: "test-session",
+    userId: "user-1",
+    symbol: "BTCUSDT",
+    side: "long",
+    marginMode: "isolated",
+    sizeMode: "notional",
+    amount: 500,
+    leverage: 5,
+    entryPrice: 95,
+    limitPrice: 95,
+    currentPrice: 100,
+    stopLoss: 90,
+    takeProfits: []
+  }, "2026-06-16T12:01:00.000Z");
+
+  assert.equal(placed.ok, true);
+  const canceled = demoTrade.cancelDemoLimitOrder(placed.state, "2026-06-16T12:02:00.000Z");
+  assert.equal(canceled.ok, true);
+  assert.equal(canceled.state.pendingLimitOrder, null);
+});
+
 test("adding to an open position updates average entry, margin, and quantity", () => {
   const state = openPosition({ takeProfits: [], stopLoss: 0 });
   const result = demoTrade.increaseDemoPosition(

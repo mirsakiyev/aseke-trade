@@ -22,6 +22,8 @@ import {
   exportDemoTradesToCsv,
   increaseDemoPosition,
   openDemoPosition,
+  cancelDemoLimitOrder,
+  placeDemoLimitOrder,
   resetDemoTradeState,
   updateDemoLeverage,
   updateDemoStopLoss,
@@ -90,17 +92,6 @@ interface PositionRiskMarkerLayout extends PositionRiskMarker {
   lane: number;
 }
 
-interface PendingLimitOrder {
-  side: DemoTradeSide;
-  marginMode: DemoMarginMode;
-  quantityUnit: DemoQuantityUnit;
-  amount: string;
-  leverage: string;
-  stopLoss: string;
-  takeProfits: TakeProfitDraft[];
-  limitPrice: string;
-}
-
 const emptyTakeProfits: TakeProfitDraft[] = [
   { id: "tp-1", price: "", closePercent: "100" }
 ];
@@ -135,7 +126,6 @@ export function DemoTrade() {
   const [isMarketLoading, setIsMarketLoading] = useState(true);
   const [orderType, setOrderType] = useState<DemoOrderType>("market");
   const [limitPrice, setLimitPrice] = useState("");
-  const [pendingLimitOrder, setPendingLimitOrder] = useState<PendingLimitOrder | null>(null);
   const [marginMode, setMarginMode] = useState<DemoMarginMode>("isolated");
   const [quantityUnit, setQuantityUnit] = useState<DemoQuantityUnit>("usdt");
   const [amount, setAmount] = useState("");
@@ -264,7 +254,6 @@ export function DemoTrade() {
   useEffect(() => {
     if (user) return;
     setOrderType("market");
-    setPendingLimitOrder(null);
   }, [user]);
 
   const loadMarketData = useCallback(async () => {
@@ -352,21 +341,29 @@ export function DemoTrade() {
         return;
       }
 
-      setPendingLimitOrder({
+      const result = placeDemoLimitOrder(demoState, {
+        userId: user?.id ?? null,
+        sessionId: demoState.sessionId,
+        symbol: activeSymbol.symbol,
         side: requestedSide,
         marginMode,
-        quantityUnit,
-        amount,
-        leverage,
-        stopLoss: String(submittedBracket.stopLoss),
-        takeProfits: submittedBracket.takeProfits.map((takeProfit) => ({
-          id: takeProfit.id,
-          price: String(takeProfit.price),
-          closePercent: String(takeProfit.closePercent)
-        })),
-        limitPrice: formatInputPrice(nextLimitPrice)
+        sizeMode: "notional",
+        amount: quantityInputToNotional(amountValue, quantityUnit, nextLimitPrice),
+        leverage: parseNumber(leverage),
+        entryPrice: nextLimitPrice,
+        limitPrice: nextLimitPrice,
+        currentPrice: entryPrice,
+        stopLoss: submittedBracket.stopLoss,
+        takeProfits: submittedBracket.takeProfits
       });
+
+      if (!result.ok) {
+        setFormErrors(result.errors);
+        return;
+      }
+
       setFormErrors([]);
+      commitDemoState(result.state);
       return;
     }
 
@@ -392,43 +389,6 @@ export function DemoTrade() {
     setFormErrors([]);
     commitDemoState(result.state);
   };
-
-  useEffect(() => {
-    if (!pendingLimitOrder || !currentPrice || demoState.openPosition) return;
-    const pendingLimitPrice = parseNumber(pendingLimitOrder.limitPrice);
-    if (!Number.isFinite(pendingLimitPrice) || pendingLimitPrice <= 0 || currentPrice > pendingLimitPrice) return;
-
-    const result = openDemoPosition(demoState, {
-      userId: user?.id ?? null,
-      sessionId: demoState.sessionId,
-      symbol: activeSymbol.symbol,
-      side: pendingLimitOrder.side,
-      marginMode: pendingLimitOrder.marginMode,
-      sizeMode: "notional",
-      amount: quantityInputToNotional(
-        parseNumber(pendingLimitOrder.amount),
-        pendingLimitOrder.quantityUnit,
-        pendingLimitPrice
-      ),
-      leverage: parseNumber(pendingLimitOrder.leverage),
-      entryPrice: pendingLimitPrice,
-      stopLoss: parseNumber(pendingLimitOrder.stopLoss),
-      takeProfits: pendingLimitOrder.takeProfits.map((takeProfit) => ({
-        id: takeProfit.id,
-        price: parseNumber(takeProfit.price),
-        closePercent: parseNumber(takeProfit.closePercent)
-      }))
-    });
-
-    setPendingLimitOrder(null);
-    if (!result.ok) {
-      setFormErrors(result.errors);
-      return;
-    }
-    setOrderType("market");
-    setFormErrors([]);
-    commitDemoState(result.state);
-  }, [activeSymbol.symbol, commitDemoState, currentPrice, demoState, pendingLimitOrder, user]);
 
   const updateStop = () => {
     const result = updateDemoStopLoss(demoState, parseNumber(positionStopLoss));
@@ -624,8 +584,8 @@ export function DemoTrade() {
               currentPrice={currentPrice}
               availableBalance={demoState.availableBalance}
               isRegistered={Boolean(user)}
-              hasPendingLimitOrder={Boolean(pendingLimitOrder)}
-              pendingLimitPrice={pendingLimitOrder?.limitPrice ?? ""}
+              hasPendingLimitOrder={Boolean(demoState.pendingLimitOrder)}
+              pendingLimitPrice={demoState.pendingLimitOrder?.limitPrice ? formatInputPrice(demoState.pendingLimitOrder.limitPrice) : ""}
               errors={formErrors}
               onOrderTypeChange={setOrderType}
               onMarginModeChange={setMarginMode}
@@ -639,7 +599,15 @@ export function DemoTrade() {
               onLimitPriceChange={setLimitPrice}
               onStopLossChange={setStopLoss}
               onTakeProfitsChange={setTakeProfits}
-              onCancelLimitOrder={() => setPendingLimitOrder(null)}
+              onCancelLimitOrder={() => {
+                const result = cancelDemoLimitOrder(demoState);
+                if (!result.ok) {
+                  setFormErrors(result.errors);
+                  return;
+                }
+                setFormErrors([]);
+                commitDemoState(result.state);
+              }}
               onOpen={openTrade}
             />
           )}
@@ -2209,6 +2177,8 @@ function shouldPersistMarketState(previous: DemoTradeState, next: DemoTradeState
   if (previous === next) return false;
   if (previous.tradeHistory.length !== next.tradeHistory.length) return true;
   if (previous.actionHistory.length !== next.actionHistory.length) return true;
+  if (previous.pendingLimitOrder?.orderId !== next.pendingLimitOrder?.orderId) return true;
+  if (previous.pendingLimitOrder?.updatedAt !== next.pendingLimitOrder?.updatedAt) return true;
 
   const previousPosition = previous.openPosition;
   const nextPosition = next.openPosition;

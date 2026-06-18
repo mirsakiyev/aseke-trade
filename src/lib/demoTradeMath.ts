@@ -20,6 +20,8 @@ export type DemoTradeActionType =
   | "position increased"
   | "partial close"
   | "manual close"
+  | "limit placed"
+  | "limit canceled"
   | "SL hit"
   | "TP hit"
   | "liquidated"
@@ -78,6 +80,23 @@ export interface DemoClosedTrade extends DemoOpenPosition {
   closedAt: string;
 }
 
+export interface DemoPendingLimitOrder {
+  orderId: string;
+  userId: string | null;
+  sessionId: string;
+  symbol: "BTCUSDT";
+  side: DemoTradeSide;
+  marginMode: DemoMarginMode;
+  sizeMode: DemoTradeSizeMode;
+  amount: number;
+  leverage: number;
+  limitPrice: number;
+  stopLoss: number;
+  takeProfits: DemoTakeProfit[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DemoTradeSettings {
   feeRate: number;
   maintenanceMarginRate: number;
@@ -94,6 +113,7 @@ export interface DemoTradeState {
   realizedPnl: number;
   unrealizedPnl: number;
   openPosition: DemoOpenPosition | null;
+  pendingLimitOrder: DemoPendingLimitOrder | null;
   tradeHistory: DemoClosedTrade[];
   actionHistory: DemoTradeAction[];
   settings: DemoTradeSettings;
@@ -114,6 +134,11 @@ export interface OpenDemoTradeInput {
   entryPrice: number;
   stopLoss: number;
   takeProfits: Array<Pick<DemoTakeProfit, "price" | "closePercent"> & { id?: string }>;
+}
+
+export interface PlaceDemoLimitOrderInput extends OpenDemoTradeInput {
+  limitPrice: number;
+  currentPrice?: number | null;
 }
 
 export interface IncreaseDemoPositionInput {
@@ -171,6 +196,7 @@ export function createInitialDemoTradeState(input: {
     realizedPnl: 0,
     unrealizedPnl: 0,
     openPosition: null,
+    pendingLimitOrder: null,
     tradeHistory: [],
     actionHistory: [],
     settings: {
@@ -194,6 +220,7 @@ export function validateDemoTradeInput(state: DemoTradeState, input: OpenDemoTra
 
   if (symbol !== "BTCUSDT") errors.push("BTC/USDT is the only supported demo pair for v1.");
   if (state.openPosition) errors.push("Close the current demo position before opening another one.");
+  if (state.pendingLimitOrder) errors.push("Cancel the pending limit order before opening another trade.");
   if (input.side !== "long" && input.side !== "short") errors.push("Choose Long or Short.");
   if (!marginMode) errors.push("Choose Isolated or Cross margin.");
   if (!isPositiveDecimal(amount)) errors.push("Trade size must be greater than zero.");
@@ -299,16 +326,91 @@ export function openDemoPosition(
   return { ok: true, state: refreshBalances(nextState, now) };
 }
 
+export function placeDemoLimitOrder(
+  state: DemoTradeState,
+  input: PlaceDemoLimitOrderInput,
+  now = new Date().toISOString()
+): DemoTradeResult {
+  const normalizedMarginMode = normalizeMarginMode(input.marginMode);
+  const normalizedInput = {
+    ...input,
+    symbol: normalizeSymbol(input.symbol ?? state.symbol),
+    marginMode: normalizedMarginMode ?? "isolated",
+    leverage: Math.trunc(Number(input.leverage)),
+    entryPrice: input.limitPrice,
+    takeProfits: normalizeTakeProfits(input.takeProfits)
+  };
+  const errors = validateDemoTradeInput(state, normalizedInput);
+  if (state.pendingLimitOrder) errors.push("Cancel the existing limit order before placing a new one.");
+  if (!normalizedMarginMode) errors.push("Choose Isolated or Cross margin.");
+  if (!Number.isFinite(input.limitPrice) || input.limitPrice <= 0) errors.push("Enter a valid limit price.");
+  if (Number.isFinite(Number(input.currentPrice)) && Number(input.currentPrice) > 0) {
+    errors.push(...validateLimitOrderPlacement(input.side, input.limitPrice, Number(input.currentPrice)));
+  }
+  if (errors.length) return { ok: false, errors: uniqueErrors(errors), state };
+
+  const nextState = cloneState(state);
+  const action = createAction("limit placed", "Limit order placed.", now, normalizedInput.limitPrice, null);
+
+  nextState.pendingLimitOrder = {
+    orderId: createId("demo-limit"),
+    userId: normalizedInput.userId ?? nextState.userId,
+    sessionId: normalizedInput.sessionId,
+    symbol: "BTCUSDT",
+    side: normalizedInput.side,
+    marginMode: normalizedInput.marginMode,
+    sizeMode: normalizedInput.sizeMode,
+    amount: roundMoney(normalizedInput.amount),
+    leverage: normalizedInput.leverage,
+    limitPrice: roundPrice(normalizedInput.limitPrice),
+    stopLoss: isPositiveDecimal(toDecimal(normalizedInput.stopLoss)) ? roundPrice(normalizedInput.stopLoss) : 0,
+    takeProfits: normalizedInput.takeProfits.map((takeProfit, index) => ({
+      id: takeProfit.id ?? `tp-${index + 1}`,
+      price: roundPrice(takeProfit.price),
+      closePercent: roundPercent(takeProfit.closePercent),
+      isHit: false,
+      hitAt: null
+    })),
+    createdAt: now,
+    updatedAt: now
+  };
+  nextState.actionHistory.push(action);
+  return { ok: true, state: refreshBalances(nextState, now) };
+}
+
+export function cancelDemoLimitOrder(
+  state: DemoTradeState,
+  now = new Date().toISOString()
+): DemoTradeResult {
+  if (!state.pendingLimitOrder) return { ok: false, errors: ["No pending limit order to cancel."], state };
+
+  const nextState = cloneState(state);
+  const action = createAction("limit canceled", "Limit order canceled.", now, nextState.pendingLimitOrder?.limitPrice ?? null, null);
+  nextState.pendingLimitOrder = null;
+  nextState.actionHistory.push(action);
+  return { ok: true, state: refreshBalances(nextState, now) };
+}
+
 export function applyMarketPrice(
   state: DemoTradeState,
   markPrice: number,
   now = new Date().toISOString()
 ): DemoTradeState {
-  if (!state.openPosition || !Number.isFinite(markPrice) || markPrice <= 0) {
+  if (!Number.isFinite(markPrice) || markPrice <= 0) {
     return state;
   }
 
-  let nextState = markPosition(cloneState(state), markPrice, now);
+  let nextState = state;
+  if (!nextState.openPosition && nextState.pendingLimitOrder && isLimitOrderTriggered(nextState.pendingLimitOrder, markPrice)) {
+    const triggerResult = triggerPendingLimitOrder(nextState, now);
+    if (triggerResult.ok) {
+      nextState = triggerResult.state;
+    }
+  }
+
+  if (!nextState.openPosition) return nextState;
+
+  nextState = markPosition(cloneState(nextState), markPrice, now);
   const position = nextState.openPosition;
   if (!position) return nextState;
 
@@ -703,6 +805,22 @@ export function validateTakeProfits(
   return uniqueErrors(errors);
 }
 
+export function validateLimitOrderPlacement(side: DemoTradeSide, limitPrice: number, currentPrice: number): string[] {
+  if (!Number.isFinite(limitPrice) || limitPrice <= 0 || !Number.isFinite(currentPrice) || currentPrice <= 0) return [];
+  if (side === "long" && limitPrice >= currentPrice) {
+    return ["Long limit orders must be below the current market price. Use Market or set a lower limit price."];
+  }
+  if (side === "short" && limitPrice <= currentPrice) {
+    return ["Short limit orders must be above the current market price. Use Market or set a higher limit price."];
+  }
+  return [];
+}
+
+export function isLimitOrderTriggered(order: Pick<DemoPendingLimitOrder, "side" | "limitPrice">, markPrice: number): boolean {
+  if (!Number.isFinite(markPrice) || markPrice <= 0 || !Number.isFinite(order.limitPrice) || order.limitPrice <= 0) return false;
+  return order.side === "long" ? markPrice <= order.limitPrice : markPrice >= order.limitPrice;
+}
+
 export function calculateDemoTradeStats(state: DemoTradeState): DemoTradeStats {
   const equity = calculateEquity(state);
   const wins = state.tradeHistory.filter((trade) => trade.realizedPnl > 0).length;
@@ -1019,6 +1137,34 @@ function closeReasonFromStatus(status: DemoTradeStatus): DemoTradeCloseReason {
     default:
       return null;
   }
+}
+
+function triggerPendingLimitOrder(
+  state: DemoTradeState,
+  now: string
+): DemoTradeResult {
+  const order = state.pendingLimitOrder;
+  if (!order) return { ok: false, errors: ["No pending limit order to trigger."], state };
+
+  const nextState = cloneState(state);
+  nextState.pendingLimitOrder = null;
+  return openDemoPosition(nextState, {
+    userId: order.userId,
+    sessionId: order.sessionId,
+    symbol: order.symbol,
+    side: order.side,
+    marginMode: order.marginMode,
+    sizeMode: order.sizeMode,
+    amount: order.amount,
+    leverage: order.leverage,
+    entryPrice: order.limitPrice,
+    stopLoss: order.stopLoss,
+    takeProfits: order.takeProfits.map((takeProfit) => ({
+      id: takeProfit.id,
+      price: takeProfit.price,
+      closePercent: takeProfit.closePercent
+    }))
+  }, now);
 }
 
 function normalizeSymbol(symbol: string): "BTCUSDT" | string {

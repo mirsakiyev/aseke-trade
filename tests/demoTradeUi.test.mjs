@@ -155,7 +155,8 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /notionalToQuantityInput/);
   assert.match(pageSource, /convertQuantityInput/);
   assert.match(pageSource, /quantityUnit=\{quantityUnit\}/);
-  assert.match(pageSource, /pendingLimitOrder\.quantityUnit/);
+  assert.match(pageSource, /placeDemoLimitOrder/);
+  assert.match(pageSource, /quantityInputToNotional\(amountValue, quantityUnit, nextLimitPrice\)/);
   assert.match(pageSource, /Quantity \(\{unitLabel\}\)/);
   assert.match(stylesSource, /unit-popover/);
   assert.match(stylesSource, /unit-option-grid/);
@@ -195,7 +196,7 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /data-hover-chart-tone="success"/);
   assert.match(pageSource, /data-hover-chart-tone="danger"/);
   assert.match(stylesSource, /candle-hover-button:hover:not\(:disabled\)/);
-  assert.match(stylesSource, /hover-chart-size, 280px 76px/);
+  assert.match(stylesSource, /hover-chart-size, min\(280px, calc\(100% - 8px\)\) calc\(100% - 8px\)/);
   assert.match(stylesSource, /var\(--hover-chart-overlay, var\(--btc-chart-overlay\)\)/);
   assert.match(stylesSource, /primary-button:not\(\.compact\):not\(\.candle-hover-button\):hover/);
   assert.doesNotMatch(pageSource, /Chase Limit/);
@@ -248,6 +249,10 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /closeOpenPositionByPercent/);
   assert.match(pageSource, /Manual close size percent/);
   assert.match(pageSource, /openDemoPosition/);
+  assert.match(pageSource, /placeDemoLimitOrder/);
+  assert.match(pageSource, /cancelDemoLimitOrder/);
+  assert.match(pageSource, /demoState\.pendingLimitOrder/);
+  assert.doesNotMatch(pageSource, /setPendingLimitOrder/);
   assert.match(pageSource, /updateDemoStopLoss/);
   assert.match(pageSource, /updateDemoTakeProfits/);
   assert.match(pageSource, /updateDemoLeverage/);

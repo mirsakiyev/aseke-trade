@@ -1,4 +1,4 @@
-import type { DemoOpenPosition, DemoTakeProfit, DemoTradeState } from "./demoTradeMath";
+import type { DemoOpenPosition, DemoPendingLimitOrder, DemoTakeProfit, DemoTradeState } from "./demoTradeMath";
 import { supabase } from "./supabase";
 
 const DEMO_TRADE_SESSION_KEY = "aseke-demo-trade-state-v1";
@@ -236,7 +236,8 @@ function normalizeStoredDemoState(value: unknown): DemoTradeState | null {
   const state = value as unknown as DemoTradeState;
   return {
     ...state,
-    openPosition: normalizeStoredOpenPosition((value as Record<string, unknown>).openPosition)
+    openPosition: normalizeStoredOpenPosition((value as Record<string, unknown>).openPosition),
+    pendingLimitOrder: normalizeStoredPendingLimitOrder((value as Record<string, unknown>).pendingLimitOrder)
   };
 }
 
@@ -253,6 +254,41 @@ function normalizeStoredOpenPosition(value: unknown): DemoOpenPosition | null {
     ...position,
     stopLoss: finiteNumber(position.stopLoss, 0),
     takeProfits: normalizeStoredTakeProfits(position.takeProfits)
+  };
+}
+
+function normalizeStoredPendingLimitOrder(value: unknown): DemoPendingLimitOrder | null {
+  if (value === null || value === undefined) return null;
+  if (!isRecord(value)) return null;
+
+  const order = value as unknown as DemoPendingLimitOrder;
+  const limitPrice = finiteNumber(order.limitPrice, 0);
+  const amount = finiteNumber(order.amount, 0);
+  const leverage = Math.trunc(finiteNumber(order.leverage, 0));
+  const side = order.side === "long" || order.side === "short" ? order.side : null;
+  const marginMode = order.marginMode === "isolated" || order.marginMode === "cross" ? order.marginMode : null;
+  const sizeMode = order.sizeMode === "margin" || order.sizeMode === "notional" ? order.sizeMode : null;
+
+  if (!side || !marginMode || !sizeMode || limitPrice <= 0 || amount <= 0 || leverage < 1 || leverage > 100) {
+    return null;
+  }
+
+  return {
+    ...order,
+    orderId: typeof order.orderId === "string" && order.orderId ? order.orderId : "demo-limit-restored",
+    userId: typeof order.userId === "string" ? order.userId : null,
+    sessionId: typeof order.sessionId === "string" && order.sessionId ? order.sessionId : "restored-session",
+    symbol: "BTCUSDT",
+    side,
+    marginMode,
+    sizeMode,
+    amount,
+    leverage,
+    limitPrice,
+    stopLoss: finiteNumber(order.stopLoss, 0),
+    takeProfits: normalizeStoredTakeProfits(order.takeProfits),
+    createdAt: typeof order.createdAt === "string" ? order.createdAt : new Date().toISOString(),
+    updatedAt: typeof order.updatedAt === "string" ? order.updatedAt : new Date().toISOString()
   };
 }
 
