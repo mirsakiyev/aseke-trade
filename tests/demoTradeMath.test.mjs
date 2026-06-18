@@ -274,6 +274,10 @@ test("long limit order persists pending and triggers only when price reaches it"
   const triggered = demoTrade.applyMarketPrice(waiting, 95, "2026-06-16T12:03:00.000Z");
   assert.equal(triggered.pendingLimitOrder, null);
   assert.equal(triggered.openPosition.entryPrice, 95);
+  assert.equal(triggered.openPosition.stopLoss, 90);
+  assert.equal(triggered.openPosition.takeProfits.length, 1);
+  assert.equal(triggered.openPosition.takeProfits[0].price, 110);
+  assert.equal(triggered.openPosition.takeProfits[0].closePercent, 100);
   assert.equal(triggered.openPosition.status, "OPEN");
 });
 

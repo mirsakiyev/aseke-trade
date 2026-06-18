@@ -200,7 +200,8 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /data-hover-chart-tone="danger"/);
   assert.match(stylesSource, /candle-hover-button:hover:not\(:disabled\)/);
   assert.match(stylesSource, /--button-candlestick-chart-overlay/);
-  assert.match(stylesSource, /hover-chart-size, min\(220px, calc\(100% - 6px\)\) calc\(100% - 6px\)/);
+  assert.match(stylesSource, /viewBox='0 0 280 58'/);
+  assert.match(stylesSource, /hover-chart-size, calc\(100% - 8px\) calc\(100% - 6px\)/);
   assert.match(stylesSource, /var\(--button-candlestick-chart-overlay, var\(--btc-chart-overlay\)\)/);
   assert.match(stylesSource, /primary-button:not\(\.compact\):not\(\.candle-hover-button\):hover/);
   assert.doesNotMatch(pageSource, /Chase Limit/);
@@ -219,6 +220,11 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /Pending limit order/);
   assert.match(pageSource, /Not opened yet/);
   assert.match(pageSource, /before it becomes an active position/);
+  assert.match(pageSource, /Pending bracket orders/);
+  assert.match(pageSource, /formatPendingBracketPrice\(pendingLimitOrder\.stopLoss\)/);
+  assert.match(pageSource, /formatPendingTakeProfit\(takeProfit\)/);
+  assert.match(pageSource, /Take Profits" value="Blank"/);
+  assert.match(pageSource, /function formatPendingTakeProfit/);
   assert.match(pageSource, /Cancel pending order/);
   assert.match(pageSource, /function PositionRiskMap/);
   assert.match(pageSource, /buildPositionRiskMarkers/);
@@ -257,6 +263,7 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(stylesSource, /position-status-badge\.pending/);
   assert.match(stylesSource, /position-pending-state/);
   assert.match(stylesSource, /pending-limit-grid/);
+  assert.match(stylesSource, /pending-bracket-grid/);
   assert.doesNotMatch(pageSource, /futures-pending-limit/);
   assert.match(stylesSource, /position-risk-marker/);
   assert.match(stylesSource, /position-risk-guide/);

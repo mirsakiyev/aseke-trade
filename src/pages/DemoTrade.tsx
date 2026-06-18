@@ -1847,6 +1847,21 @@ function CurrentPositionPanel({
               <PositionSummaryItem label="Created" value={formatDateTime(pendingLimitOrder.createdAt)} />
             </dl>
 
+            <dl className="position-summary-grid pending-bracket-grid" aria-label="Pending bracket orders">
+              <PositionSummaryItem label="Stop Loss" value={formatPendingBracketPrice(pendingLimitOrder.stopLoss)} />
+              {pendingLimitOrder.takeProfits.length > 0 ? (
+                pendingLimitOrder.takeProfits.map((takeProfit, index) => (
+                  <PositionSummaryItem
+                    label={`TP${index + 1}`}
+                    value={formatPendingTakeProfit(takeProfit)}
+                    key={takeProfit.id}
+                  />
+                ))
+              ) : (
+                <PositionSummaryItem label="Take Profits" value="Blank" />
+              )}
+            </dl>
+
             <div className="position-pending-actions">
               <button className="ghost-button compact" type="button" onClick={onCancelPendingLimitOrder}>
                 Cancel pending order
@@ -2145,6 +2160,16 @@ function formatTakeProfitClosePercent(value: number): string {
   return `${value.toLocaleString("en-US", {
     maximumFractionDigits: value % 1 === 0 ? 0 : 2
   })}%`;
+}
+
+function formatPendingBracketPrice(value: number | null | undefined): string {
+  return isFiniteNumber(value) && value > 0 ? formatCurrency(value) : "Blank";
+}
+
+function formatPendingTakeProfit(takeProfit: DemoPendingLimitOrder["takeProfits"][number]): string {
+  const price = formatPendingBracketPrice(takeProfit.price);
+  const closePercent = formatTakeProfitClosePercent(takeProfit.closePercent);
+  return price === "Blank" || !closePercent ? price : `${price} / ${closePercent}`;
 }
 
 function formatOptionalCurrency(value: number | null | undefined): string {
