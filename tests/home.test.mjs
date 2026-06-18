@@ -6,6 +6,7 @@ const homeSource = await readFile(new URL("../src/pages/Home.tsx", import.meta.u
 
 test("homepage market showcase promotes Trading Academy signals", () => {
   assert.match(homeSource, /Trading Academy Signals/);
+  assert.match(homeSource, /\/assets\/home-trading-signal\.png/);
   assert.match(homeSource, /Get educational trade signals with Academy access/);
   assert.match(homeSource, /Active Signals/);
   assert.match(homeSource, /TP \/ SL Updates/);

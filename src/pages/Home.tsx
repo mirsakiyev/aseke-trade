@@ -78,7 +78,7 @@ export function Home() {
 
       <section className="page market-showcase">
         <div className="market-image">
-          <img src="/assets/aseke-trade-hero.png" alt="Crypto market desk representing Trading Academy signals" />
+          <img src="/assets/home-trading-signal.png" alt="Crypto market desk representing Trading Academy signals" />
         </div>
         <div className="market-copy">
           <p className="eyebrow">Trading Academy Signals</p>

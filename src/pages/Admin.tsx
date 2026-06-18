@@ -1118,7 +1118,7 @@ export function Admin() {
                 ))}
               </AdminList>
 
-              <AdminList title="Registered Users">
+              <AdminList title="Registered Users" noHover>
                 {profiles.map((profile) => (
                   <li key={profile.id}>
                     <div>
@@ -1139,7 +1139,7 @@ export function Admin() {
                 ))}
               </AdminList>
 
-              <AdminList title="Purchases and Access">
+              <AdminList title="Purchases and Access" noHover>
                 {purchases.map((purchase) => (
                   <li key={purchase.id}>
                     <div>
