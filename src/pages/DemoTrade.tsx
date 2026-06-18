@@ -77,6 +77,7 @@ interface DemoOverlayLineLayout {
 
 interface PositionRiskMarker {
   label: string;
+  detailLabel?: string;
   price: number;
   tone: PositionRiskMarkerTone;
   percent: number;
@@ -655,6 +656,9 @@ export function DemoTrade() {
               <h2>Reset / re-up</h2>
             </div>
           </div>
+          <p className="demo-balance-copy">
+            Set a fresh practice balance before resetting. Open positions, pending orders, and trade history clear after confirmation.
+          </p>
           <label>
             Starting Balance
             <input
@@ -665,10 +669,14 @@ export function DemoTrade() {
               onChange={(event) => setNextStartingBalance(event.target.value)}
             />
           </label>
-          <button className="ghost-button compact" type="button" onClick={requestBalanceReset}>
+          <button className="ghost-button compact candle-hover-button" type="button" onClick={requestBalanceReset}>
             <RotateCcw size={16} />
             Reset and Apply Balance
           </button>
+          <div className="demo-balance-note">
+            <strong>Clean reset</strong>
+            <span>Your demo stats rebuild from the new starting balance.</span>
+          </div>
         </article>
       </section>
 
@@ -922,10 +930,22 @@ function TradeEntryForm({
       </details>
 
       <div className="futures-action-row">
-        <button className="primary-button futures-submit long" type="button" onClick={() => openSide("long")} disabled={!currentPrice}>
+        <button
+          className="primary-button futures-submit long candle-hover-button"
+          type="button"
+          onClick={() => openSide("long")}
+          disabled={!currentPrice}
+          data-hover-chart-tone="success"
+        >
           Open Long
         </button>
-        <button className="primary-button futures-submit short" type="button" onClick={() => openSide("short")} disabled={!currentPrice}>
+        <button
+          className="primary-button futures-submit short candle-hover-button"
+          type="button"
+          onClick={() => openSide("short")}
+          disabled={!currentPrice}
+          data-hover-chart-tone="danger"
+        >
           Open Short
         </button>
       </div>
@@ -1745,10 +1765,15 @@ function DemoTradeChart({
 }
 
 function CurrentPositionPanel({ position, currentPrice }: { position: DemoOpenPosition | null; currentPrice: number | null }) {
-  const statusLabel = position?.status ?? "CLOSED";
+  const statusLabel = position?.status ?? "NOT OPENED";
+  const statusTone = position
+    ? statusLabel === "OPEN" || statusLabel === "PARTIALLY_CLOSED"
+      ? "open"
+      : "closed"
+    : "idle";
   const statusClassName = [
     "position-status-badge",
-    statusLabel === "OPEN" || statusLabel === "PARTIALLY_CLOSED" ? "open" : "closed"
+    statusTone
   ].join(" ");
 
   if (!position) {
@@ -1867,11 +1892,11 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
                 "--risk-lane": marker.lane
               } as CSSProperties
             }
-            title={`${marker.label} ${formatCurrency(marker.price)}`}
+            title={`${formatRiskMarkerLabel(marker)} ${formatRiskMapPrice(marker.price)}`}
             key={`${marker.label}-${marker.price}`}
           >
-            <strong>{marker.label}</strong>
-            <span>{formatCompactTradePrice(marker.price)}</span>
+            <strong>{formatRiskMarkerLabel(marker)}</strong>
+            <span>{formatRiskMapPrice(marker.price)}</span>
           </span>
         ))}
       </div>
@@ -1906,7 +1931,12 @@ function buildPositionRiskMarkers(position: DemoOpenPosition, markPrice: number 
   }
   position.takeProfits.forEach((takeProfit, index) => {
     if (takeProfit.price > 0) {
-      rawMarkers.push({ label: `TP${index + 1}`, price: takeProfit.price, tone: "take-profit" });
+      rawMarkers.push({
+        label: `TP${index + 1}`,
+        detailLabel: formatTakeProfitClosePercent(takeProfit.closePercent),
+        price: takeProfit.price,
+        tone: "take-profit"
+      });
     }
   });
 
@@ -1929,7 +1959,7 @@ function buildPositionRiskMarkers(position: DemoOpenPosition, markPrice: number 
 function resolveRiskMarkerLayouts(markers: PositionRiskMarker[]): PositionRiskMarkerLayout[] {
   if (!markers.length) return [];
 
-  const minGap = clamp(78 / Math.max(1, markers.length - 1), 9, 14);
+  const minGap = clamp(96 / Math.max(1, markers.length - 1), 12, 17);
   const layouts = markers.map((marker, index) => ({
     ...marker,
     index,
@@ -2012,7 +2042,25 @@ function nudgeRiskLaneInsideBounds(markers: Array<PositionRiskMarkerLayout & { i
 function formatRiskMapRange(markers: PositionRiskMarker[]): string {
   if (!markers.length) return "--";
   const prices = markers.map((marker) => marker.price);
-  return `${formatCompactTradePrice(Math.min(...prices))} - ${formatCompactTradePrice(Math.max(...prices))}`;
+  return `${formatRiskMapPrice(Math.min(...prices))} - ${formatRiskMapPrice(Math.max(...prices))}`;
+}
+
+function formatRiskMarkerLabel(marker: PositionRiskMarker): string {
+  return marker.detailLabel ? `${marker.label} ${marker.detailLabel}` : marker.label;
+}
+
+function formatRiskMapPrice(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "--";
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: value >= 1000 ? 0 : 4
+  });
+}
+
+function formatTakeProfitClosePercent(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return `${value.toLocaleString("en-US", {
+    maximumFractionDigits: value % 1 === 0 ? 0 : 2
+  })}%`;
 }
 
 function formatOptionalCurrency(value: number | null | undefined): string {
@@ -2081,9 +2129,9 @@ function TradeHistoryTable({ trades, onExport }: { trades: DemoTradeState["trade
       <div className="section-heading compact-heading">
         <div>
           <p className="eyebrow">Trade history</p>
-          <h2>Closed demo trades</h2>
+          <h2>Closed trades</h2>
         </div>
-        <button className="ghost-button compact" type="button" onClick={onExport}>
+        <button className="ghost-button compact candle-hover-button" type="button" onClick={onExport}>
           <Download size={16} />
           Export CSV
         </button>

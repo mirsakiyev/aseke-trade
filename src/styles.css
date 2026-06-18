@@ -493,6 +493,30 @@ p {
   font-size: 0.88rem;
 }
 
+.candle-hover-button:hover:not(:disabled) {
+  border-color: rgba(229, 228, 226, 0.34);
+  background:
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 260px 72px) no-repeat,
+    linear-gradient(135deg, rgba(13, 17, 20, 0.96), rgba(4, 7, 9, 0.94)),
+    var(--crypto-gradient);
+  color: var(--platinum);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.3),
+    0 0 20px var(--hover-chart-glow, rgba(229, 228, 226, 0.16));
+}
+
+.candle-hover-button[data-hover-chart-tone="success"]:hover:not(:disabled) {
+  border-color: rgba(126, 224, 167, 0.5);
+  color: #ecfff5;
+  --hover-chart-glow: rgba(126, 224, 167, 0.2);
+}
+
+.candle-hover-button[data-hover-chart-tone="danger"]:hover:not(:disabled) {
+  border-color: rgba(255, 107, 107, 0.5);
+  color: #fff4f4;
+  --hover-chart-glow: rgba(255, 107, 107, 0.2);
+}
+
 .full-width {
   width: 100%;
 }
@@ -5290,6 +5314,12 @@ select:focus {
   color: var(--success);
 }
 
+.position-status-badge.idle {
+  border-color: rgba(184, 214, 222, 0.26);
+  background: rgba(184, 214, 222, 0.08);
+  color: var(--muted);
+}
+
 .position-status-badge.closed {
   border-color: rgba(255, 107, 107, 0.28);
   background: rgba(255, 107, 107, 0.08);
@@ -5445,10 +5475,10 @@ select:focus {
   left: var(--risk-left);
   z-index: 3;
   display: grid;
-  min-width: 72px;
-  max-width: 88px;
-  gap: 0.08rem;
-  padding: 0.26rem 0.36rem;
+  min-width: 86px;
+  max-width: 112px;
+  gap: 0.1rem;
+  padding: 0.3rem 0.42rem;
   border: 1px solid rgba(229, 228, 226, 0.15);
   border-radius: 7px;
   background: rgba(7, 10, 12, 0.92);
@@ -5485,15 +5515,17 @@ select:focus {
 }
 
 .position-risk-marker strong {
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   font-weight: 950;
   letter-spacing: 0;
+  line-height: 1.05;
 }
 
 .position-risk-marker span {
   color: var(--platinum);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 900;
+  line-height: 1.05;
 }
 
 .position-risk-guide.take-profit {
@@ -5751,6 +5783,11 @@ select:focus {
   stroke: rgba(229, 228, 226, 0.62);
 }
 
+.trade-overlay-line.mark line:not(.chart-marker-connector) {
+  stroke-dasharray: 1 7;
+  stroke-linecap: round;
+}
+
 .trade-overlay-line.entry line {
   stroke: rgba(184, 214, 222, 0.92);
 }
@@ -5847,6 +5884,38 @@ select:focus {
 
 .demo-balance-panel {
   align-content: start;
+}
+
+.demo-balance-copy {
+  margin: -0.2rem 0 0.05rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
+.demo-balance-note {
+  display: grid;
+  gap: 0.28rem;
+  margin-top: 0.18rem;
+  padding: 0.72rem 0.78rem;
+  border: 1px solid rgba(126, 224, 167, 0.16);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(126, 224, 167, 0.09), rgba(97, 181, 201, 0.06));
+}
+
+.demo-balance-note strong {
+  color: var(--success);
+  font-size: 0.74rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.demo-balance-note span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 760;
+  line-height: 1.35;
 }
 
 .futures-ticket {
@@ -6656,6 +6725,25 @@ select.futures-mode-chip {
 
 .table-scroll {
   overflow-x: auto;
+}
+
+.demo-history-panel .section-heading {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.demo-history-panel .section-heading > div {
+  min-width: 0;
+}
+
+.demo-history-panel .section-heading .ghost-button {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
 }
 
 .demo-history-table {
