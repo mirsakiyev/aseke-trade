@@ -195,6 +195,7 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /data-hover-chart-tone="success"/);
   assert.match(pageSource, /data-hover-chart-tone="danger"/);
   assert.match(stylesSource, /candle-hover-button:hover:not\(:disabled\)/);
+  assert.match(stylesSource, /hover-chart-size, 100% 100%/);
   assert.match(stylesSource, /var\(--hover-chart-overlay, var\(--btc-chart-overlay\)\)/);
   assert.doesNotMatch(pageSource, /Chase Limit/);
   assert.doesNotMatch(pageSource, /Position Size/);
@@ -216,6 +217,7 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /function formatTakeProfitClosePercent/);
   assert.match(pageSource, /position-risk-guide/);
   assert.match(pageSource, /getRiskMarkerPlacement/);
+  assert.match(pageSource, /getRiskMarkerLaneCount/);
   assert.match(pageSource, /getRiskMarkerAnchor/);
   assert.match(pageSource, /placeRiskLabelsInLanes/);
   assert.match(pageSource, /position-summary-grid/);
@@ -227,7 +229,11 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(stylesSource, /position-status-badge\.idle/);
   assert.match(stylesSource, /position-risk-marker/);
   assert.match(stylesSource, /position-risk-guide/);
-  assert.match(stylesSource, /min-width: 86px/);
+  assert.match(stylesSource, /position-risk-dot\.mark::after/);
+  assert.match(stylesSource, /mark-price-pulse/);
+  assert.match(stylesSource, /prefers-reduced-motion: reduce/);
+  assert.match(stylesSource, /min-width: 88px/);
+  assert.match(stylesSource, /min-height: 218px/);
   assert.match(stylesSource, /edge-end/);
   assert.doesNotMatch(pageSource, /function CurrentTradeRow/);
   assert.doesNotMatch(pageSource, /current-trade-row/);
@@ -242,6 +248,8 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /updateDemoTakeProfits/);
   assert.match(pageSource, /updateDemoLeverage/);
   assert.match(pageSource, /Close at Market/);
+  assert.match(pageSource, /primary-button danger-button candle-hover-button manual-close-button/);
+  assert.match(stylesSource, /manual-close-button[\s\S]*box-shadow: none/);
   assert.match(pageSource, /Export CSV/);
   assert.match(pageSource, /ghost-button compact candle-hover-button/);
   assert.match(stylesSource, /demo-history-panel \.section-heading \{[\s\S]*justify-content: space-between/);

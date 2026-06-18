@@ -1389,7 +1389,12 @@ function PositionManager({
             <dd>{Math.max(0, remainingAfterClose).toFixed(6)} BTC</dd>
           </div>
         </dl>
-        <button className="primary-button danger-button" type="button" onClick={onClose}>
+        <button
+          className="primary-button danger-button candle-hover-button manual-close-button"
+          type="button"
+          onClick={onClose}
+          data-hover-chart-tone="danger"
+        >
           Close at Market
         </button>
       </div>
@@ -1974,7 +1979,7 @@ function resolveRiskMarkerLayouts(markers: PositionRiskMarker[]): PositionRiskMa
       .filter((marker) => marker.placement === placement)
       .sort((a, b) => a.labelPercent - b.labelPercent || a.index - b.index);
 
-    placeRiskLabelsInLanes(group, placement === "above" ? 2 : 1, minGap);
+    placeRiskLabelsInLanes(group, placement === "above" ? getRiskMarkerLaneCount(group.length) : 1, minGap);
   });
 
   layouts.forEach((marker) => {
@@ -1988,6 +1993,10 @@ function resolveRiskMarkerLayouts(markers: PositionRiskMarker[]): PositionRiskMa
 
 function getRiskMarkerPlacement(marker: PositionRiskMarker): PositionRiskMarkerPlacement {
   return marker.tone === "mark" ? "below" : "above";
+}
+
+function getRiskMarkerLaneCount(markerCount: number): number {
+  return clamp(Math.ceil(markerCount / 2), 2, 3);
 }
 
 function getRiskMarkerAnchor(labelPercent: number): PositionRiskMarkerAnchor {

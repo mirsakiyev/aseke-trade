@@ -493,25 +493,30 @@ p {
   font-size: 0.88rem;
 }
 
-.candle-hover-button:hover:not(:disabled) {
+.primary-button.candle-hover-button:hover:not(:disabled),
+.ghost-button.candle-hover-button:hover:not(:disabled),
+.danger-button.candle-hover-button:hover:not(:disabled),
+.futures-submit.candle-hover-button:hover:not(:disabled) {
   border-color: rgba(229, 228, 226, 0.34);
   background:
-    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 260px 72px) no-repeat,
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 100% 100%) no-repeat,
     linear-gradient(135deg, rgba(13, 17, 20, 0.96), rgba(4, 7, 9, 0.94)),
     var(--crypto-gradient);
   color: var(--platinum);
   box-shadow:
     0 16px 36px rgba(0, 0, 0, 0.3),
-    0 0 20px var(--hover-chart-glow, rgba(229, 228, 226, 0.16));
+    0 0 18px var(--hover-chart-glow, rgba(229, 228, 226, 0.16));
 }
 
-.candle-hover-button[data-hover-chart-tone="success"]:hover:not(:disabled) {
+.primary-button.candle-hover-button[data-hover-chart-tone="success"]:hover:not(:disabled),
+.ghost-button.candle-hover-button[data-hover-chart-tone="success"]:hover:not(:disabled) {
   border-color: rgba(126, 224, 167, 0.5);
   color: #ecfff5;
   --hover-chart-glow: rgba(126, 224, 167, 0.2);
 }
 
-.candle-hover-button[data-hover-chart-tone="danger"]:hover:not(:disabled) {
+.primary-button.candle-hover-button[data-hover-chart-tone="danger"]:hover:not(:disabled),
+.ghost-button.candle-hover-button[data-hover-chart-tone="danger"]:hover:not(:disabled) {
   border-color: rgba(255, 107, 107, 0.5);
   color: #fff4f4;
   --hover-chart-glow: rgba(255, 107, 107, 0.2);
@@ -5421,14 +5426,14 @@ select:focus {
 
 .position-risk-track {
   position: relative;
-  min-height: 178px;
+  min-height: 218px;
   overflow: hidden;
   padding: 0.45rem 0.55rem 0.65rem;
 }
 
 .position-risk-axis {
   position: absolute;
-  top: 98px;
+  top: 132px;
   right: 0.6rem;
   left: 0.6rem;
   height: 2px;
@@ -5447,18 +5452,18 @@ select:focus {
 }
 
 .position-risk-guide.above {
-  top: calc(42px + (var(--risk-lane, 0) * 39px));
-  height: calc(49px - (var(--risk-lane, 0) * 39px));
+  top: calc(41px + (var(--risk-lane, 0) * 40px));
+  height: max(10px, calc(83px - (var(--risk-lane, 0) * 40px)));
 }
 
 .position-risk-guide.below {
-  top: 107px;
+  top: 141px;
   height: 22px;
 }
 
 .position-risk-dot {
   position: absolute;
-  top: 90px;
+  top: 124px;
   left: var(--risk-left);
   z-index: 2;
   width: 16px;
@@ -5475,8 +5480,8 @@ select:focus {
   left: var(--risk-left);
   z-index: 3;
   display: grid;
-  min-width: 86px;
-  max-width: 112px;
+  min-width: 88px;
+  max-width: 118px;
   gap: 0.1rem;
   padding: 0.3rem 0.42rem;
   border: 1px solid rgba(229, 228, 226, 0.15);
@@ -5486,11 +5491,11 @@ select:focus {
 }
 
 .position-risk-marker.above {
-  top: calc(2px + (var(--risk-lane, 0) * 39px));
+  top: calc(4px + (var(--risk-lane, 0) * 40px));
 }
 
 .position-risk-marker.below {
-  top: 132px;
+  top: 166px;
 }
 
 .position-risk-marker.edge-center {
@@ -5580,8 +5585,39 @@ select:focus {
   background: var(--teal);
 }
 
+.position-risk-dot.mark::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 1px solid rgba(40, 198, 175, 0.6);
+  border-radius: inherit;
+  opacity: 0.72;
+  animation: mark-price-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
 .position-risk-marker.mark strong {
   color: var(--teal);
+}
+
+@keyframes mark-price-pulse {
+  0% {
+    opacity: 0.72;
+    transform: scale(0.72);
+  }
+
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .position-risk-dot.mark::after {
+    opacity: 0.35;
+    animation: none;
+  }
 }
 
 .position-risk-guide.entry {
@@ -5965,6 +6001,13 @@ select:focus {
 
 .manual-close-metrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.manual-close-button,
+.manual-close-button:hover,
+.manual-close-button.candle-hover-button:hover:not(:disabled),
+.manual-close-button[data-hover-chart-tone="danger"]:hover {
+  box-shadow: none;
 }
 
 .position-add-block .ghost-button {
@@ -7707,13 +7750,13 @@ select.futures-mode-chip {
   }
 
   .position-risk-track {
-    min-height: 184px;
+    min-height: 220px;
     padding-inline: 0.3rem;
   }
 
   .position-risk-marker {
-    min-width: 58px;
-    max-width: 68px;
+    min-width: 76px;
+    max-width: 92px;
     padding-inline: 0.28rem;
   }
 
