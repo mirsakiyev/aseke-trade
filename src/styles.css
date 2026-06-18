@@ -499,7 +499,7 @@ p {
 .futures-submit.candle-hover-button:hover:not(:disabled) {
   border-color: rgba(229, 228, 226, 0.34);
   background:
-    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 100% 100%) no-repeat,
+    var(--hover-chart-overlay, var(--btc-chart-overlay)) center / var(--hover-chart-size, 280px 76px) no-repeat,
     linear-gradient(135deg, rgba(13, 17, 20, 0.96), rgba(4, 7, 9, 0.94)),
     var(--crypto-gradient);
   color: var(--platinum);
@@ -875,8 +875,8 @@ p {
   transform: translateY(0.15rem);
 }
 
-.no-hover-effect .primary-button:not(.compact):hover,
-.no-hover-effect .ghost-button:not(.compact):hover,
+.no-hover-effect .primary-button:not(.compact):not(.candle-hover-button):hover,
+.no-hover-effect .ghost-button:not(.compact):not(.candle-hover-button):hover,
 .no-hover-effect .platinum-button:not(.compact):hover,
 .no-hover-effect .filter-pill:hover,
 .no-hover-effect .icon-button:hover {
@@ -5463,11 +5463,11 @@ select:focus {
 
 .position-risk-dot {
   position: absolute;
-  top: 124px;
+  top: 125px;
   left: var(--risk-left);
   z-index: 2;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border: 2px solid #050809;
   border-radius: 999px;
   background: var(--platinum);
@@ -5588,7 +5588,7 @@ select:focus {
 .position-risk-dot.mark::after {
   content: "";
   position: absolute;
-  inset: -7px;
+  inset: -6px;
   border: 1px solid rgba(40, 198, 175, 0.6);
   border-radius: inherit;
   opacity: 0.72;

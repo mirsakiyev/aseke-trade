@@ -195,8 +195,9 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /data-hover-chart-tone="success"/);
   assert.match(pageSource, /data-hover-chart-tone="danger"/);
   assert.match(stylesSource, /candle-hover-button:hover:not\(:disabled\)/);
-  assert.match(stylesSource, /hover-chart-size, 100% 100%/);
+  assert.match(stylesSource, /hover-chart-size, 280px 76px/);
   assert.match(stylesSource, /var\(--hover-chart-overlay, var\(--btc-chart-overlay\)\)/);
+  assert.match(stylesSource, /primary-button:not\(\.compact\):not\(\.candle-hover-button\):hover/);
   assert.doesNotMatch(pageSource, /Chase Limit/);
   assert.doesNotMatch(pageSource, /Position Size/);
   assert.doesNotMatch(pageSource, />S<\/span>/);
@@ -220,6 +221,7 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /getRiskMarkerLaneCount/);
   assert.match(pageSource, /getRiskMarkerAnchor/);
   assert.match(pageSource, /placeRiskLabelsInLanes/);
+  assert.match(pageSource, /"--risk-left": `\$\{marker\.labelPercent\}%`/);
   assert.match(pageSource, /position-summary-grid/);
   assert.match(pageSource, /position-risk-map/);
   assert.match(pageSource, /No active position/);
@@ -232,6 +234,8 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(stylesSource, /position-risk-dot\.mark::after/);
   assert.match(stylesSource, /mark-price-pulse/);
   assert.match(stylesSource, /prefers-reduced-motion: reduce/);
+  assert.match(stylesSource, /width: 14px/);
+  assert.match(stylesSource, /height: 14px/);
   assert.match(stylesSource, /min-width: 88px/);
   assert.match(stylesSource, /min-height: 218px/);
   assert.match(stylesSource, /edge-end/);

@@ -1874,7 +1874,7 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
             className={`position-risk-guide ${marker.tone} ${marker.placement}`}
             style={
               {
-                "--risk-left": `${marker.percent}%`,
+                "--risk-left": `${marker.labelPercent}%`,
                 "--risk-lane": marker.lane
               } as CSSProperties
             }
