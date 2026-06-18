@@ -60,6 +60,8 @@ type DemoOrderType = "market" | "limit";
 type DemoQuantityUnit = "usdt" | "btc" | "cont";
 type DemoOverlayTone = "mark" | "entry" | "target" | "hit" | "danger" | "liquidation";
 type PositionRiskMarkerTone = "liquidation" | "stop" | "mark" | "entry" | "take-profit";
+type PositionRiskMarkerPlacement = "above" | "below";
+type PositionRiskMarkerAnchor = "start" | "center" | "end";
 
 interface DemoOverlayLine {
   label: string;
@@ -82,7 +84,8 @@ interface PositionRiskMarker {
 
 interface PositionRiskMarkerLayout extends PositionRiskMarker {
   labelPercent: number;
-  lane: number;
+  placement: PositionRiskMarkerPlacement;
+  anchor: PositionRiskMarkerAnchor;
 }
 
 interface PendingLimitOrder {
@@ -651,6 +654,8 @@ export function DemoTrade() {
       </section>
 
       <section className="dashboard-grid demo-summary-grid">
+        <PerformanceStats stats={stats} />
+
         <article className="section-panel demo-balance-panel no-hover-effect">
           <div className="section-heading compact-heading">
             <div>
@@ -673,8 +678,6 @@ export function DemoTrade() {
             Reset and Apply Balance
           </button>
         </article>
-
-        <PerformanceStats stats={stats} />
       </section>
 
       <TradeHistoryTable trades={demoState.tradeHistory} onExport={exportCsv} />
@@ -1647,7 +1650,7 @@ function DemoTradeChart({
             })}
           </g>
           {overlayLineLayouts.map(({ line, lineY, markerY }) => {
-            const hasBracketPriceMarker = isBracketPriceMarker(line.tone);
+            const hasPriceMarker = isOverlayPriceMarker(line.tone);
             const isMarkerShifted = Math.abs(markerY - lineY) > 1;
             const overlayClassName = ["trade-overlay-line", line.tone, line.tone === "mark" ? latestCandleTone : ""]
               .filter(Boolean)
@@ -1656,18 +1659,11 @@ function DemoTradeChart({
               <g className={overlayClassName} key={`${line.label}-${line.price}`}>
                 <line x1={padding.left} x2={axisX} y1={lineY} y2={lineY} />
                 {isMarkerShifted ? <line className="chart-marker-connector" x1={axisX} x2={axisX + 8} y1={lineY} y2={markerY} /> : null}
-                {line.tone === "mark" ? (
+                {hasPriceMarker ? (
                   <>
-                    <rect className="chart-price-marker" x={axisX + 8} y={markerY - 15} width="86" height="28" rx="4" />
-                    <text className="chart-price-marker-text" x={axisX + 16} y={markerY + 4}>
-                      {formatChartPrice(line.price)}
-                    </text>
-                  </>
-                ) : hasBracketPriceMarker ? (
-                  <>
-                    <rect className="chart-price-marker" x={axisX + 8} y={markerY - 15} width="86" height="28" rx="4" />
-                    <text className="chart-price-marker-label" x={axisX + 16} y={markerY - 4}>
-                      {line.label}
+                    <rect className="chart-price-marker" x={axisX + 8} y={markerY - 16} width="88" height="30" rx="4" />
+                    <text className="chart-price-marker-label" x={axisX + 16} y={markerY - 5}>
+                      {line.label.toUpperCase()}
                     </text>
                     <text className="chart-price-marker-text" x={axisX + 16} y={markerY + 9}>
                       {formatChartPrice(line.price)}
@@ -1678,9 +1674,11 @@ function DemoTradeChart({
                     {line.label}
                   </text>
                 )}
-                <text className="chart-overlay-label" x={padding.left + 8} y={markerY - 6}>
-                  {line.label}
-                </text>
+                {line.tone === "mark" || line.tone === "entry" ? null : (
+                  <text className="chart-overlay-label" x={padding.left + 8} y={lineY - 6}>
+                    {line.label}
+                  </text>
+                )}
               </g>
             );
           })}
@@ -1803,6 +1801,13 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
         <span className="position-risk-axis" />
         {markerLayouts.map((marker) => (
           <span
+            className={`position-risk-guide ${marker.tone} ${marker.placement}`}
+            style={{ "--risk-left": `${marker.percent}%` } as CSSProperties}
+            key={`${marker.label}-guide-${marker.price}`}
+          />
+        ))}
+        {markerLayouts.map((marker) => (
+          <span
             className={`position-risk-dot ${marker.tone}`}
             style={{ "--risk-left": `${marker.percent}%` } as CSSProperties}
             key={`${marker.label}-dot-${marker.price}`}
@@ -1810,11 +1815,10 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
         ))}
         {markerLayouts.map((marker) => (
           <span
-            className={`position-risk-marker ${marker.tone}`}
+            className={`position-risk-marker ${marker.tone} ${marker.placement} edge-${marker.anchor}`}
             style={
               {
-                "--risk-left": `${marker.labelPercent}%`,
-                "--risk-lane": marker.lane
+                "--risk-left": `${marker.labelPercent}%`
               } as CSSProperties
             }
             title={`${marker.label} ${formatCurrency(marker.price)}`}
@@ -1879,46 +1883,66 @@ function buildPositionRiskMarkers(position: DemoOpenPosition, markPrice: number 
 function resolveRiskMarkerLayouts(markers: PositionRiskMarker[]): PositionRiskMarkerLayout[] {
   if (!markers.length) return [];
 
-  const minGap = clamp(78 / Math.max(1, markers.length - 1), 8, 13);
-  const sorted = markers
-    .map((marker, index) => ({
+  const minGap = clamp(86 / Math.max(1, markers.length - 1), 10, 16);
+  const layouts = markers.map((marker, index) => ({
       ...marker,
       index,
-      labelPercent: clamp(marker.percent, 4, 96),
-      lane: 0
-    }))
-    .sort((a, b) => a.labelPercent - b.labelPercent || a.index - b.index);
+      labelPercent: clamp(marker.percent, 6, 94),
+      placement: getRiskMarkerPlacement(marker),
+      anchor: "center" as PositionRiskMarkerAnchor
+    }));
 
-  for (let index = 1; index < sorted.length; index += 1) {
-    sorted[index].labelPercent = Math.max(sorted[index].labelPercent, sorted[index - 1].labelPercent + minGap);
+  (["above", "below"] as PositionRiskMarkerPlacement[]).forEach((placement) => {
+    const group = layouts
+      .filter((marker) => marker.placement === placement)
+      .sort((a, b) => a.labelPercent - b.labelPercent || a.index - b.index);
+
+    distributeRiskLabels(group, minGap);
+  });
+
+  layouts.forEach((marker) => {
+    marker.anchor = getRiskMarkerAnchor(marker.labelPercent);
+  });
+
+  return layouts
+    .sort((a, b) => a.index - b.index)
+    .map(({ index, ...marker }) => marker);
+}
+
+function getRiskMarkerPlacement(marker: PositionRiskMarker): PositionRiskMarkerPlacement {
+  return marker.tone === "mark" ? "below" : "above";
+}
+
+function getRiskMarkerAnchor(labelPercent: number): PositionRiskMarkerAnchor {
+  if (labelPercent <= 9) return "start";
+  if (labelPercent >= 91) return "end";
+  return "center";
+}
+
+function distributeRiskLabels(markers: Array<PositionRiskMarkerLayout & { index: number }>, minGap: number): void {
+  if (markers.length < 2) return;
+
+  for (let index = 1; index < markers.length; index += 1) {
+    markers[index].labelPercent = Math.max(markers[index].labelPercent, markers[index - 1].labelPercent + minGap);
   }
 
-  const rightOverflow = sorted[sorted.length - 1].labelPercent - 96;
+  const rightOverflow = markers[markers.length - 1].labelPercent - 94;
   if (rightOverflow > 0) {
-    sorted.forEach((marker) => {
+    markers.forEach((marker) => {
       marker.labelPercent -= rightOverflow;
     });
   }
 
-  for (let index = sorted.length - 2; index >= 0; index -= 1) {
-    sorted[index].labelPercent = Math.min(sorted[index].labelPercent, sorted[index + 1].labelPercent - minGap);
+  for (let index = markers.length - 2; index >= 0; index -= 1) {
+    markers[index].labelPercent = Math.min(markers[index].labelPercent, markers[index + 1].labelPercent - minGap);
   }
 
-  const leftOverflow = 4 - sorted[0].labelPercent;
+  const leftOverflow = 6 - markers[0].labelPercent;
   if (leftOverflow > 0) {
-    sorted.forEach((marker) => {
+    markers.forEach((marker) => {
       marker.labelPercent += leftOverflow;
     });
   }
-
-  const laneRightEdges = [-Infinity, -Infinity];
-  sorted.forEach((marker) => {
-    const lane = marker.labelPercent - laneRightEdges[0] < minGap + 2 ? 1 : 0;
-    marker.lane = lane;
-    laneRightEdges[lane] = marker.labelPercent;
-  });
-
-  return sorted.map(({ index, ...marker }) => marker);
 }
 
 function formatRiskMapRange(markers: PositionRiskMarker[]): string {
@@ -2198,6 +2222,10 @@ function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: numb
 
 function isBracketPriceMarker(tone: DemoOverlayTone): boolean {
   return tone === "target" || tone === "hit" || tone === "danger" || tone === "liquidation";
+}
+
+function isOverlayPriceMarker(tone: DemoOverlayTone): boolean {
+  return tone === "mark" || tone === "entry" || isBracketPriceMarker(tone);
 }
 
 function resolveOverlayMarkerLayouts(layouts: DemoOverlayLineLayout[], minY: number, maxY: number): DemoOverlayLineLayout[] {

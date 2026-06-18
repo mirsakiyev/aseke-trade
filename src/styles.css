@@ -5391,48 +5391,90 @@ select:focus {
 
 .position-risk-track {
   position: relative;
-  min-height: 112px;
-  padding: 0.35rem 0.3rem 0.55rem;
+  min-height: 156px;
+  overflow: hidden;
+  padding: 0.45rem 0.55rem 0.65rem;
 }
 
 .position-risk-axis {
   position: absolute;
-  top: 58px;
-  right: 0.35rem;
-  left: 0.35rem;
+  top: 76px;
+  right: 0.6rem;
+  left: 0.6rem;
   height: 2px;
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(255, 107, 107, 0.72), rgba(229, 228, 226, 0.34), rgba(126, 224, 167, 0.72));
 }
 
+.position-risk-guide {
+  position: absolute;
+  left: var(--risk-left);
+  z-index: 1;
+  width: 1px;
+  border-radius: 999px;
+  background: rgba(229, 228, 226, 0.28);
+  transform: translateX(-50%);
+}
+
+.position-risk-guide.above {
+  top: 42px;
+  height: 27px;
+}
+
+.position-risk-guide.below {
+  top: 85px;
+  height: 24px;
+}
+
 .position-risk-dot {
   position: absolute;
-  top: 52px;
+  top: 68px;
   left: var(--risk-left);
   z-index: 2;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border: 2px solid #050809;
   border-radius: 999px;
   background: var(--platinum);
+  box-shadow: 0 0 0 2px rgba(229, 228, 226, 0.08);
   transform: translateX(-50%);
 }
 
 .position-risk-marker {
   position: absolute;
-  top: calc(0px + (var(--risk-lane) * 38px));
   left: var(--risk-left);
   z-index: 3;
   display: grid;
-  min-width: 66px;
-  max-width: 82px;
+  min-width: 72px;
+  max-width: 88px;
   gap: 0.08rem;
   padding: 0.26rem 0.36rem;
   border: 1px solid rgba(229, 228, 226, 0.15);
   border-radius: 7px;
   background: rgba(7, 10, 12, 0.92);
   text-align: center;
+}
+
+.position-risk-marker.above {
+  top: 2px;
+}
+
+.position-risk-marker.below {
+  top: 111px;
+}
+
+.position-risk-marker.edge-center {
   transform: translateX(-50%);
+}
+
+.position-risk-marker.edge-start {
+  text-align: left;
+  transform: none;
+}
+
+.position-risk-marker.edge-end {
+  text-align: right;
+  transform: translateX(-100%);
 }
 
 .position-risk-marker strong,
@@ -5454,6 +5496,10 @@ select:focus {
   font-weight: 900;
 }
 
+.position-risk-guide.take-profit {
+  background: rgba(126, 224, 167, 0.42);
+}
+
 .position-risk-dot.take-profit,
 .position-risk-marker.take-profit {
   border-color: rgba(126, 224, 167, 0.46);
@@ -5465,6 +5511,11 @@ select:focus {
 
 .position-risk-marker.take-profit strong {
   color: var(--success);
+}
+
+.position-risk-guide.stop,
+.position-risk-guide.liquidation {
+  background: rgba(255, 107, 107, 0.42);
 }
 
 .position-risk-dot.stop,
@@ -5484,6 +5535,10 @@ select:focus {
   color: var(--danger);
 }
 
+.position-risk-guide.mark {
+  background: rgba(184, 214, 222, 0.42);
+}
+
 .position-risk-dot.mark,
 .position-risk-marker.mark {
   border-color: rgba(40, 198, 175, 0.46);
@@ -5495,6 +5550,10 @@ select:focus {
 
 .position-risk-marker.mark strong {
   color: var(--teal);
+}
+
+.position-risk-guide.entry {
+  background: rgba(97, 181, 201, 0.42);
 }
 
 .position-risk-dot.entry,
@@ -5640,6 +5699,12 @@ select:focus {
   font-weight: 800;
 }
 
+.chart-overlay-label {
+  paint-order: stroke;
+  stroke: rgba(2, 4, 5, 0.88);
+  stroke-width: 3px;
+}
+
 .chart-drag-hint {
   fill: rgba(184, 196, 207, 0.5);
   font-size: 11px;
@@ -5708,6 +5773,10 @@ select:focus {
   fill: rgba(255, 91, 95, 0.92);
 }
 
+.trade-overlay-line.entry .chart-price-marker {
+  fill: rgba(97, 181, 201, 0.92);
+}
+
 .trade-overlay-line.target .chart-price-marker,
 .trade-overlay-line.hit .chart-price-marker {
   fill: rgba(40, 198, 175, 0.92);
@@ -5720,14 +5789,14 @@ select:focus {
 
 .chart-price-marker-label {
   fill: #f8fbfc;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 950;
-  letter-spacing: 0;
+  letter-spacing: 0.04em;
 }
 
 .chart-price-marker-text {
   fill: #f8fbfc;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 950;
 }
 
@@ -6492,6 +6561,7 @@ select.futures-mode-chip {
 
 .demo-summary-grid {
   align-items: start;
+  grid-template-columns: minmax(0, 1.75fr) minmax(300px, 0.62fr);
 }
 
 .form-error-list {
@@ -7511,7 +7581,8 @@ select.futures-mode-chip {
   }
 
   .position-risk-track {
-    min-height: 126px;
+    min-height: 158px;
+    padding-inline: 0.3rem;
   }
 
   .position-risk-marker {
@@ -7526,6 +7597,12 @@ select.futures-mode-chip {
 
   .position-risk-marker span {
     font-size: 0.62rem;
+  }
+
+  .position-risk-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
   .signal-card-setup,
