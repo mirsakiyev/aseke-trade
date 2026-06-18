@@ -28,6 +28,7 @@ import {
   updateDemoLeverage,
   updateDemoStopLoss,
   updateDemoTakeProfits,
+  type DemoPendingLimitOrder,
   type DemoOpenPosition,
   type DemoMarginMode,
   type DemoTradeSide,
@@ -459,8 +460,21 @@ export function DemoTrade() {
     commitDemoState(result.state);
   };
 
+  const cancelLimitOrder = () => {
+    const result = cancelDemoLimitOrder(demoState);
+    if (!result.ok) {
+      setFormErrors(result.errors);
+      return;
+    }
+    setFormErrors([]);
+    commitDemoState(result.state);
+  };
+
   const requestBalanceReset = () => {
-    const hasProgress = Boolean(demoState.openPosition) || demoState.tradeHistory.length > 0 || demoState.currentBalance !== demoState.startingBalance;
+    const hasProgress = Boolean(demoState.openPosition)
+      || Boolean(demoState.pendingLimitOrder)
+      || demoState.tradeHistory.length > 0
+      || demoState.currentBalance !== demoState.startingBalance;
     if (hasProgress) {
       setShowResetModal(true);
       return;
@@ -540,7 +554,12 @@ export function DemoTrade() {
             timeframe={timeframe}
             onTimeframeChange={setTimeframe}
           />
-          <CurrentPositionPanel position={demoState.openPosition} currentPrice={currentPrice} />
+          <CurrentPositionPanel
+            position={demoState.openPosition}
+            pendingLimitOrder={demoState.pendingLimitOrder}
+            currentPrice={currentPrice}
+            onCancelPendingLimitOrder={cancelLimitOrder}
+          />
         </article>
 
         <aside className="section-panel demo-ticket-panel no-hover-effect">
@@ -584,8 +603,6 @@ export function DemoTrade() {
               currentPrice={currentPrice}
               availableBalance={demoState.availableBalance}
               isRegistered={Boolean(user)}
-              hasPendingLimitOrder={Boolean(demoState.pendingLimitOrder)}
-              pendingLimitPrice={demoState.pendingLimitOrder?.limitPrice ? formatInputPrice(demoState.pendingLimitOrder.limitPrice) : ""}
               errors={formErrors}
               onOrderTypeChange={setOrderType}
               onMarginModeChange={setMarginMode}
@@ -599,15 +616,6 @@ export function DemoTrade() {
               onLimitPriceChange={setLimitPrice}
               onStopLossChange={setStopLoss}
               onTakeProfitsChange={setTakeProfits}
-              onCancelLimitOrder={() => {
-                const result = cancelDemoLimitOrder(demoState);
-                if (!result.ok) {
-                  setFormErrors(result.errors);
-                  return;
-                }
-                setFormErrors([]);
-                commitDemoState(result.state);
-              }}
               onOpen={openTrade}
             />
           )}
@@ -691,8 +699,6 @@ function TradeEntryForm({
   currentPrice,
   availableBalance,
   isRegistered,
-  hasPendingLimitOrder,
-  pendingLimitPrice,
   errors,
   onOrderTypeChange,
   onMarginModeChange,
@@ -703,7 +709,6 @@ function TradeEntryForm({
   onLimitPriceChange,
   onStopLossChange,
   onTakeProfitsChange,
-  onCancelLimitOrder,
   onOpen
 }: {
   orderType: DemoOrderType;
@@ -718,8 +723,6 @@ function TradeEntryForm({
   currentPrice: number | null;
   availableBalance: number;
   isRegistered: boolean;
-  hasPendingLimitOrder: boolean;
-  pendingLimitPrice: string;
   errors: string[];
   onOrderTypeChange: (type: DemoOrderType) => void;
   onMarginModeChange: (mode: DemoMarginMode) => void;
@@ -730,7 +733,6 @@ function TradeEntryForm({
   onLimitPriceChange: (value: string) => void;
   onStopLossChange: (value: string) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
-  onCancelLimitOrder: () => void;
   onOpen: (side: DemoTradeSide) => void;
 }) {
   const parsedLeverage = Math.max(1, Math.trunc(parseNumber(leverage)) || 1);
@@ -818,15 +820,6 @@ function TradeEntryForm({
           Limit Price
           <input type="number" min="0" step="0.01" value={limitPrice} onChange={(event) => onLimitPriceChange(event.target.value)} />
         </label>
-      )}
-
-      {hasPendingLimitOrder && (
-        <div className="futures-pending-limit">
-          <span>Limit pending at {formatUsdt(parseNumber(pendingLimitPrice))}</span>
-          <button type="button" onClick={onCancelLimitOrder}>
-            Cancel
-          </button>
-        </div>
       )}
 
       <div className="futures-available-row">
@@ -1372,6 +1365,57 @@ function PositionManager({
   );
 }
 
+function rebalanceTakeProfitPercents(
+  items: TakeProfitDraft[],
+  lockedId?: string,
+  lockedValue?: string
+): TakeProfitDraft[] {
+  if (items.length === 0) return items;
+
+  const lockedIndex = lockedId ? items.findIndex((item) => item.id === lockedId) : -1;
+  if (lockedIndex === -1) {
+    const evenPercents = splitTakeProfitPercents(100, items.length);
+    return items.map((item, index) => ({ ...item, closePercent: evenPercents[index] }));
+  }
+
+  const isBlankEdit = lockedValue !== undefined && lockedValue.trim() === "";
+  const lockedPercent = isBlankEdit ? 0 : clamp(parseNumber(lockedValue ?? items[lockedIndex].closePercent), 0, 100);
+  const otherPercents = splitTakeProfitPercents(100 - lockedPercent, items.length - 1);
+  let otherIndex = 0;
+
+  return items.map((item) => {
+    if (item.id === lockedId) {
+      return {
+        ...item,
+        closePercent: isBlankEdit ? "" : formatTakeProfitPercentInput(lockedPercent)
+      };
+    }
+
+    const closePercent = otherPercents[otherIndex] ?? "0";
+    otherIndex += 1;
+    return { ...item, closePercent };
+  });
+}
+
+function splitTakeProfitPercents(totalPercent: number, count: number): string[] {
+  if (count <= 0) return [];
+  const totalTenths = Math.round(clamp(totalPercent, 0, 100) * 10);
+  const baseTenths = Math.floor(totalTenths / count);
+  const remainderTenths = totalTenths - baseTenths * count;
+
+  return Array.from({ length: count }, (_, index) => (
+    formatTakeProfitPercentFromTenths(baseTenths + (index === count - 1 ? remainderTenths : 0))
+  ));
+}
+
+function formatTakeProfitPercentInput(value: number): string {
+  return formatTakeProfitPercentFromTenths(Math.round(clamp(value, 0, 100) * 10));
+}
+
+function formatTakeProfitPercentFromTenths(tenths: number): string {
+  return (tenths / 10).toFixed(1).replace(/\.0$/, "");
+}
+
 function TakeProfitEditor({
   takeProfits,
   onChange
@@ -1383,22 +1427,21 @@ function TakeProfitEditor({
     onChange(takeProfits.map((takeProfit) => (takeProfit.id === id ? { ...takeProfit, ...patch } : takeProfit)));
   };
 
+  const updateClosePercent = (id: string, value: string) => {
+    onChange(rebalanceTakeProfitPercents(takeProfits, id, value));
+  };
+
   const addRow = () => {
-    onChange([...takeProfits, { id: `tp-${Date.now()}`, price: "", closePercent: "" }]);
+    const nextRows = [...takeProfits, { id: `tp-${Date.now()}`, price: "", closePercent: "" }];
+    onChange(rebalanceTakeProfitPercents(nextRows));
   };
 
   const removeRow = (id: string) => {
-    onChange(takeProfits.filter((takeProfit) => takeProfit.id !== id));
+    onChange(rebalanceTakeProfitPercents(takeProfits.filter((takeProfit) => takeProfit.id !== id)));
   };
 
   return (
     <div className="tp-builder">
-      <div className="tp-builder-heading">
-        <strong>Take Profits</strong>
-        <button className="icon-button" type="button" onClick={addRow} aria-label="Add take profit">
-          <Plus size={16} />
-        </button>
-      </div>
       {takeProfits.map((takeProfit, index) => (
         <div className="tp-draft-row" key={takeProfit.id}>
           <label>
@@ -1417,9 +1460,9 @@ function TakeProfitEditor({
               type="number"
               min="0"
               max="100"
-              step="1"
+              step="0.1"
               value={takeProfit.closePercent}
-              onChange={(event) => updateRow(takeProfit.id, { closePercent: event.target.value })}
+              onChange={(event) => updateClosePercent(takeProfit.id, event.target.value)}
             />
           </label>
           <button className="icon-button danger" type="button" onClick={() => removeRow(takeProfit.id)} aria-label={`Remove TP${index + 1}`}>
@@ -1427,6 +1470,12 @@ function TakeProfitEditor({
           </button>
         </div>
       ))}
+      <div className="tp-builder-heading">
+        <strong>Take Profits</strong>
+        <button className="icon-button" type="button" onClick={addRow} aria-label="Add take profit">
+          <Plus size={16} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -1737,19 +1786,77 @@ function DemoTradeChart({
   );
 }
 
-function CurrentPositionPanel({ position, currentPrice }: { position: DemoOpenPosition | null; currentPrice: number | null }) {
-  const statusLabel = position?.status ?? "NOT OPENED";
+function CurrentPositionPanel({
+  position,
+  pendingLimitOrder,
+  currentPrice,
+  onCancelPendingLimitOrder
+}: {
+  position: DemoOpenPosition | null;
+  pendingLimitOrder: DemoPendingLimitOrder | null;
+  currentPrice: number | null;
+  onCancelPendingLimitOrder: () => void;
+}) {
+  const statusLabel = position?.status ?? (pendingLimitOrder ? "PENDING LIMIT" : "NOT OPENED");
   const statusTone = position
     ? statusLabel === "OPEN" || statusLabel === "PARTIALLY_CLOSED"
       ? "open"
       : "closed"
-    : "idle";
+    : pendingLimitOrder
+      ? "pending"
+      : "idle";
   const statusClassName = [
     "position-status-badge",
     statusTone
   ].join(" ");
 
   if (!position) {
+    if (pendingLimitOrder) {
+      const displaySymbol = formatDemoSymbol(pendingLimitOrder.symbol);
+      const sideLabel = pendingLimitOrder.side.toUpperCase();
+      const sideTone = pendingLimitOrder.side === "long" ? "positive" : "negative";
+      const pendingMargin = pendingLimitOrder.leverage > 0 ? pendingLimitOrder.amount / pendingLimitOrder.leverage : null;
+      const triggerDirection = pendingLimitOrder.side === "long" ? "down to" : "up to";
+
+      return (
+        <section className="current-position-panel pending" aria-label="Current position">
+          <div className="current-position-header">
+            <div>
+              <p className="eyebrow">CURRENT POSITION</p>
+              <h2>Pending limit order</h2>
+            </div>
+            <span className={statusClassName}>{statusLabel}</span>
+          </div>
+
+          <div className="position-pending-state">
+            <div className="position-pending-copy">
+              <strong>Not opened yet</strong>
+              <span>
+                This limit order is waiting for BTC/USDT to trade {triggerDirection} {formatPositiveCurrency(pendingLimitOrder.limitPrice)} before it becomes an active position.
+              </span>
+            </div>
+
+            <dl className="position-summary-grid pending-limit-grid">
+              <PositionSummaryItem label="Order" value={`${sideLabel} ${displaySymbol}`} tone={sideTone} strong />
+              <PositionSummaryItem label="Limit" value={formatPositiveCurrency(pendingLimitOrder.limitPrice)} />
+              <PositionSummaryItem label="Mark" value={formatPositiveCurrency(currentPrice)} />
+              <PositionSummaryItem label="Notional" value={formatPositiveCurrency(pendingLimitOrder.amount)} />
+              <PositionSummaryItem label="Margin" value={formatPositiveCurrency(pendingMargin)} />
+              <PositionSummaryItem label="Leverage" value={formatOptionalLeverage(pendingLimitOrder.leverage)} />
+              <PositionSummaryItem label="Mode" value={pendingLimitOrder.marginMode.toUpperCase()} />
+              <PositionSummaryItem label="Created" value={formatDateTime(pendingLimitOrder.createdAt)} />
+            </dl>
+
+            <div className="position-pending-actions">
+              <button className="ghost-button compact" type="button" onClick={onCancelPendingLimitOrder}>
+                Cancel pending order
+              </button>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
     return (
       <section className="current-position-panel empty" aria-label="Current position">
         <div className="current-position-header">
