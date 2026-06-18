@@ -86,6 +86,7 @@ interface PositionRiskMarkerLayout extends PositionRiskMarker {
   labelPercent: number;
   placement: PositionRiskMarkerPlacement;
   anchor: PositionRiskMarkerAnchor;
+  lane: number;
 }
 
 interface PendingLimitOrder {
@@ -136,8 +137,6 @@ export function DemoTrade() {
   const [pendingLimitOrder, setPendingLimitOrder] = useState<PendingLimitOrder | null>(null);
   const [marginMode, setMarginMode] = useState<DemoMarginMode>("isolated");
   const [quantityUnit, setQuantityUnit] = useState<DemoQuantityUnit>("usdt");
-  const [draftQuantityUnit, setDraftQuantityUnit] = useState<DemoQuantityUnit>("usdt");
-  const [showQuantityUnitModal, setShowQuantityUnitModal] = useState(false);
   const [amount, setAmount] = useState("");
   const [leverage, setLeverage] = useState("5");
   const [isBracketEnabled, setIsBracketEnabled] = useState(false);
@@ -160,18 +159,11 @@ export function DemoTrade() {
   const activeSymbol = demoTradeSymbols[0];
   const quantityConversionPrice = currentPrice ?? demoState.openPosition?.markPrice ?? candles[candles.length - 1]?.close ?? 0;
 
-  const openQuantityUnitSettings = () => {
-    setDraftQuantityUnit(quantityUnit);
-    setShowQuantityUnitModal(true);
-  };
-
-  const confirmQuantityUnitSettings = () => {
-    if (draftQuantityUnit !== quantityUnit) {
-      setAmount((value) => convertQuantityInput(value, quantityUnit, draftQuantityUnit, quantityConversionPrice));
-      setPositionAddAmount((value) => convertQuantityInput(value, quantityUnit, draftQuantityUnit, quantityConversionPrice));
-      setQuantityUnit(draftQuantityUnit);
-    }
-    setShowQuantityUnitModal(false);
+  const applyQuantityUnit = (nextUnit: DemoQuantityUnit) => {
+    if (nextUnit === quantityUnit) return;
+    setAmount((value) => convertQuantityInput(value, quantityUnit, nextUnit, quantityConversionPrice));
+    setPositionAddAmount((value) => convertQuantityInput(value, quantityUnit, nextUnit, quantityConversionPrice));
+    setQuantityUnit(nextUnit);
   };
 
   const handleDemoStateSaveError = useCallback((error: unknown) => {
@@ -610,7 +602,7 @@ export function DemoTrade() {
               onTakeProfitsChange={setPositionTakeProfits}
               onClosePercentChange={setManualClosePercent}
               onAddAmountChange={setPositionAddAmount}
-              onQuantityUnitSettingsOpen={openQuantityUnitSettings}
+              onQuantityUnitChange={applyQuantityUnit}
               onAddToPosition={addToPosition}
               onUpdateStop={updateStop}
               onUpdateLeverage={updateLeverage}
@@ -637,7 +629,7 @@ export function DemoTrade() {
               onOrderTypeChange={setOrderType}
               onMarginModeChange={setMarginMode}
               onAmountChange={setAmount}
-              onQuantityUnitSettingsOpen={openQuantityUnitSettings}
+              onQuantityUnitChange={applyQuantityUnit}
               onLeverageChange={setLeverage}
               onBracketEnabledChange={(enabled) => {
                 setIsBracketEnabled(enabled);
@@ -681,45 +673,6 @@ export function DemoTrade() {
       </section>
 
       <TradeHistoryTable trades={demoState.tradeHistory} onExport={exportCsv} />
-
-      {showQuantityUnitModal && (
-        <div className="modal-backdrop" role="presentation">
-          <section className="modal-card futures-unit-modal" role="dialog" aria-modal="true" aria-labelledby="futures-unit-title">
-            <div className="modal-title-row">
-              <h2 id="futures-unit-title">Futures Unit Settings</h2>
-              <button className="icon-button compact-icon-button" type="button" onClick={() => setShowQuantityUnitModal(false)} aria-label="Close unit settings">
-                &times;
-              </button>
-            </div>
-            <div className="futures-unit-options" role="radiogroup" aria-label="Order by quantity">
-              <strong>Order by Quantity</strong>
-              <div>
-                {(["btc", "usdt", "cont"] as DemoQuantityUnit[]).map((unit) => (
-                  <label key={unit}>
-                    <input
-                      type="radio"
-                      name="futures-unit"
-                      value={unit}
-                      checked={draftQuantityUnit === unit}
-                      onChange={() => setDraftQuantityUnit(unit)}
-                    />
-                    <span>{quantityUnitLabels[unit]}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <p className="futures-unit-copy">{unitSettingsCopy(draftQuantityUnit, quantityConversionPrice)}</p>
-            <div className="futures-unit-actions">
-              <button className="ghost-button" type="button" onClick={() => setShowQuantityUnitModal(false)}>
-                Cancel
-              </button>
-              <button className="primary-button" type="button" onClick={confirmQuantityUnitSettings}>
-                Confirm
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
 
       {showResetModal && (
         <div className="modal-backdrop" role="presentation">
@@ -768,7 +721,7 @@ function TradeEntryForm({
   onOrderTypeChange,
   onMarginModeChange,
   onAmountChange,
-  onQuantityUnitSettingsOpen,
+  onQuantityUnitChange,
   onLeverageChange,
   onBracketEnabledChange,
   onLimitPriceChange,
@@ -795,7 +748,7 @@ function TradeEntryForm({
   onOrderTypeChange: (type: DemoOrderType) => void;
   onMarginModeChange: (mode: DemoMarginMode) => void;
   onAmountChange: (value: string) => void;
-  onQuantityUnitSettingsOpen: () => void;
+  onQuantityUnitChange: (unit: DemoQuantityUnit) => void;
   onLeverageChange: (value: string) => void;
   onBracketEnabledChange: (enabled: boolean) => void;
   onLimitPriceChange: (value: string) => void;
@@ -908,9 +861,7 @@ function TradeEntryForm({
       <label className="futures-quantity-card">
         <span className="futures-quantity-label">
           Quantity ({unitLabel})
-          <button type="button" onClick={onQuantityUnitSettingsOpen}>
-            {unitLabel}
-          </button>
+          <QuantityUnitSelector unit={quantityUnit} referencePrice={quantityReferencePrice} onApply={onQuantityUnitChange} />
         </span>
         <div className="futures-quantity-input-row">
           <input
@@ -1071,7 +1022,7 @@ function LeverageSelector({ leverage, onApply }: { leverage: string; onApply: (v
         onClick={() => (isOpen ? closeSelector() : openSelector())}
       >
         <strong>{formatLeverageInput(appliedLeverage)}</strong>
-        <span aria-hidden="true">▾</span>
+        <span aria-hidden="true">{"\u25BE"}</span>
       </button>
 
       {isOpen && (
@@ -1130,6 +1081,97 @@ function LeverageSelector({ leverage, onApply }: { leverage: string; onApply: (v
   );
 }
 
+function QuantityUnitSelector({
+  unit,
+  referencePrice,
+  onApply
+}: {
+  unit: DemoQuantityUnit;
+  referencePrice: number;
+  onApply: (unit: DemoQuantityUnit) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftUnit, setDraftUnit] = useState<DemoQuantityUnit>(unit);
+  const selectorRef = useRef<HTMLDivElement | null>(null);
+  const unitLabel = quantityUnitLabels[unit];
+
+  const openSelector = () => {
+    setDraftUnit(unit);
+    setIsOpen(true);
+  };
+
+  const closeSelector = () => {
+    setDraftUnit(unit);
+    setIsOpen(false);
+  };
+
+  const applyDraft = () => {
+    onApply(draftUnit);
+    setIsOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event: globalThis.PointerEvent) => {
+      if (!selectorRef.current?.contains(event.target as Node)) closeSelector();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSelector();
+      if (event.key === "Enter") applyDraft();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [draftUnit, isOpen, unit]);
+
+  return (
+    <div className="futures-unit-control" ref={selectorRef}>
+      <button
+        className="futures-unit-trigger"
+        type="button"
+        aria-label="Set quantity unit"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        onClick={() => (isOpen ? closeSelector() : openSelector())}
+      >
+        <strong>{unitLabel}</strong>
+        <span aria-hidden="true">{"\u25BE"}</span>
+      </button>
+
+      {isOpen && (
+        <section className="unit-popover" role="dialog" aria-label="Set quantity unit">
+          <h3>ORDER BY QUANTITY</h3>
+          <div className="unit-option-grid" role="radiogroup" aria-label="Quantity unit">
+            {(["btc", "usdt", "cont"] as DemoQuantityUnit[]).map((item) => (
+              <button
+                className={draftUnit === item ? "active" : ""}
+                type="button"
+                role="radio"
+                aria-checked={draftUnit === item}
+                onClick={() => setDraftUnit(item)}
+                key={item}
+              >
+                {quantityUnitLabels[item]}
+              </button>
+            ))}
+          </div>
+          <p>{unitSettingsCopy(draftUnit, referencePrice)}</p>
+          <button className="primary-button compact unit-apply-button" type="button" onClick={applyDraft}>
+            Apply
+          </button>
+        </section>
+      )}
+    </div>
+  );
+}
+
 function PositionManager({
   position,
   stopLoss,
@@ -1146,7 +1188,7 @@ function PositionManager({
   onTakeProfitsChange,
   onClosePercentChange,
   onAddAmountChange,
-  onQuantityUnitSettingsOpen,
+  onQuantityUnitChange,
   onAddToPosition,
   onUpdateStop,
   onUpdateLeverage,
@@ -1168,7 +1210,7 @@ function PositionManager({
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
   onClosePercentChange: (value: string) => void;
   onAddAmountChange: (value: string) => void;
-  onQuantityUnitSettingsOpen: () => void;
+  onQuantityUnitChange: (unit: DemoQuantityUnit) => void;
   onAddToPosition: () => void;
   onUpdateStop: () => void;
   onUpdateLeverage: () => void;
@@ -1203,9 +1245,7 @@ function PositionManager({
         <label>
           <span className="futures-quantity-label">
             Quantity ({quantityUnitLabels[quantityUnit]})
-            <button type="button" onClick={onQuantityUnitSettingsOpen}>
-              {quantityUnitLabels[quantityUnit]}
-            </button>
+            <QuantityUnitSelector unit={quantityUnit} referencePrice={currentPrice} onApply={onQuantityUnitChange} />
           </span>
           <input
             type="number"
@@ -1802,7 +1842,12 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
         {markerLayouts.map((marker) => (
           <span
             className={`position-risk-guide ${marker.tone} ${marker.placement}`}
-            style={{ "--risk-left": `${marker.percent}%` } as CSSProperties}
+            style={
+              {
+                "--risk-left": `${marker.percent}%`,
+                "--risk-lane": marker.lane
+              } as CSSProperties
+            }
             key={`${marker.label}-guide-${marker.price}`}
           />
         ))}
@@ -1818,7 +1863,8 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
             className={`position-risk-marker ${marker.tone} ${marker.placement} edge-${marker.anchor}`}
             style={
               {
-                "--risk-left": `${marker.labelPercent}%`
+                "--risk-left": `${marker.labelPercent}%`,
+                "--risk-lane": marker.lane
               } as CSSProperties
             }
             title={`${marker.label} ${formatCurrency(marker.price)}`}
@@ -1883,21 +1929,22 @@ function buildPositionRiskMarkers(position: DemoOpenPosition, markPrice: number 
 function resolveRiskMarkerLayouts(markers: PositionRiskMarker[]): PositionRiskMarkerLayout[] {
   if (!markers.length) return [];
 
-  const minGap = clamp(86 / Math.max(1, markers.length - 1), 10, 16);
+  const minGap = clamp(78 / Math.max(1, markers.length - 1), 9, 14);
   const layouts = markers.map((marker, index) => ({
-      ...marker,
-      index,
-      labelPercent: clamp(marker.percent, 6, 94),
-      placement: getRiskMarkerPlacement(marker),
-      anchor: "center" as PositionRiskMarkerAnchor
-    }));
+    ...marker,
+    index,
+    labelPercent: clamp(marker.percent, 8, 92),
+    placement: getRiskMarkerPlacement(marker),
+    anchor: "center" as PositionRiskMarkerAnchor,
+    lane: 0
+  }));
 
   (["above", "below"] as PositionRiskMarkerPlacement[]).forEach((placement) => {
     const group = layouts
       .filter((marker) => marker.placement === placement)
       .sort((a, b) => a.labelPercent - b.labelPercent || a.index - b.index);
 
-    distributeRiskLabels(group, minGap);
+    placeRiskLabelsInLanes(group, placement === "above" ? 2 : 1, minGap);
   });
 
   layouts.forEach((marker) => {
@@ -1914,35 +1961,52 @@ function getRiskMarkerPlacement(marker: PositionRiskMarker): PositionRiskMarkerP
 }
 
 function getRiskMarkerAnchor(labelPercent: number): PositionRiskMarkerAnchor {
-  if (labelPercent <= 9) return "start";
-  if (labelPercent >= 91) return "end";
+  if (labelPercent <= 10) return "start";
+  if (labelPercent >= 90) return "end";
   return "center";
 }
 
-function distributeRiskLabels(markers: Array<PositionRiskMarkerLayout & { index: number }>, minGap: number): void {
+function placeRiskLabelsInLanes(
+  markers: Array<PositionRiskMarkerLayout & { index: number }>,
+  laneCount: number,
+  minGap: number
+): void {
+  if (!markers.length) return;
+
+  const laneRightEdges = Array.from({ length: laneCount }, () => -Infinity);
+
+  markers.forEach((marker) => {
+    const openLane = laneRightEdges.findIndex((rightEdge) => marker.labelPercent - rightEdge >= minGap);
+    const lane = openLane >= 0 ? openLane : laneRightEdges.indexOf(Math.min(...laneRightEdges));
+    marker.lane = Math.max(0, lane);
+    if (openLane < 0) {
+      marker.labelPercent = clamp(laneRightEdges[lane] + minGap, 8, 92);
+    }
+    laneRightEdges[marker.lane] = marker.labelPercent;
+  });
+
+  Array.from({ length: laneCount }, (_, lane) => {
+    const laneMarkers = markers.filter((marker) => marker.lane === lane);
+    nudgeRiskLaneInsideBounds(laneMarkers, minGap);
+  });
+}
+
+function nudgeRiskLaneInsideBounds(markers: Array<PositionRiskMarkerLayout & { index: number }>, minGap: number): void {
   if (markers.length < 2) return;
 
   for (let index = 1; index < markers.length; index += 1) {
     markers[index].labelPercent = Math.max(markers[index].labelPercent, markers[index - 1].labelPercent + minGap);
   }
 
-  const rightOverflow = markers[markers.length - 1].labelPercent - 94;
-  if (rightOverflow > 0) {
-    markers.forEach((marker) => {
-      marker.labelPercent -= rightOverflow;
-    });
-  }
+  const rightOverflow = markers[markers.length - 1].labelPercent - 92;
+  if (rightOverflow > 0) markers.forEach((marker) => (marker.labelPercent -= rightOverflow));
 
   for (let index = markers.length - 2; index >= 0; index -= 1) {
     markers[index].labelPercent = Math.min(markers[index].labelPercent, markers[index + 1].labelPercent - minGap);
   }
 
-  const leftOverflow = 6 - markers[0].labelPercent;
-  if (leftOverflow > 0) {
-    markers.forEach((marker) => {
-      marker.labelPercent += leftOverflow;
-    });
-  }
+  const leftOverflow = 8 - markers[0].labelPercent;
+  if (leftOverflow > 0) markers.forEach((marker) => (marker.labelPercent += leftOverflow));
 }
 
 function formatRiskMapRange(markers: PositionRiskMarker[]): string {
@@ -2240,31 +2304,49 @@ function resolveOverlayMarkerLayouts(layouts: DemoOverlayLineLayout[], minY: num
     layout.markerY = clamp(layout.markerY, minY, maxY);
   });
 
+  const clusters: Array<typeof sorted> = [];
+  let cluster: typeof sorted = [sorted[0]];
+
   for (let index = 1; index < sorted.length; index += 1) {
-    sorted[index].markerY = Math.max(sorted[index].markerY, sorted[index - 1].markerY + minGap);
+    const previous = sorted[index - 1];
+    const current = sorted[index];
+    if (current.markerY - previous.markerY < minGap) {
+      cluster.push(current);
+    } else {
+      clusters.push(cluster);
+      cluster = [current];
+    }
   }
+  clusters.push(cluster);
 
-  const bottomOverflow = sorted[sorted.length - 1].markerY - maxY;
-  if (bottomOverflow > 0) {
-    sorted.forEach((layout) => {
-      layout.markerY -= bottomOverflow;
-    });
-  }
-
-  for (let index = sorted.length - 2; index >= 0; index -= 1) {
-    sorted[index].markerY = Math.min(sorted[index].markerY, sorted[index + 1].markerY - minGap);
-  }
-
-  const topOverflow = minY - sorted[0].markerY;
-  if (topOverflow > 0) {
-    sorted.forEach((layout) => {
-      layout.markerY += topOverflow;
-    });
-  }
+  clusters.forEach((items) => resolveOverlayMarkerCluster(items, minGap, minY, maxY));
 
   return sorted
     .sort((a, b) => a.index - b.index)
     .map(({ index, ...layout }) => layout);
+}
+
+function resolveOverlayMarkerCluster(
+  layouts: Array<DemoOverlayLineLayout & { index: number }>,
+  minGap: number,
+  minY: number,
+  maxY: number
+): void {
+  if (layouts.length < 2) return;
+
+  for (let index = 1; index < layouts.length; index += 1) {
+    layouts[index].markerY = Math.max(layouts[index].markerY, layouts[index - 1].markerY + minGap);
+  }
+
+  const bottomOverflow = layouts[layouts.length - 1].markerY - maxY;
+  if (bottomOverflow > 0) layouts.forEach((layout) => (layout.markerY -= bottomOverflow));
+
+  for (let index = layouts.length - 2; index >= 0; index -= 1) {
+    layouts[index].markerY = Math.min(layouts[index].markerY, layouts[index + 1].markerY - minGap);
+  }
+
+  const topOverflow = minY - layouts[0].markerY;
+  if (topOverflow > 0) layouts.forEach((layout) => (layout.markerY += topOverflow));
 }
 
 function parseLeverageInput(value: string): number | null {

@@ -111,6 +111,7 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /isBullishCandle/);
   assert.match(pageSource, /latestCandleTone/);
   assert.match(pageSource, /resolveOverlayMarkerLayouts/);
+  assert.match(pageSource, /resolveOverlayMarkerCluster/);
   assert.match(pageSource, /chart-marker-connector/);
   assert.match(pageSource, /isOverlayPriceMarker/);
   assert.match(pageSource, /chart-price-marker-label/);
@@ -142,7 +143,10 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(stylesSource, /align-items: stretch/);
   assert.match(stylesSource, /demo-ticket-panel[\s\S]*align-self: stretch/);
   assert.match(pageSource, /type DemoQuantityUnit = "usdt" \| "btc" \| "cont"/);
-  assert.match(pageSource, /Futures Unit Settings/);
+  assert.match(pageSource, /function QuantityUnitSelector/);
+  assert.match(pageSource, /ORDER BY QUANTITY/);
+  assert.match(pageSource, /aria-label="Set quantity unit"/);
+  assert.match(pageSource, /onQuantityUnitChange=\{applyQuantityUnit\}/);
   assert.match(pageSource, /quantityUnitLabels/);
   assert.match(pageSource, /DEMO_CONTRACT_BTC_SIZE = 0\.0001/);
   assert.match(pageSource, /quantityInputToNotional/);
@@ -151,8 +155,11 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /quantityUnit=\{quantityUnit\}/);
   assert.match(pageSource, /pendingLimitOrder\.quantityUnit/);
   assert.match(pageSource, /Quantity \(\{unitLabel\}\)/);
-  assert.match(stylesSource, /futures-unit-modal/);
+  assert.match(stylesSource, /unit-popover/);
+  assert.match(stylesSource, /unit-option-grid/);
   assert.match(stylesSource, /futures-quantity-label/);
+  assert.doesNotMatch(pageSource, /Futures Unit Settings|showQuantityUnitModal|draftQuantityUnit/);
+  assert.doesNotMatch(stylesSource, /futures-unit-modal/);
   assert.match(pageSource, /BTCUSDT Perpetual/);
   assert.match(pageSource, /Limit orders are available for registered users only/);
   assert.match(pageSource, /Limit Price/);
@@ -196,6 +203,7 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /position-risk-guide/);
   assert.match(pageSource, /getRiskMarkerPlacement/);
   assert.match(pageSource, /getRiskMarkerAnchor/);
+  assert.match(pageSource, /placeRiskLabelsInLanes/);
   assert.match(pageSource, /position-summary-grid/);
   assert.match(pageSource, /position-risk-map/);
   assert.match(pageSource, /No active position/);
@@ -222,6 +230,8 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   const balancePanelIndex = pageSource.indexOf('className="section-panel demo-balance-panel no-hover-effect"');
   assert.ok(performancePanelIndex !== -1 && balancePanelIndex !== -1 && performancePanelIndex < balancePanelIndex);
   assert.match(stylesSource, /demo-summary-grid \{[\s\S]*grid-template-columns: minmax\(0, 1\.75fr\) minmax\(300px, 0\.62fr\)/);
+  assert.match(stylesSource, /demo-summary-grid \{[\s\S]*align-items: stretch/);
+  assert.match(stylesSource, /demo-balance-panel \{[\s\S]*align-content: start/);
   assert.match(pageSource, /Changing your starting demo balance will reset your current demo progress/);
   assert.match(pageSource, /Reset and Apply New Balance/);
 });

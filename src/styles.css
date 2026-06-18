@@ -5391,14 +5391,14 @@ select:focus {
 
 .position-risk-track {
   position: relative;
-  min-height: 156px;
+  min-height: 178px;
   overflow: hidden;
   padding: 0.45rem 0.55rem 0.65rem;
 }
 
 .position-risk-axis {
   position: absolute;
-  top: 76px;
+  top: 98px;
   right: 0.6rem;
   left: 0.6rem;
   height: 2px;
@@ -5417,18 +5417,18 @@ select:focus {
 }
 
 .position-risk-guide.above {
-  top: 42px;
-  height: 27px;
+  top: calc(42px + (var(--risk-lane, 0) * 39px));
+  height: calc(49px - (var(--risk-lane, 0) * 39px));
 }
 
 .position-risk-guide.below {
-  top: 85px;
-  height: 24px;
+  top: 107px;
+  height: 22px;
 }
 
 .position-risk-dot {
   position: absolute;
-  top: 68px;
+  top: 90px;
   left: var(--risk-left);
   z-index: 2;
   width: 16px;
@@ -5456,11 +5456,11 @@ select:focus {
 }
 
 .position-risk-marker.above {
-  top: 2px;
+  top: calc(2px + (var(--risk-lane, 0) * 39px));
 }
 
 .position-risk-marker.below {
-  top: 111px;
+  top: 132px;
 }
 
 .position-risk-marker.edge-center {
@@ -5845,6 +5845,10 @@ select:focus {
   gap: 0.78rem;
 }
 
+.demo-balance-panel {
+  align-content: start;
+}
+
 .futures-ticket {
   gap: 0.58rem;
 }
@@ -6177,9 +6181,15 @@ select.futures-mode-chip {
   gap: 0.5rem;
 }
 
-.futures-quantity-label button {
+.futures-unit-control {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.futures-unit-trigger {
   display: inline-flex;
   align-items: center;
+  gap: 0.28rem;
   min-height: 24px;
   padding: 0 0.46rem;
   border: 1px solid rgba(229, 228, 226, 0.13);
@@ -6188,6 +6198,73 @@ select.futures-mode-chip {
   color: var(--platinum);
   font-size: 0.68rem;
   font-weight: 900;
+}
+
+.futures-unit-trigger span {
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.unit-popover {
+  position: absolute;
+  top: calc(100% + 0.42rem);
+  right: 0;
+  z-index: 12;
+  display: grid;
+  width: min(238px, 82vw);
+  gap: 0.62rem;
+  padding: 0.72rem;
+  border: 1px solid rgba(229, 228, 226, 0.16);
+  border-radius: 8px;
+  background: rgba(10, 13, 17, 0.98);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.42);
+  text-transform: none;
+}
+
+.unit-popover h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.unit-option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.38rem;
+}
+
+.unit-option-grid button {
+  min-height: 34px;
+  padding: 0.32rem 0.4rem;
+  border: 1px solid rgba(229, 228, 226, 0.13);
+  border-radius: 7px;
+  background: rgba(36, 43, 52, 0.84);
+  color: var(--platinum);
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.unit-option-grid button.active {
+  border-color: rgba(126, 224, 167, 0.45);
+  background: rgba(126, 224, 167, 0.12);
+  color: var(--success);
+}
+
+.unit-popover p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+  line-height: 1.42;
+}
+
+.unit-apply-button {
+  width: 100%;
+  min-height: 34px;
+  padding-block: 0.46rem;
 }
 
 .futures-quantity-input-row {
@@ -6560,7 +6637,7 @@ select.futures-mode-chip {
 }
 
 .demo-summary-grid {
-  align-items: start;
+  align-items: stretch;
   grid-template-columns: minmax(0, 1.75fr) minmax(300px, 0.62fr);
 }
 
@@ -6622,45 +6699,6 @@ select.futures-mode-chip {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-}
-
-.futures-unit-modal {
-  width: min(100%, 480px);
-}
-
-.futures-unit-options {
-  display: grid;
-  gap: 0.72rem;
-}
-
-.futures-unit-options > strong {
-  color: var(--platinum);
-  font-size: 0.9rem;
-}
-
-.futures-unit-options > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.futures-unit-options label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--platinum);
-  font-weight: 850;
-}
-
-.futures-unit-copy {
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.futures-unit-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.7rem;
 }
 
 .helper-copy {
@@ -7581,7 +7619,7 @@ select.futures-mode-chip {
   }
 
   .position-risk-track {
-    min-height: 158px;
+    min-height: 184px;
     padding-inline: 0.3rem;
   }
 
