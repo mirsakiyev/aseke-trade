@@ -9,6 +9,7 @@ const stylesSource = await readFile(new URL("../src/styles.css", import.meta.url
 const persistenceSource = await readFile(new URL("../src/lib/demoTradePersistence.ts", import.meta.url), "utf8");
 const marketDataSource = await readFile(new URL("../src/lib/demoTradeMarketData.ts", import.meta.url), "utf8");
 const migrationSource = await readFile(new URL("../supabase/migrations/202606160001_demo_trade.sql", import.meta.url), "utf8");
+const grantMigrationSource = await readFile(new URL("../supabase/migrations/202606180001_demo_trade_persistence_grants.sql", import.meta.url), "utf8");
 
 test("Demo Trade page renders as a public route", () => {
   assert.match(appSource, /import \{ DemoTrade \} from "\.\/pages\/DemoTrade"/);
@@ -32,6 +33,16 @@ test("Demo Trade page includes guest and authenticated persistence paths", () =>
   assert.match(persistenceSource, /chooseLatestState/);
   assert.match(persistenceSource, /demo_trade_states/);
   assert.match(persistenceSource, /save_demo_trade_state/);
+  assert.match(persistenceSource, /RegisteredDemoTradeLoadResult/);
+  assert.match(persistenceSource, /isAccountSyncAvailable/);
+  assert.match(persistenceSource, /REGISTERED_SAVE_ERROR_MESSAGE/);
+  assert.match(persistenceSource, /onConflict: "user_id"/);
+  assert.match(persistenceSource, /throw new Error\(REGISTERED_SAVE_ERROR_MESSAGE\)/);
+  assert.match(pageSource, /DEMO_TRADE_LOAD_ERROR_MESSAGE/);
+  assert.match(pageSource, /persistenceError/);
+  assert.match(pageSource, /setIsHydrated\(false\)/);
+  assert.match(pageSource, /setIsHydrated\(isAccountSyncAvailable\)/);
+  assert.match(pageSource, /Demo trade progress could not be saved to your account/);
 });
 
 test("Demo Trade page includes custom chart and no TradingView widget", () => {
@@ -188,4 +199,7 @@ test("registered demo state migration includes RLS and server-side validation", 
   assert.match(migrationSource, /validate_demo_trade_state/);
   assert.match(migrationSource, /save_demo_trade_state/);
   assert.match(migrationSource, /BTCUSDT/);
+  assert.match(grantMigrationSource, /grant select, insert, update on table public\.demo_trade_states to authenticated/);
+  assert.match(grantMigrationSource, /grant execute on function public\.save_demo_trade_state\(jsonb\) to authenticated/);
+  assert.match(grantMigrationSource, /notify pgrst, 'reload schema'/);
 });

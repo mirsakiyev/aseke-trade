@@ -5,6 +5,16 @@ const DEMO_TRADE_SESSION_KEY = "aseke-demo-trade-state-v1";
 const DEMO_TRADE_STORAGE_KEY = "aseke-demo-trade-state-v1";
 const DEMO_TRADE_GUEST_ID_KEY = "aseke-demo-trade-guest-id";
 const DEMO_TRADE_REGISTERED_PREFIX = "aseke-demo-trade-state-v1:user:";
+const REGISTERED_SAVE_ERROR_MESSAGE = "Demo trade progress could not be saved to your account. Keep this tab open and try again.";
+
+interface SupabasePersistenceError {
+  message?: string;
+}
+
+export interface RegisteredDemoTradeLoadResult {
+  state: DemoTradeState | null;
+  isAccountSyncAvailable: boolean;
+}
 
 export function getDemoTradeGuestSessionId(): string {
   if (typeof window === "undefined") return "guest-session";
@@ -36,12 +46,14 @@ export function saveGuestDemoTradeState(state: DemoTradeState): void {
   writeStoredState(DEMO_TRADE_SESSION_KEY, state, window.sessionStorage);
 }
 
-export async function loadRegisteredDemoTradeState(userId: string): Promise<DemoTradeState | null> {
+export async function loadRegisteredDemoTradeState(userId: string): Promise<RegisteredDemoTradeLoadResult> {
   const localState = typeof window === "undefined"
     ? null
     : readStoredState(registeredStateKey(userId), window.localStorage);
 
-  if (!supabase) return localState;
+  if (!supabase) {
+    return { state: localState, isAccountSyncAvailable: false };
+  }
 
   const { data, error } = await supabase
     .from("demo_trade_states")
@@ -49,14 +61,20 @@ export async function loadRegisteredDemoTradeState(userId: string): Promise<Demo
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error || !data) return localState;
+  if (error) {
+    return { state: localState, isAccountSyncAvailable: false };
+  }
+
+  if (!data) {
+    return { state: localState, isAccountSyncAvailable: true };
+  }
 
   const remoteState = normalizeStoredDemoState((data as { state?: unknown }).state);
   const latestState = chooseLatestState(localState, remoteState);
   if (latestState && typeof window !== "undefined") {
     writeStoredState(registeredStateKey(userId), latestState, window.localStorage);
   }
-  return latestState;
+  return { state: latestState, isAccountSyncAvailable: true };
 }
 
 export async function saveRegisteredDemoTradeState(userId: string, state: DemoTradeState): Promise<void> {
@@ -70,28 +88,41 @@ export async function saveRegisteredDemoTradeState(userId: string, state: DemoTr
     writeStoredState(registeredStateKey(userId), payload, window.localStorage);
   }
 
-  if (!supabase) return;
+  if (!supabase) {
+    throw new Error(REGISTERED_SAVE_ERROR_MESSAGE);
+  }
 
   const { error } = await supabase.rpc("save_demo_trade_state", {
     next_state: payload
   });
 
   if (!error) return;
+  if (isValidationError(error)) {
+    throw new Error(REGISTERED_SAVE_ERROR_MESSAGE);
+  }
 
-  await supabase.from("demo_trade_states").upsert({
-    user_id: userId,
-    state: payload,
-    starting_balance: payload.startingBalance,
-    current_balance: payload.currentBalance,
-    available_balance: payload.availableBalance,
-    realized_pnl: payload.realizedPnl,
-    unrealized_pnl: payload.unrealizedPnl,
-    open_position: payload.openPosition,
-    trade_history: payload.tradeHistory,
-    settings: payload.settings,
-    reset_at: payload.resetAt,
-    updated_at: payload.updatedAt
-  });
+  const { error: upsertError } = await supabase
+    .from("demo_trade_states")
+    .upsert({
+      user_id: userId,
+      state: payload,
+      starting_balance: payload.startingBalance,
+      current_balance: payload.currentBalance,
+      available_balance: payload.availableBalance,
+      realized_pnl: payload.realizedPnl,
+      unrealized_pnl: payload.unrealizedPnl,
+      open_position: payload.openPosition,
+      trade_history: payload.tradeHistory,
+      settings: payload.settings,
+      reset_at: payload.resetAt,
+      updated_at: payload.updatedAt
+    }, {
+      onConflict: "user_id"
+    });
+
+  if (upsertError) {
+    throw new Error(REGISTERED_SAVE_ERROR_MESSAGE);
+  }
 }
 
 function registeredStateKey(userId: string): string {
@@ -154,4 +185,8 @@ function normalizeStoredDemoState(value: unknown): DemoTradeState | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidationError(error: SupabasePersistenceError): boolean {
+  return error.message?.toLowerCase().includes("demo trade state is invalid") ?? false;
 }

@@ -80,6 +80,8 @@ const PERCENT_SLIDER_THUMB_SIZE = 12;
 const DEMO_CONTRACT_BTC_SIZE = 0.0001;
 const MIN_DEMO_LEVERAGE = 1;
 const MAX_DEMO_LEVERAGE = 100;
+const DEMO_TRADE_LOAD_ERROR_MESSAGE = "Demo trade progress could not be loaded from your account. Cross-device sync is paused until the account connection recovers.";
+const DEMO_TRADE_SAVE_ERROR_MESSAGE = "Demo trade progress could not be saved to your account. Keep this tab open and try again.";
 
 const quantityUnitLabels: Record<DemoQuantityUnit, string> = {
   usdt: "USDT",
@@ -98,6 +100,7 @@ export function DemoTrade() {
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [marketSource, setMarketSource] = useState("Binance.US public market data");
   const [marketError, setMarketError] = useState<string | null>(null);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const [isMarketLoading, setIsMarketLoading] = useState(true);
   const [orderType, setOrderType] = useState<DemoOrderType>("market");
   const [limitPrice, setLimitPrice] = useState("");
@@ -141,6 +144,10 @@ export function DemoTrade() {
     setShowQuantityUnitModal(false);
   };
 
+  const handleDemoStateSaveError = useCallback((error: unknown) => {
+    setPersistenceError(error instanceof Error ? error.message : DEMO_TRADE_SAVE_ERROR_MESSAGE);
+  }, []);
+
   const persistDemoState = useCallback((nextState: DemoTradeState) => {
     if (!isHydrated) return;
 
@@ -148,8 +155,10 @@ export function DemoTrade() {
       ? saveRegisteredDemoTradeState(user.id, nextState)
       : Promise.resolve(saveGuestDemoTradeState(nextState));
 
-    void save.catch(() => undefined);
-  }, [isHydrated, user]);
+    void save
+      .then(() => setPersistenceError(null))
+      .catch(handleDemoStateSaveError);
+  }, [handleDemoStateSaveError, isHydrated, user]);
 
   const commitDemoState = useCallback((nextState: DemoTradeState) => {
     setDemoState(nextState);
@@ -172,25 +181,37 @@ export function DemoTrade() {
     if (isAuthLoading) return;
 
     let isMounted = true;
-    async function hydrateState() {
-      const sessionId = getDemoTradeGuestSessionId();
-      const storedState = user ? await loadRegisteredDemoTradeState(user.id) : loadGuestDemoTradeState();
-      const nextState = storedState
-        ? {
-            ...storedState,
-            userId: user?.id ?? null,
-            sessionId: storedState.sessionId || sessionId
-          }
-        : createInitialDemoTradeState({
-            sessionId,
-            userId: user?.id ?? null,
-            startingBalance: 1000
-          });
+    setIsHydrated(false);
+    setPersistenceError(null);
 
-      if (!isMounted) return;
-      setDemoState(nextState);
-      setNextStartingBalance(String(nextState.startingBalance));
-      setIsHydrated(true);
+    async function hydrateState() {
+      try {
+        const sessionId = getDemoTradeGuestSessionId();
+        const registeredState = user ? await loadRegisteredDemoTradeState(user.id) : null;
+        const storedState = user ? registeredState?.state ?? null : loadGuestDemoTradeState();
+        const isAccountSyncAvailable = user ? registeredState?.isAccountSyncAvailable === true : true;
+        const nextState = storedState
+          ? {
+              ...storedState,
+              userId: user?.id ?? null,
+              sessionId: storedState.sessionId || sessionId
+            }
+          : createInitialDemoTradeState({
+              sessionId,
+              userId: user?.id ?? null,
+              startingBalance: 1000
+            });
+
+        if (!isMounted) return;
+        setDemoState(nextState);
+        setNextStartingBalance(String(nextState.startingBalance));
+        setPersistenceError(isAccountSyncAvailable ? null : DEMO_TRADE_LOAD_ERROR_MESSAGE);
+        setIsHydrated(isAccountSyncAvailable);
+      } catch {
+        if (!isMounted) return;
+        setPersistenceError(DEMO_TRADE_LOAD_ERROR_MESSAGE);
+        setIsHydrated(false);
+      }
     }
 
     void hydrateState();
@@ -207,11 +228,13 @@ export function DemoTrade() {
         ? saveRegisteredDemoTradeState(user.id, demoState)
         : Promise.resolve(saveGuestDemoTradeState(demoState));
 
-      void save.catch(() => undefined);
+      void save
+        .then(() => setPersistenceError(null))
+        .catch(handleDemoStateSaveError);
     }, 450);
 
     return () => window.clearTimeout(saveTimer);
-  }, [demoState, isHydrated, user]);
+  }, [demoState, handleDemoStateSaveError, isHydrated, user]);
 
   useEffect(() => {
     if (user) return;
@@ -521,6 +544,7 @@ export function DemoTrade() {
       </section>
 
       {marketError && <p className="warning-box">{marketError}</p>}
+      {persistenceError && <p className="warning-box">{persistenceError}</p>}
 
       <section className="demo-trade-grid">
         <article className="section-panel demo-chart-panel no-hover-effect">
