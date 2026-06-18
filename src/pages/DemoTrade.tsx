@@ -58,6 +58,32 @@ interface TakeProfitDraft {
 
 type DemoOrderType = "market" | "limit";
 type DemoQuantityUnit = "usdt" | "btc" | "cont";
+type DemoOverlayTone = "mark" | "entry" | "target" | "hit" | "danger" | "liquidation";
+type PositionRiskMarkerTone = "liquidation" | "stop" | "mark" | "entry" | "take-profit";
+
+interface DemoOverlayLine {
+  label: string;
+  price: number;
+  tone: DemoOverlayTone;
+}
+
+interface DemoOverlayLineLayout {
+  line: DemoOverlayLine;
+  lineY: number;
+  markerY: number;
+}
+
+interface PositionRiskMarker {
+  label: string;
+  price: number;
+  tone: PositionRiskMarkerTone;
+  percent: number;
+}
+
+interface PositionRiskMarkerLayout extends PositionRiskMarker {
+  labelPercent: number;
+  lane: number;
+}
 
 interface PendingLimitOrder {
   side: DemoTradeSide;
@@ -558,7 +584,7 @@ export function DemoTrade() {
             timeframe={timeframe}
             onTimeframeChange={setTimeframe}
           />
-          {demoState.openPosition && <CurrentTradeRow position={demoState.openPosition} />}
+          <CurrentPositionPanel position={demoState.openPosition} currentPrice={currentPrice} />
         </article>
 
         <aside className="section-panel demo-ticket-panel no-hover-effect">
@@ -1430,6 +1456,14 @@ function DemoTradeChart({
   const latestVisibleCandle = visibleCandles[visibleCandles.length - 1];
   const latestPreviousClose = visibleCandles[visibleCandles.length - 2]?.close ?? latestVisibleCandle?.open ?? 0;
   const latestCandleTone = latestVisibleCandle && isBullishCandle(latestVisibleCandle, latestPreviousClose) ? "up" : "down";
+  const overlayLineLayouts = resolveOverlayMarkerLayouts(
+    overlayLines.map((line) => {
+      const lineY = clamp(yForPrice(line.price), padding.top + 10, height - padding.bottom - 10);
+      return { line, lineY, markerY: lineY };
+    }),
+    padding.top + 16,
+    height - padding.bottom - 16
+  );
 
   useEffect(() => {
     setVisibleCount(defaultVisibleCandles(timeframe));
@@ -1612,28 +1646,39 @@ function DemoTradeChart({
               );
             })}
           </g>
-          {overlayLines.map((line) => {
-            const rawY = yForPrice(line.price);
-            const y = clamp(rawY, padding.top + 10, height - padding.bottom - 10);
+          {overlayLineLayouts.map(({ line, lineY, markerY }) => {
+            const hasBracketPriceMarker = isBracketPriceMarker(line.tone);
+            const isMarkerShifted = Math.abs(markerY - lineY) > 1;
             const overlayClassName = ["trade-overlay-line", line.tone, line.tone === "mark" ? latestCandleTone : ""]
               .filter(Boolean)
               .join(" ");
             return (
               <g className={overlayClassName} key={`${line.label}-${line.price}`}>
-                <line x1={padding.left} x2={axisX} y1={y} y2={y} />
+                <line x1={padding.left} x2={axisX} y1={lineY} y2={lineY} />
+                {isMarkerShifted ? <line className="chart-marker-connector" x1={axisX} x2={axisX + 8} y1={lineY} y2={markerY} /> : null}
                 {line.tone === "mark" ? (
                   <>
-                    <rect className="chart-price-marker" x={axisX + 8} y={y - 15} width="86" height="28" rx="4" />
-                    <text className="chart-price-marker-text" x={axisX + 16} y={y + 4}>
+                    <rect className="chart-price-marker" x={axisX + 8} y={markerY - 15} width="86" height="28" rx="4" />
+                    <text className="chart-price-marker-text" x={axisX + 16} y={markerY + 4}>
+                      {formatChartPrice(line.price)}
+                    </text>
+                  </>
+                ) : hasBracketPriceMarker ? (
+                  <>
+                    <rect className="chart-price-marker" x={axisX + 8} y={markerY - 15} width="86" height="28" rx="4" />
+                    <text className="chart-price-marker-label" x={axisX + 16} y={markerY - 4}>
+                      {line.label}
+                    </text>
+                    <text className="chart-price-marker-text" x={axisX + 16} y={markerY + 9}>
                       {formatChartPrice(line.price)}
                     </text>
                   </>
                 ) : (
-                  <text x={axisX + 14} y={y + 4}>
+                  <text x={axisX + 14} y={markerY + 4}>
                     {line.label}
                   </text>
                 )}
-                <text className="chart-overlay-label" x={padding.left + 8} y={y - 6}>
+                <text className="chart-overlay-label" x={padding.left + 8} y={markerY - 6}>
                   {line.label}
                 </text>
               </g>
@@ -1661,36 +1706,245 @@ function DemoTradeChart({
   );
 }
 
-function CurrentTradeRow({ position }: { position: DemoOpenPosition }) {
-  const bracketSummary = formatBracketSummary(position);
-  const bracketTitle = formatBracketTitle(position);
+function CurrentPositionPanel({ position, currentPrice }: { position: DemoOpenPosition | null; currentPrice: number | null }) {
+  const statusLabel = position?.status ?? "CLOSED";
+  const statusClassName = [
+    "position-status-badge",
+    statusLabel === "OPEN" || statusLabel === "PARTIALLY_CLOSED" ? "open" : "closed"
+  ].join(" ");
+
+  if (!position) {
+    return (
+      <section className="current-position-panel empty" aria-label="Current position">
+        <div className="current-position-header">
+          <div>
+            <p className="eyebrow">CURRENT POSITION</p>
+            <h2>No active position</h2>
+          </div>
+          <span className={statusClassName}>{statusLabel}</span>
+        </div>
+        <div className="position-empty-state">
+          <strong>No active position</strong>
+          <span>Open a demo trade to see position details here.</span>
+        </div>
+      </section>
+    );
+  }
+
   const displaySymbol = formatDemoSymbol(position.symbol);
+  const markPrice = resolvePositionMarkPrice(position, currentPrice);
+  const directionTone = position.side === "long" ? "positive" : "negative";
+  const pnlTone = position.unrealizedPnl >= 0 ? "positive" : "negative";
+  const roiTone = position.returnPercent >= 0 ? "positive" : "negative";
 
   return (
-    <div className="current-trade-row">
-      <div className="current-trade-heading">
-        <span>Current trade</span>
-        <strong className={position.side === "long" ? "positive" : "negative"}>
-          <span>{position.side.toUpperCase()}</span>
-          <span>{displaySymbol}</span>
-        </strong>
+    <section className="current-position-panel" aria-label="Current position">
+      <div className="current-position-header">
+        <div>
+          <p className="eyebrow">CURRENT POSITION</p>
+          <h2>{`${position.side.toUpperCase()} ${displaySymbol}`}</h2>
+        </div>
+        <span className={statusClassName}>{statusLabel.replace(/_/g, " ")}</span>
       </div>
-      <dl className="current-trade-metrics">
-        <Metric label="Entry" value={formatCurrency(position.entryPrice)} />
-        <Metric label="Mark" value={formatCurrency(position.markPrice)} />
-        <Metric label="Qty" value={formatPositionQuantity(position.remainingQuantity)} />
-        <Metric label="Margin" value={formatCurrency(position.remainingMargin)} />
-        <Metric label="SL/TP" value={bracketSummary} title={bracketTitle} />
-        <Metric label="Liq" value={position.liquidationPrice ? formatCurrency(position.liquidationPrice) : "N/A"} />
-        <Metric
-          label="uPnL"
-          value={formatCurrency(position.unrealizedPnl)}
-          tone={position.unrealizedPnl >= 0 ? "positive" : "negative"}
+
+      <dl className="position-summary-grid">
+        <PositionSummaryItem
+          label="Position"
+          value={`${position.side.toUpperCase()} ${displaySymbol}`}
+          tone={directionTone}
+          strong
         />
-        <Metric label="Status" value={position.status} />
+        <PositionSummaryItem label="Entry" value={formatPositiveCurrency(position.entryPrice)} />
+        <PositionSummaryItem label="Mark" value={formatPositiveCurrency(markPrice)} />
+        <PositionSummaryItem label="UPNL" value={formatOptionalCurrency(position.unrealizedPnl)} tone={pnlTone} strong />
+        <PositionSummaryItem label="Quantity" value={formatOptionalPositionQuantity(position.remainingQuantity)} />
+        <PositionSummaryItem label="Margin" value={formatPositiveCurrency(position.remainingMargin)} />
+        <PositionSummaryItem label="Leverage" value={formatOptionalLeverage(position.leverage)} />
+        <PositionSummaryItem label="ROI" value={formatOptionalPercent(position.returnPercent)} tone={roiTone} />
       </dl>
+
+      <PositionRiskMap position={position} markPrice={markPrice} />
+    </section>
+  );
+}
+
+function PositionSummaryItem({
+  label,
+  value,
+  tone,
+  strong = false
+}: {
+  label: string;
+  value: string;
+  tone?: "positive" | "negative";
+  strong?: boolean;
+}) {
+  return (
+    <div className={strong ? "position-summary-item strong" : "position-summary-item"}>
+      <dt>{label}</dt>
+      <dd className={tone} title={value}>
+        {value}
+      </dd>
     </div>
   );
+}
+
+function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; markPrice: number | null }) {
+  const markers = buildPositionRiskMarkers(position, markPrice);
+  const markerLayouts = resolveRiskMarkerLayouts(markers);
+
+  return (
+    <div className="position-risk-map">
+      <div className="position-risk-heading">
+        <span>Price / risk map</span>
+        <strong>{formatRiskMapRange(markers)}</strong>
+      </div>
+      <div className="position-risk-track" aria-label="Position price and risk levels">
+        <span className="position-risk-axis" />
+        {markerLayouts.map((marker) => (
+          <span
+            className={`position-risk-dot ${marker.tone}`}
+            style={{ "--risk-left": `${marker.percent}%` } as CSSProperties}
+            key={`${marker.label}-dot-${marker.price}`}
+          />
+        ))}
+        {markerLayouts.map((marker) => (
+          <span
+            className={`position-risk-marker ${marker.tone}`}
+            style={
+              {
+                "--risk-left": `${marker.labelPercent}%`,
+                "--risk-lane": marker.lane
+              } as CSSProperties
+            }
+            title={`${marker.label} ${formatCurrency(marker.price)}`}
+            key={`${marker.label}-${marker.price}`}
+          >
+            <strong>{marker.label}</strong>
+            <span>{formatCompactTradePrice(marker.price)}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function resolvePositionMarkPrice(position: DemoOpenPosition, currentPrice: number | null): number | null {
+  if (isFiniteNumber(position.markPrice) && position.markPrice > 0) return position.markPrice;
+  if (isFiniteNumber(currentPrice) && currentPrice > 0) return currentPrice;
+  return null;
+}
+
+function buildPositionRiskMarkers(position: DemoOpenPosition, markPrice: number | null): PositionRiskMarker[] {
+  const rawMarkers: Array<Omit<PositionRiskMarker, "percent">> = [];
+
+  if (position.liquidationPrice && position.liquidationPrice > 0) {
+    rawMarkers.push({ label: "LIQ", price: position.liquidationPrice, tone: "liquidation" });
+  }
+  if (position.stopLoss > 0) {
+    rawMarkers.push({ label: "SL", price: position.stopLoss, tone: "stop" });
+  }
+  if (markPrice && markPrice > 0) {
+    rawMarkers.push({ label: "MARK", price: markPrice, tone: "mark" });
+  }
+  if (position.entryPrice > 0) {
+    rawMarkers.push({ label: "ENTRY", price: position.entryPrice, tone: "entry" });
+  }
+  position.takeProfits.forEach((takeProfit, index) => {
+    if (takeProfit.price > 0) {
+      rawMarkers.push({ label: `TP${index + 1}`, price: takeProfit.price, tone: "take-profit" });
+    }
+  });
+
+  const prices = rawMarkers.map((marker) => marker.price);
+  if (!prices.length) return [];
+
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const rawRange = Math.max(maxPrice - minPrice, Math.max(Math.abs(maxPrice) * 0.004, 1));
+  const paddedMin = minPrice - rawRange * 0.08;
+  const paddedMax = maxPrice + rawRange * 0.08;
+  const range = Math.max(paddedMax - paddedMin, 1);
+
+  return rawMarkers.map((marker) => ({
+    ...marker,
+    percent: clamp(((marker.price - paddedMin) / range) * 100, 0, 100)
+  }));
+}
+
+function resolveRiskMarkerLayouts(markers: PositionRiskMarker[]): PositionRiskMarkerLayout[] {
+  if (!markers.length) return [];
+
+  const minGap = clamp(78 / Math.max(1, markers.length - 1), 8, 13);
+  const sorted = markers
+    .map((marker, index) => ({
+      ...marker,
+      index,
+      labelPercent: clamp(marker.percent, 4, 96),
+      lane: 0
+    }))
+    .sort((a, b) => a.labelPercent - b.labelPercent || a.index - b.index);
+
+  for (let index = 1; index < sorted.length; index += 1) {
+    sorted[index].labelPercent = Math.max(sorted[index].labelPercent, sorted[index - 1].labelPercent + minGap);
+  }
+
+  const rightOverflow = sorted[sorted.length - 1].labelPercent - 96;
+  if (rightOverflow > 0) {
+    sorted.forEach((marker) => {
+      marker.labelPercent -= rightOverflow;
+    });
+  }
+
+  for (let index = sorted.length - 2; index >= 0; index -= 1) {
+    sorted[index].labelPercent = Math.min(sorted[index].labelPercent, sorted[index + 1].labelPercent - minGap);
+  }
+
+  const leftOverflow = 4 - sorted[0].labelPercent;
+  if (leftOverflow > 0) {
+    sorted.forEach((marker) => {
+      marker.labelPercent += leftOverflow;
+    });
+  }
+
+  const laneRightEdges = [-Infinity, -Infinity];
+  sorted.forEach((marker) => {
+    const lane = marker.labelPercent - laneRightEdges[0] < minGap + 2 ? 1 : 0;
+    marker.lane = lane;
+    laneRightEdges[lane] = marker.labelPercent;
+  });
+
+  return sorted.map(({ index, ...marker }) => marker);
+}
+
+function formatRiskMapRange(markers: PositionRiskMarker[]): string {
+  if (!markers.length) return "--";
+  const prices = markers.map((marker) => marker.price);
+  return `${formatCompactTradePrice(Math.min(...prices))} - ${formatCompactTradePrice(Math.max(...prices))}`;
+}
+
+function formatOptionalCurrency(value: number | null | undefined): string {
+  return isFiniteNumber(value) ? formatCurrency(value) : "--";
+}
+
+function formatPositiveCurrency(value: number | null | undefined): string {
+  return isFiniteNumber(value) && value > 0 ? formatCurrency(value) : "--";
+}
+
+function formatOptionalPositionQuantity(quantity: number | null | undefined): string {
+  return isFiniteNumber(quantity) && quantity > 0 ? formatPositionQuantity(quantity) : "--";
+}
+
+function formatOptionalLeverage(leverage: number | null | undefined): string {
+  return isFiniteNumber(leverage) && leverage > 0 ? formatLeverageInput(leverage) : "--";
+}
+
+function formatOptionalPercent(value: number | null | undefined): string {
+  return isFiniteNumber(value) ? `${value.toFixed(2)}%` : "--";
 }
 
 function formatDemoSymbol(symbol: string): string {
@@ -1702,26 +1956,6 @@ function formatPositionQuantity(quantity: number): string {
   if (!Number.isFinite(quantity) || quantity <= 0) return "0 BTC";
   const maximumFractionDigits = quantity >= 10 ? 4 : quantity >= 1 ? 5 : 6;
   return `${quantity.toLocaleString("en-US", { maximumFractionDigits })} BTC`;
-}
-
-function formatBracketSummary(position: DemoOpenPosition): string {
-  const stopLoss = position.stopLoss > 0 ? `SL ${formatCompactTradePrice(position.stopLoss)}` : "SL --";
-  const openTakeProfits = position.takeProfits.filter((takeProfit) => takeProfit.price > 0 && !takeProfit.isHit);
-
-  if (!openTakeProfits.length) return `${stopLoss} / TP --`;
-
-  const visibleTakeProfits = openTakeProfits.slice(0, 2).map((takeProfit) => formatCompactTradePrice(takeProfit.price));
-  const hiddenCount = openTakeProfits.length - visibleTakeProfits.length;
-  return `${stopLoss} / TP ${visibleTakeProfits.join(", ")}${hiddenCount > 0 ? ` +${hiddenCount}` : ""}`;
-}
-
-function formatBracketTitle(position: DemoOpenPosition): string {
-  const stopLoss = position.stopLoss > 0 ? `SL ${formatCurrency(position.stopLoss)}` : "SL not set";
-  const takeProfits = position.takeProfits
-    .filter((takeProfit) => takeProfit.price > 0)
-    .map((takeProfit, index) => `TP${index + 1} ${formatCurrency(takeProfit.price)}${takeProfit.isHit ? " hit" : ""}`);
-
-  return [stopLoss, takeProfits.length ? takeProfits.join(" | ") : "TP not set"].join(" | ");
 }
 
 function PerformanceStats({ stats }: { stats: ReturnType<typeof calculateDemoTradeStats> }) {
@@ -1948,8 +2182,8 @@ function getSvgPointer(event: PointerEvent<SVGSVGElement>, width: number, height
   };
 }
 
-function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: number | null) {
-  const lines: Array<{ label: string; price: number; tone: string }> = [];
+function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: number | null): DemoOverlayLine[] {
+  const lines: DemoOverlayLine[] = [];
   if (currentPrice) lines.push({ label: "Mark", price: currentPrice, tone: "mark" });
   if (!position) return lines;
 
@@ -1960,6 +2194,49 @@ function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: numb
     lines.push({ label: `TP${index + 1}`, price: takeProfit.price, tone: takeProfit.isHit ? "hit" : "target" });
   });
   return lines;
+}
+
+function isBracketPriceMarker(tone: DemoOverlayTone): boolean {
+  return tone === "target" || tone === "hit" || tone === "danger" || tone === "liquidation";
+}
+
+function resolveOverlayMarkerLayouts(layouts: DemoOverlayLineLayout[], minY: number, maxY: number): DemoOverlayLineLayout[] {
+  if (layouts.length < 2) return layouts;
+
+  const minGap = 30;
+  const sorted = layouts
+    .map((layout, index) => ({ ...layout, index }))
+    .sort((a, b) => a.markerY - b.markerY || a.index - b.index);
+
+  sorted.forEach((layout) => {
+    layout.markerY = clamp(layout.markerY, minY, maxY);
+  });
+
+  for (let index = 1; index < sorted.length; index += 1) {
+    sorted[index].markerY = Math.max(sorted[index].markerY, sorted[index - 1].markerY + minGap);
+  }
+
+  const bottomOverflow = sorted[sorted.length - 1].markerY - maxY;
+  if (bottomOverflow > 0) {
+    sorted.forEach((layout) => {
+      layout.markerY -= bottomOverflow;
+    });
+  }
+
+  for (let index = sorted.length - 2; index >= 0; index -= 1) {
+    sorted[index].markerY = Math.min(sorted[index].markerY, sorted[index + 1].markerY - minGap);
+  }
+
+  const topOverflow = minY - sorted[0].markerY;
+  if (topOverflow > 0) {
+    sorted.forEach((layout) => {
+      layout.markerY += topOverflow;
+    });
+  }
+
+  return sorted
+    .sort((a, b) => a.index - b.index)
+    .map(({ index, ...layout }) => layout);
 }
 
 function parseLeverageInput(value: string): number | null {
