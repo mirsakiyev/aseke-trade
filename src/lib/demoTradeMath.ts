@@ -9,6 +9,7 @@ export type DemoTradeStatus =
   | "TAKE_PROFIT_HIT"
   | "LIQUIDATED"
   | "MANUALLY_CLOSED";
+export type DemoTradeCloseReason = "stop_loss" | "take_profit" | "liquidation" | "manual" | null;
 export type DemoTradeActionType =
   | "opened"
   | "SL updated"
@@ -60,6 +61,8 @@ export interface DemoOpenPosition {
   remainingQuantity: number;
   stopLoss: number;
   takeProfits: DemoTakeProfit[];
+  closeReason: DemoTradeCloseReason;
+  lastCheckedAt: string;
   realizedPnl: number;
   unrealizedPnl: number;
   returnPercent: number;
@@ -280,6 +283,8 @@ export function openDemoPosition(
       isHit: false,
       hitAt: null
     })),
+    closeReason: null,
+    lastCheckedAt: now,
     realizedPnl: 0,
     unrealizedPnl: 0,
     returnPercent: 0,
@@ -340,6 +345,18 @@ export function applyMarketPrice(
   }
 
   return nextState;
+}
+
+export function markDemoPositionPrice(
+  state: DemoTradeState,
+  markPrice: number,
+  now = new Date().toISOString()
+): DemoTradeState {
+  if (!state.openPosition || !Number.isFinite(markPrice) || markPrice <= 0) {
+    return state;
+  }
+
+  return markPosition(cloneState(state), markPrice, now);
 }
 
 export function updateDemoStopLoss(
@@ -845,6 +862,7 @@ function closePositionQuantity(
   position.exitPrice = roundPrice(exitPrice);
   position.markPrice = roundPrice(exitPrice);
   position.status = position.remainingQuantity <= EPSILON ? finalStatus : "PARTIALLY_CLOSED";
+  position.closeReason = position.remainingQuantity <= EPSILON ? closeReasonFromStatus(finalStatus) : null;
   position.unrealizedPnl = position.remainingQuantity > EPSILON
     ? calculateUnrealizedPnl({
         side: position.side,
@@ -855,6 +873,7 @@ function closePositionQuantity(
     : 0;
   position.returnPercent = position.initialMargin > 0 ? roundPercent((position.realizedPnl / position.initialMargin) * 100) : 0;
   position.updatedAt = now;
+  position.lastCheckedAt = now;
   position.actionLog.push(action);
   nextState.actionHistory.push(action);
 
@@ -899,7 +918,9 @@ function liquidateOpenPosition(state: DemoTradeState, markPrice: number, now: st
   position.markPrice = roundPrice(markPrice);
   position.exitPrice = roundPrice(markPrice);
   position.status = "LIQUIDATED";
+  position.closeReason = "liquidation";
   position.updatedAt = now;
+  position.lastCheckedAt = now;
   position.closedAt = now;
   position.actionLog.push(action);
   nextState.actionHistory.push(action);
@@ -929,6 +950,7 @@ function markPosition(state: DemoTradeState, markPrice: number, now: string): De
     maintenanceMarginRate: state.settings.maintenanceMarginRate
   });
   state.openPosition.updatedAt = now;
+  state.openPosition.lastCheckedAt = now;
   return refreshBalances(state, now);
 }
 
@@ -981,6 +1003,22 @@ function normalizeTakeProfits(
       isHit: "isHit" in takeProfit ? Boolean((takeProfit as DemoTakeProfit).isHit) : false,
       hitAt: "hitAt" in takeProfit ? (takeProfit as DemoTakeProfit).hitAt : null
     }));
+}
+
+function closeReasonFromStatus(status: DemoTradeStatus): DemoTradeCloseReason {
+  switch (status) {
+    case "STOP_LOSS_HIT":
+      return "stop_loss";
+    case "TAKE_PROFIT_HIT":
+      return "take_profit";
+    case "LIQUIDATED":
+      return "liquidation";
+    case "MANUALLY_CLOSED":
+    case "CLOSED":
+      return "manual";
+    default:
+      return null;
+  }
 }
 
 function normalizeSymbol(symbol: string): "BTCUSDT" | string {

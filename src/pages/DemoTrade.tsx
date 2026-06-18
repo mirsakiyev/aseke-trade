@@ -124,6 +124,7 @@ export function DemoTrade() {
   const [positionAddAmount, setPositionAddAmount] = useState("");
   const [positionErrors, setPositionErrors] = useState<string[]>([]);
   const currentPriceRef = useRef<number | null>(null);
+  const pendingMarketStateToPersistRef = useRef<DemoTradeState | null>(null);
 
   const stats = useMemo(() => calculateDemoTradeStats(demoState), [demoState]);
   const equityTone = stats.equity >= demoState.startingBalance ? "positive" : "negative";
@@ -165,13 +166,23 @@ export function DemoTrade() {
     persistDemoState(nextState);
   }, [persistDemoState]);
 
+  const applyMarketPriceToDemoState = useCallback((price: number, now?: string) => {
+    setDemoState((state) => {
+      const nextState = applyMarketPrice(state, price, now);
+      if (shouldPersistMarketState(state, nextState)) {
+        pendingMarketStateToPersistRef.current = nextState;
+      }
+      return nextState;
+    });
+  }, []);
+
   const applyLiveTicker = useCallback((ticker: DemoTradeTicker, updateSource = true) => {
     setCurrentPrice(ticker.price);
     if (updateSource) setMarketSource(ticker.source);
     setCandles((items) => applyLivePriceToCandles(items, ticker.price, timeframe, Date.parse(ticker.timestamp)));
-    setDemoState((state) => applyMarketPrice(state, ticker.price));
+    applyMarketPriceToDemoState(ticker.price, ticker.timestamp);
     setMarketError(ticker.source.includes(" cached") ? "Live BTC price is temporarily unavailable. Showing cached price while retrying." : null);
-  }, [timeframe]);
+  }, [applyMarketPriceToDemoState, timeframe]);
 
   useEffect(() => {
     currentPriceRef.current = currentPrice;
@@ -221,20 +232,12 @@ export function DemoTrade() {
   }, [isAuthLoading, user]);
 
   useEffect(() => {
-    if (!isHydrated) return;
+    const pendingMarketState = pendingMarketStateToPersistRef.current;
+    if (!pendingMarketState) return;
 
-    const saveTimer = window.setTimeout(() => {
-      const save = user
-        ? saveRegisteredDemoTradeState(user.id, demoState)
-        : Promise.resolve(saveGuestDemoTradeState(demoState));
-
-      void save
-        .then(() => setPersistenceError(null))
-        .catch(handleDemoStateSaveError);
-    }, 450);
-
-    return () => window.clearTimeout(saveTimer);
-  }, [demoState, handleDemoStateSaveError, isHydrated, user]);
+    pendingMarketStateToPersistRef.current = null;
+    persistDemoState(pendingMarketState);
+  }, [demoState, persistDemoState]);
 
   useEffect(() => {
     if (user) return;
@@ -250,14 +253,14 @@ export function DemoTrade() {
       setCandles(applyLivePriceToCandles(snapshot.candles, snapshot.ticker.price, timeframe, Date.parse(snapshot.ticker.timestamp)));
       setCurrentPrice(snapshot.ticker.price);
       setMarketSource(snapshot.source);
-      setDemoState((state) => applyMarketPrice(state, snapshot.ticker.price));
+      applyMarketPriceToDemoState(snapshot.ticker.price, snapshot.ticker.timestamp);
       setMarketError(snapshot.isCached ? "Live BTC market data is temporarily unavailable. Showing cached data while retrying." : null);
     } catch (error) {
       setMarketError(error instanceof Error ? error.message : "BTC data could not be loaded.");
     } finally {
       setIsMarketLoading(false);
     }
-  }, [activeSymbol.symbol, timeframe]);
+  }, [activeSymbol.symbol, applyMarketPriceToDemoState, timeframe]);
 
   useEffect(() => {
     void loadMarketData();
@@ -1821,6 +1824,27 @@ function ErrorList({ errors }: { errors: string[] }) {
       ))}
     </ul>
   );
+}
+
+function shouldPersistMarketState(previous: DemoTradeState, next: DemoTradeState): boolean {
+  if (previous === next) return false;
+  if (previous.tradeHistory.length !== next.tradeHistory.length) return true;
+  if (previous.actionHistory.length !== next.actionHistory.length) return true;
+
+  const previousPosition = previous.openPosition;
+  const nextPosition = next.openPosition;
+  if (!previousPosition && !nextPosition) return false;
+  if (!previousPosition || !nextPosition) return true;
+  if (previousPosition.tradeId !== nextPosition.tradeId) return true;
+  if (previousPosition.status !== nextPosition.status) return true;
+
+  return previousPosition.takeProfits.some((previousTakeProfit) => {
+    const nextTakeProfit = nextPosition.takeProfits.find((takeProfit) => takeProfit.id === previousTakeProfit.id);
+    return Boolean(nextTakeProfit && (
+      nextTakeProfit.isHit !== previousTakeProfit.isHit
+      || nextTakeProfit.hitAt !== previousTakeProfit.hitAt
+    ));
+  });
 }
 
 function applyLivePriceToCandles(

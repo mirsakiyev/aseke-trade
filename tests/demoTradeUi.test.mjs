@@ -7,9 +7,13 @@ const layoutSource = await readFile(new URL("../src/components/Layout.tsx", impo
 const pageSource = await readFile(new URL("../src/pages/DemoTrade.tsx", import.meta.url), "utf8");
 const stylesSource = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 const persistenceSource = await readFile(new URL("../src/lib/demoTradePersistence.ts", import.meta.url), "utf8");
+const reconciliationSource = await readFile(new URL("../src/lib/demoTradeReconciliation.ts", import.meta.url), "utf8");
 const marketDataSource = await readFile(new URL("../src/lib/demoTradeMarketData.ts", import.meta.url), "utf8");
+const reconcileFunctionSource = await readFile(new URL("../supabase/functions/demo-trade-reconcile/index.ts", import.meta.url), "utf8");
 const migrationSource = await readFile(new URL("../supabase/migrations/202606160001_demo_trade.sql", import.meta.url), "utf8");
 const grantMigrationSource = await readFile(new URL("../supabase/migrations/202606180001_demo_trade_persistence_grants.sql", import.meta.url), "utf8");
+const staleSaveMigrationSource = await readFile(new URL("../supabase/migrations/202606180002_demo_trade_stale_save_guard.sql", import.meta.url), "utf8");
+const serverReconciliationMigrationSource = await readFile(new URL("../supabase/migrations/202606180003_demo_trade_server_reconciliation.sql", import.meta.url), "utf8");
 
 test("Demo Trade page renders as a public route", () => {
   assert.match(appSource, /import \{ DemoTrade \} from "\.\/pages\/DemoTrade"/);
@@ -33,8 +37,11 @@ test("Demo Trade page includes guest and authenticated persistence paths", () =>
   assert.match(persistenceSource, /chooseLatestState/);
   assert.match(persistenceSource, /demo_trade_states/);
   assert.match(persistenceSource, /save_demo_trade_state/);
+  assert.match(persistenceSource, /demo-trade-reconcile/);
   assert.match(persistenceSource, /RegisteredDemoTradeLoadResult/);
   assert.match(persistenceSource, /isAccountSyncAvailable/);
+  assert.match(persistenceSource, /mergeBracketOrdersForSameOpenPosition/);
+  assert.match(persistenceSource, /normalizeStoredOpenPosition/);
   assert.match(persistenceSource, /REGISTERED_SAVE_ERROR_MESSAGE/);
   assert.match(persistenceSource, /onConflict: "user_id"/);
   assert.match(persistenceSource, /throw new Error\(REGISTERED_SAVE_ERROR_MESSAGE\)/);
@@ -43,6 +50,27 @@ test("Demo Trade page includes guest and authenticated persistence paths", () =>
   assert.match(pageSource, /setIsHydrated\(false\)/);
   assert.match(pageSource, /setIsHydrated\(isAccountSyncAvailable\)/);
   assert.match(pageSource, /Demo trade progress could not be saved to your account/);
+});
+
+test("registered Demo Trade has backend reconciliation primitives", () => {
+  assert.match(reconciliationSource, /reconcileDemoTradeStateWithCandles/);
+  assert.match(reconciliationSource, /liquidation first, then stop loss, then take profits/);
+  assert.match(reconcileFunctionSource, /fetchHistoricalCandles/);
+  assert.match(reconcileFunctionSource, /save_reconciled_demo_trade_state/);
+  assert.match(reconcileFunctionSource, /scope === "all"/);
+  assert.match(serverReconciliationMigrationSource, /demo_trade_execution_events/);
+  assert.match(serverReconciliationMigrationSource, /unique \(user_id, trade_id, event_key\)/);
+  assert.match(serverReconciliationMigrationSource, /for update/);
+  assert.match(serverReconciliationMigrationSource, /cron\.schedule/);
+  assert.match(serverReconciliationMigrationSource, /demo-trade-reconcile-every-5-minutes/);
+});
+
+test("Demo Trade does not account-save ordinary market ticks over bracket edits", () => {
+  assert.match(pageSource, /pendingMarketStateToPersistRef/);
+  assert.match(pageSource, /shouldPersistMarketState/);
+  assert.match(pageSource, /applyMarketPriceToDemoState/);
+  assert.match(pageSource, /persistDemoState\(pendingMarketState\)/);
+  assert.doesNotMatch(pageSource, /window\.setTimeout\(\(\) => \{\s*const save = user/);
 });
 
 test("Demo Trade page includes custom chart and no TradingView widget", () => {
@@ -202,4 +230,8 @@ test("registered demo state migration includes RLS and server-side validation", 
   assert.match(grantMigrationSource, /grant select, insert, update on table public\.demo_trade_states to authenticated/);
   assert.match(grantMigrationSource, /grant execute on function public\.save_demo_trade_state\(jsonb\) to authenticated/);
   assert.match(grantMigrationSource, /notify pgrst, 'reload schema'/);
+  assert.match(staleSaveMigrationSource, /demo_trade_state_updated_at/);
+  assert.match(staleSaveMigrationSource, /public\.demo_trade_state_updated_at\(public\.demo_trade_states\.state\)/);
+  assert.match(staleSaveMigrationSource, /<= incoming_updated_at/);
+  assert.match(staleSaveMigrationSource, /notify pgrst, 'reload schema'/);
 });

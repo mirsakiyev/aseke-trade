@@ -1,4 +1,4 @@
-import type { DemoTradeState } from "./demoTradeMath";
+import type { DemoOpenPosition, DemoTakeProfit, DemoTradeState } from "./demoTradeMath";
 import { supabase } from "./supabase";
 
 const DEMO_TRADE_SESSION_KEY = "aseke-demo-trade-state-v1";
@@ -14,6 +14,10 @@ interface SupabasePersistenceError {
 export interface RegisteredDemoTradeLoadResult {
   state: DemoTradeState | null;
   isAccountSyncAvailable: boolean;
+}
+
+interface RegisteredDemoTradeReconcileResponse {
+  state?: unknown;
 }
 
 export function getDemoTradeGuestSessionId(): string {
@@ -53,6 +57,15 @@ export async function loadRegisteredDemoTradeState(userId: string): Promise<Regi
 
   if (!supabase) {
     return { state: localState, isAccountSyncAvailable: false };
+  }
+
+  const reconciledState = await reconcileRegisteredDemoTradeState();
+  if (reconciledState) {
+    const latestState = chooseLatestState(localState, reconciledState);
+    if (latestState && typeof window !== "undefined") {
+      writeStoredState(registeredStateKey(userId), latestState, window.localStorage);
+    }
+    return { state: latestState, isAccountSyncAvailable: true };
   }
 
   const { data, error } = await supabase
@@ -101,6 +114,16 @@ export async function saveRegisteredDemoTradeState(userId: string, state: DemoTr
     throw new Error(REGISTERED_SAVE_ERROR_MESSAGE);
   }
 
+  const { data: existingData } = await supabase
+    .from("demo_trade_states")
+    .select("state")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const existingState = normalizeStoredDemoState((existingData as { state?: unknown } | null)?.state);
+  if (existingState && isFirstStateNewer(existingState, payload)) {
+    return;
+  }
+
   const { error: upsertError } = await supabase
     .from("demo_trade_states")
     .upsert({
@@ -115,6 +138,10 @@ export async function saveRegisteredDemoTradeState(userId: string, state: DemoTr
       trade_history: payload.tradeHistory,
       settings: payload.settings,
       reset_at: payload.resetAt,
+      last_checked_at: readStateLastCheckedAt(payload),
+      close_reason: readStateCloseReason(payload),
+      close_price: readStateClosePrice(payload),
+      close_time: readStateCloseTime(payload),
       updated_at: payload.updatedAt
     }, {
       onConflict: "user_id"
@@ -122,6 +149,20 @@ export async function saveRegisteredDemoTradeState(userId: string, state: DemoTr
 
   if (upsertError) {
     throw new Error(REGISTERED_SAVE_ERROR_MESSAGE);
+  }
+}
+
+async function reconcileRegisteredDemoTradeState(): Promise<DemoTradeState | null> {
+  if (!supabase) return null;
+
+  try {
+    const { data, error } = await supabase.functions.invoke("demo-trade-reconcile", {
+      body: { scope: "user" }
+    });
+    if (error) return null;
+    return normalizeStoredDemoState((data as RegisteredDemoTradeReconcileResponse | null)?.state);
+  } catch {
+    return null;
   }
 }
 
@@ -166,11 +207,23 @@ function chooseLatestState(
   if (!firstState) return secondState;
   if (!secondState) return firstState;
 
+  if (isFirstStateNewer(firstState, secondState)) {
+    return mergeBracketOrdersForSameOpenPosition(firstState, secondState);
+  }
+
+  if (isFirstStateNewer(secondState, firstState)) {
+    return mergeBracketOrdersForSameOpenPosition(secondState, firstState);
+  }
+
+  return mergeBracketOrdersForSameOpenPosition(secondState, firstState);
+}
+
+function isFirstStateNewer(firstState: DemoTradeState, secondState: DemoTradeState): boolean {
   const firstTime = Date.parse(firstState.updatedAt);
   const secondTime = Date.parse(secondState.updatedAt);
-  if (!Number.isFinite(firstTime)) return secondState;
-  if (!Number.isFinite(secondTime)) return firstState;
-  return secondTime > firstTime ? secondState : firstState;
+  if (!Number.isFinite(firstTime)) return false;
+  if (!Number.isFinite(secondTime)) return true;
+  return firstTime > secondTime;
 }
 
 function normalizeStoredDemoState(value: unknown): DemoTradeState | null {
@@ -180,11 +233,115 @@ function normalizeStoredDemoState(value: unknown): DemoTradeState | null {
   if (!Number.isFinite(Number(value.currentBalance)) || Number(value.currentBalance) < 0) return null;
   if (!Number.isFinite(Number(value.availableBalance)) || Number(value.availableBalance) < 0) return null;
 
-  return value as unknown as DemoTradeState;
+  const state = value as unknown as DemoTradeState;
+  return {
+    ...state,
+    openPosition: normalizeStoredOpenPosition((value as Record<string, unknown>).openPosition)
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeStoredOpenPosition(value: unknown): DemoOpenPosition | null {
+  if (value === null || value === undefined) return null;
+  if (!isRecord(value)) return null;
+
+  const position = value as unknown as DemoOpenPosition;
+  return {
+    ...position,
+    stopLoss: finiteNumber(position.stopLoss, 0),
+    takeProfits: normalizeStoredTakeProfits(position.takeProfits)
+  };
+}
+
+function normalizeStoredTakeProfits(value: unknown): DemoTakeProfit[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter(isRecord)
+    .map((takeProfit, index) => ({
+      id: typeof takeProfit.id === "string" && takeProfit.id ? takeProfit.id : `tp-${index + 1}`,
+      price: finiteNumber(takeProfit.price, 0),
+      closePercent: finiteNumber(takeProfit.closePercent, 0),
+      isHit: Boolean(takeProfit.isHit),
+      hitAt: typeof takeProfit.hitAt === "string" ? takeProfit.hitAt : null
+    }))
+    .filter((takeProfit) => takeProfit.price > 0 && takeProfit.closePercent > 0);
+}
+
+function mergeBracketOrdersForSameOpenPosition(
+  latestState: DemoTradeState,
+  previousState: DemoTradeState
+): DemoTradeState {
+  const latestPosition = latestState.openPosition;
+  const previousPosition = previousState.openPosition;
+
+  if (!latestPosition || !previousPosition || latestPosition.tradeId !== previousPosition.tradeId) {
+    return latestState;
+  }
+
+  let nextPosition = latestPosition;
+  const previousPositionTime = Date.parse(previousPosition.updatedAt);
+
+  if (
+    latestPosition.stopLoss <= 0
+    && previousPosition.stopLoss > 0
+    && !hasBracketActionSince(latestState, ["SL updated"], previousPositionTime)
+  ) {
+    nextPosition = { ...nextPosition, stopLoss: previousPosition.stopLoss };
+  }
+
+  if (
+    latestPosition.takeProfits.length === 0
+    && previousPosition.takeProfits.length > 0
+    && !hasBracketActionSince(latestState, ["TP removed", "TP edited"], previousPositionTime)
+  ) {
+    nextPosition = { ...nextPosition, takeProfits: previousPosition.takeProfits };
+  }
+
+  return nextPosition === latestPosition
+    ? latestState
+    : { ...latestState, openPosition: nextPosition };
+}
+
+function hasBracketActionSince(
+  state: DemoTradeState,
+  actionTypes: string[],
+  since: number
+): boolean {
+  const actions = [
+    ...(state.actionHistory ?? []),
+    ...(state.openPosition?.actionLog ?? [])
+  ];
+
+  return actions.some((action) => {
+    if (!actionTypes.includes(action.type)) return false;
+    const actionTime = Date.parse(action.timestamp);
+    return !Number.isFinite(since) || !Number.isFinite(actionTime) || actionTime >= since;
+  });
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function readStateLastCheckedAt(state: DemoTradeState): string | null {
+  return state.openPosition?.lastCheckedAt ?? null;
+}
+
+function readStateCloseReason(state: DemoTradeState): string | null {
+  return state.tradeHistory[0]?.closeReason ?? state.openPosition?.closeReason ?? null;
+}
+
+function readStateClosePrice(state: DemoTradeState): number | null {
+  return state.tradeHistory[0]?.exitPrice ?? state.openPosition?.exitPrice ?? null;
+}
+
+function readStateCloseTime(state: DemoTradeState): string | null {
+  return state.tradeHistory[0]?.closedAt ?? state.openPosition?.closedAt ?? null;
 }
 
 function isValidationError(error: SupabasePersistenceError): boolean {
