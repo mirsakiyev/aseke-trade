@@ -28,6 +28,7 @@ import {
   updateDemoLeverage,
   updateDemoStopLoss,
   updateDemoTakeProfits,
+  type DemoTakeProfit,
   type DemoPendingLimitOrder,
   type DemoOpenPosition,
   type DemoMarginMode,
@@ -62,7 +63,6 @@ import {
 interface TakeProfitDraft {
   id: string;
   price: string;
-  priceInputMode: DemoTakeProfitInputMode;
   closePercent: string;
 }
 
@@ -84,7 +84,7 @@ interface DemoOverlayLineLayout {
 }
 
 const emptyTakeProfits: TakeProfitDraft[] = [
-  { id: "tp-1", price: "", priceInputMode: "price", closePercent: "100" }
+  { id: "tp-1", price: "", closePercent: "100" }
 ];
 
 const DEMO_TRADE_LIVE_REFRESH_MS = 1000;
@@ -155,12 +155,14 @@ export function DemoTrade() {
   const [isBracketEnabled, setIsBracketEnabled] = useState(false);
   const [stopLossInputMode, setStopLossInputMode] = useState<DemoStopLossInputMode>("price");
   const [stopLoss, setStopLoss] = useState("");
+  const [takeProfitInputMode, setTakeProfitInputMode] = useState<DemoTakeProfitInputMode>("price");
   const [takeProfits, setTakeProfits] = useState<TakeProfitDraft[]>(emptyTakeProfits);
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [nextStartingBalance, setNextStartingBalance] = useState("1000");
   const [showResetModal, setShowResetModal] = useState(false);
   const [positionStopLoss, setPositionStopLoss] = useState("");
   const [positionLeverage, setPositionLeverage] = useState("5");
+  const [positionTakeProfitInputMode, setPositionTakeProfitInputMode] = useState<DemoTakeProfitInputMode>("price");
   const [positionTakeProfits, setPositionTakeProfits] = useState<TakeProfitDraft[]>([]);
   const [manualClosePercent, setManualClosePercent] = useState("100");
   const [positionAddAmount, setPositionAddAmount] = useState("");
@@ -330,6 +332,7 @@ export function DemoTrade() {
     if (!position) {
       setPositionTakeProfits([]);
       setPositionStopLoss("");
+      setPositionTakeProfitInputMode("price");
       setManualClosePercent("100");
       setPositionAddAmount("");
       return;
@@ -342,10 +345,10 @@ export function DemoTrade() {
       position.takeProfits.map((takeProfit) => ({
         id: takeProfit.id,
         price: String(takeProfit.price),
-        priceInputMode: "price",
         closePercent: String(takeProfit.closePercent)
       }))
     );
+    setPositionTakeProfitInputMode("price");
   }, [demoState.openPosition?.tradeId]);
 
   const openTrade = (requestedSide: DemoTradeSide) => {
@@ -354,7 +357,15 @@ export function DemoTrade() {
 
     if (orderType === "limit") {
       const nextLimitPrice = parseNumber(limitPrice);
-      const submittedBracket = buildSubmittedBracket(isBracketEnabled, stopLoss, stopLossInputMode, requestedSide, nextLimitPrice, takeProfits);
+      const submittedBracket = buildSubmittedBracket(
+        isBracketEnabled,
+        stopLoss,
+        stopLossInputMode,
+        requestedSide,
+        nextLimitPrice,
+        takeProfits,
+        takeProfitInputMode
+      );
       const nextErrors: string[] = [];
       if (!user) nextErrors.push("Limit orders are available for registered users only.");
       if (!Number.isFinite(nextLimitPrice) || nextLimitPrice <= 0) nextErrors.push("Enter a valid limit price.");
@@ -391,7 +402,15 @@ export function DemoTrade() {
       return;
     }
 
-    const submittedBracket = buildSubmittedBracket(isBracketEnabled, stopLoss, stopLossInputMode, requestedSide, entryPrice, takeProfits);
+    const submittedBracket = buildSubmittedBracket(
+      isBracketEnabled,
+      stopLoss,
+      stopLossInputMode,
+      requestedSide,
+      entryPrice,
+      takeProfits,
+      takeProfitInputMode
+    );
     const result = openDemoPosition(demoState, {
       userId: user?.id ?? null,
       sessionId: demoState.sessionId,
@@ -415,46 +434,55 @@ export function DemoTrade() {
     commitDemoState(result.state);
   };
 
-  const updateStop = () => {
-    const result = updateDemoStopLoss(demoState, parseNumber(positionStopLoss));
-    if (!result.ok) {
-      setPositionErrors(result.errors);
-      return;
-    }
-    setPositionErrors([]);
-    commitDemoState(result.state);
-  };
-
-  const updateLeverage = () => {
-    const result = updateDemoLeverage(demoState, parseNumber(positionLeverage));
-    if (!result.ok) {
-      setPositionErrors(result.errors);
-      return;
-    }
-    setPositionErrors([]);
-    commitDemoState(result.state);
-  };
-
-  const updateTps = () => {
+  const savePositionChanges = () => {
     const position = demoState.openPosition;
     if (!position) return;
 
-    const result = updateDemoTakeProfits(
-      demoState,
-      positionTakeProfits.map((takeProfit) => ({
-        id: takeProfit.id,
-        price: resolveSubmittedTakeProfitPrice(takeProfit, position.side, position.entryPrice),
-        closePercent: parseNumber(takeProfit.closePercent),
-        isHit: position.takeProfits.find((item) => item.id === takeProfit.id)?.isHit ?? false,
-        hitAt: position.takeProfits.find((item) => item.id === takeProfit.id)?.hitAt ?? null
-      }))
-    );
-    if (!result.ok) {
-      setPositionErrors(result.errors);
-      return;
+    let nextState = demoState;
+    const now = new Date().toISOString();
+    const nextStopLoss = parseNumber(positionStopLoss);
+    const stopLossChanged = positionStopLoss.trim() !== "" || position.stopLoss > 0;
+
+    if (stopLossChanged && nextStopLoss !== position.stopLoss) {
+      const stopResult = updateDemoStopLoss(nextState, nextStopLoss, now);
+      if (!stopResult.ok) {
+        setPositionErrors(stopResult.errors);
+        return;
+      }
+      nextState = stopResult.state;
     }
+
+    const nextLeverage = parseNumber(positionLeverage);
+    if (nextLeverage !== position.leverage) {
+      const leverageResult = updateDemoLeverage(nextState, nextLeverage, now);
+      if (!leverageResult.ok) {
+        setPositionErrors(leverageResult.errors);
+        return;
+      }
+      nextState = leverageResult.state;
+    }
+
+    const currentPosition = nextState.openPosition;
+    if (!currentPosition) return;
+    const nextTakeProfits = positionTakeProfits.map((takeProfit) => ({
+      id: takeProfit.id,
+      price: resolveSubmittedTakeProfitPrice(takeProfit.price, positionTakeProfitInputMode, currentPosition.side, currentPosition.entryPrice),
+      closePercent: parseNumber(takeProfit.closePercent),
+      isHit: currentPosition.takeProfits.find((item) => item.id === takeProfit.id)?.isHit ?? false,
+      hitAt: currentPosition.takeProfits.find((item) => item.id === takeProfit.id)?.hitAt ?? null
+    }));
+
+    if (haveTakeProfitDraftsChanged(currentPosition.takeProfits, nextTakeProfits)) {
+      const takeProfitResult = updateDemoTakeProfits(nextState, nextTakeProfits, now);
+      if (!takeProfitResult.ok) {
+        setPositionErrors(takeProfitResult.errors);
+        return;
+      }
+      nextState = takeProfitResult.state;
+    }
+
     setPositionErrors([]);
-    commitDemoState(result.state);
+    commitDemoState(nextState);
   };
 
   const addToPosition = () => {
@@ -598,6 +626,7 @@ export function DemoTrade() {
               position={demoState.openPosition}
               stopLoss={positionStopLoss}
               leverage={positionLeverage}
+              takeProfitInputMode={positionTakeProfitInputMode}
               takeProfits={positionTakeProfits}
               closePercent={manualClosePercent}
               addAmount={positionAddAmount}
@@ -607,14 +636,13 @@ export function DemoTrade() {
               errors={positionErrors}
               onStopLossChange={setPositionStopLoss}
               onLeverageChange={setPositionLeverage}
+              onTakeProfitInputModeChange={setPositionTakeProfitInputMode}
               onTakeProfitsChange={setPositionTakeProfits}
               onClosePercentChange={setManualClosePercent}
               onAddAmountChange={setPositionAddAmount}
               onQuantityUnitChange={applyQuantityUnit}
               onAddToPosition={addToPosition}
-              onUpdateStop={updateStop}
-              onUpdateLeverage={updateLeverage}
-              onUpdateTakeProfits={updateTps}
+              onSaveChanges={savePositionChanges}
               onClose={closePosition}
             />
           ) : (
@@ -628,6 +656,7 @@ export function DemoTrade() {
               stopLossInputMode={stopLossInputMode}
               limitPrice={limitPrice}
               stopLoss={stopLoss}
+              takeProfitInputMode={takeProfitInputMode}
               takeProfits={takeProfits}
               currentPrice={currentPrice}
               availableBalance={demoState.availableBalance}
@@ -645,6 +674,7 @@ export function DemoTrade() {
               onStopLossInputModeChange={setStopLossInputMode}
               onLimitPriceChange={setLimitPrice}
               onStopLossChange={setStopLoss}
+              onTakeProfitInputModeChange={setTakeProfitInputMode}
               onTakeProfitsChange={setTakeProfits}
               onOpen={openTrade}
             />
@@ -662,9 +692,7 @@ export function DemoTrade() {
               <h2>Reset / re-up</h2>
             </div>
           </div>
-          <p className="demo-balance-copy">
-            Set a fresh practice balance before resetting. Open positions, pending orders, and trade history clear after confirmation.
-          </p>
+          <p className="demo-balance-copy">Set a fresh practice balance before resetting.</p>
           <label>
             Starting Balance
             <input
@@ -677,7 +705,7 @@ export function DemoTrade() {
           </label>
           <button className="ghost-button compact candle-hover-button" type="button" onClick={requestBalanceReset}>
             <RotateCcw size={16} />
-            Reset and Apply Balance
+            Reset and Apply New Balance
           </button>
           <div className="demo-balance-note">
             <strong>Clean reset</strong>
@@ -726,6 +754,7 @@ function TradeEntryForm({
   stopLossInputMode,
   limitPrice,
   stopLoss,
+  takeProfitInputMode,
   takeProfits,
   currentPrice,
   availableBalance,
@@ -740,6 +769,7 @@ function TradeEntryForm({
   onStopLossInputModeChange,
   onLimitPriceChange,
   onStopLossChange,
+  onTakeProfitInputModeChange,
   onTakeProfitsChange,
   onOpen
 }: {
@@ -752,6 +782,7 @@ function TradeEntryForm({
   stopLossInputMode: DemoStopLossInputMode;
   limitPrice: string;
   stopLoss: string;
+  takeProfitInputMode: DemoTakeProfitInputMode;
   takeProfits: TakeProfitDraft[];
   currentPrice: number | null;
   availableBalance: number;
@@ -766,6 +797,7 @@ function TradeEntryForm({
   onStopLossInputModeChange: (mode: DemoStopLossInputMode) => void;
   onLimitPriceChange: (value: string) => void;
   onStopLossChange: (value: string) => void;
+  onTakeProfitInputModeChange: (mode: DemoTakeProfitInputMode) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
   onOpen: (side: DemoTradeSide) => void;
 }) {
@@ -918,7 +950,12 @@ function TradeEntryForm({
                 placeholder={stopLossInputMode === "percent" ? "SL distance %" : "Stop price"}
               />
             </label>
-            <TakeProfitEditor takeProfits={takeProfits} onChange={onTakeProfitsChange} />
+            <TakeProfitEditor
+              inputMode={takeProfitInputMode}
+              takeProfits={takeProfits}
+              onInputModeChange={onTakeProfitInputModeChange}
+              onChange={onTakeProfitsChange}
+            />
           </>
         )}
       </details>
@@ -1457,6 +1494,7 @@ function PositionManager({
   position,
   stopLoss,
   leverage,
+  takeProfitInputMode,
   takeProfits,
   closePercent,
   addAmount,
@@ -1466,19 +1504,19 @@ function PositionManager({
   errors,
   onStopLossChange,
   onLeverageChange,
+  onTakeProfitInputModeChange,
   onTakeProfitsChange,
   onClosePercentChange,
   onAddAmountChange,
   onQuantityUnitChange,
   onAddToPosition,
-  onUpdateStop,
-  onUpdateLeverage,
-  onUpdateTakeProfits,
+  onSaveChanges,
   onClose
 }: {
   position: DemoOpenPosition;
   stopLoss: string;
   leverage: string;
+  takeProfitInputMode: DemoTakeProfitInputMode;
   takeProfits: TakeProfitDraft[];
   closePercent: string;
   addAmount: string;
@@ -1488,14 +1526,13 @@ function PositionManager({
   errors: string[];
   onStopLossChange: (value: string) => void;
   onLeverageChange: (value: string) => void;
+  onTakeProfitInputModeChange: (mode: DemoTakeProfitInputMode) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
   onClosePercentChange: (value: string) => void;
   onAddAmountChange: (value: string) => void;
   onQuantityUnitChange: (unit: DemoQuantityUnit) => void;
   onAddToPosition: () => void;
-  onUpdateStop: () => void;
-  onUpdateLeverage: () => void;
-  onUpdateTakeProfits: () => void;
+  onSaveChanges: () => void;
   onClose: () => void;
 }) {
   const closePercentValue = clamp(parseNumber(closePercent), 0, 100);
@@ -1571,38 +1608,23 @@ function PositionManager({
         </button>
       </div>
 
-      <div className="demo-inline-edit">
+      <div className="position-settings-grid">
         <label>
           Stop Loss
           <input type="number" min="0" step="0.01" value={stopLoss} onChange={(event) => onStopLossChange(event.target.value)} />
         </label>
-        <button className="ghost-button compact" type="button" onClick={onUpdateStop}>
-          <Save size={16} />
-          Update SL
-        </button>
+        <LeverageSelector leverage={leverage} onApply={onLeverageChange} />
       </div>
 
-      <div className="demo-inline-edit">
-        <label>
-          Leverage
-          <select value={leverage} onChange={(event) => onLeverageChange(event.target.value)}>
-            {Array.from({ length: 100 }, (_, index) => index + 1).map((value) => (
-              <option value={value} key={value}>
-                {value}x
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="ghost-button compact" type="button" onClick={onUpdateLeverage}>
-          <Save size={16} />
-          Update
-        </button>
-      </div>
-
-      <TakeProfitEditor takeProfits={takeProfits} onChange={onTakeProfitsChange} />
-      <button className="ghost-button compact" type="button" onClick={onUpdateTakeProfits}>
+      <TakeProfitEditor
+        inputMode={takeProfitInputMode}
+        takeProfits={takeProfits}
+        onInputModeChange={onTakeProfitInputModeChange}
+        onChange={onTakeProfitsChange}
+      />
+      <button className="ghost-button compact" type="button" onClick={onSaveChanges}>
         <Save size={16} />
-        Save TP Changes
+        Save Changes
       </button>
 
       <div className="manual-close-block">
@@ -1716,11 +1738,33 @@ function formatTakeProfitPercentFromTenths(tenths: number): string {
   return (tenths / 10).toFixed(1).replace(/\.0$/, "");
 }
 
+function haveTakeProfitDraftsChanged(
+  currentTakeProfits: DemoTakeProfit[],
+  nextTakeProfits: Array<Pick<DemoTakeProfit, "id" | "price" | "closePercent" | "isHit" | "hitAt">>
+): boolean {
+  if (currentTakeProfits.length !== nextTakeProfits.length) return true;
+
+  return nextTakeProfits.some((nextTakeProfit, index) => {
+    const currentTakeProfit = currentTakeProfits[index];
+    if (!currentTakeProfit) return true;
+
+    return currentTakeProfit.id !== nextTakeProfit.id
+      || currentTakeProfit.price !== nextTakeProfit.price
+      || currentTakeProfit.closePercent !== nextTakeProfit.closePercent
+      || currentTakeProfit.isHit !== nextTakeProfit.isHit
+      || currentTakeProfit.hitAt !== nextTakeProfit.hitAt;
+  });
+}
+
 function TakeProfitEditor({
+  inputMode,
   takeProfits,
+  onInputModeChange,
   onChange
 }: {
+  inputMode: DemoTakeProfitInputMode;
   takeProfits: TakeProfitDraft[];
+  onInputModeChange: (mode: DemoTakeProfitInputMode) => void;
   onChange: (items: TakeProfitDraft[]) => void;
 }) {
   const updateRow = (id: string, patch: Partial<TakeProfitDraft>) => {
@@ -1732,7 +1776,7 @@ function TakeProfitEditor({
   };
 
   const addRow = () => {
-    const nextRows = [...takeProfits, { id: `tp-${Date.now()}`, price: "", priceInputMode: "price" as DemoTakeProfitInputMode, closePercent: "" }];
+    const nextRows = [...takeProfits, { id: `tp-${Date.now()}`, price: "", closePercent: "" }];
     onChange(rebalanceTakeProfitPercents(nextRows));
   };
 
@@ -1746,19 +1790,21 @@ function TakeProfitEditor({
         <div className="tp-draft-row" key={takeProfit.id}>
           <label>
             <span className="tp-price-label">
-              TP{index + 1} {takeProfit.priceInputMode === "percent" ? "%" : "Price"}
-              <TakeProfitModeSelector
-                mode={takeProfit.priceInputMode ?? "price"}
-                onApply={(priceInputMode) => updateRow(takeProfit.id, { priceInputMode })}
-              />
+              TP{index + 1} {inputMode === "percent" ? "%" : "Price"}
+              {index === 0 && (
+                <TakeProfitModeSelector
+                  mode={inputMode}
+                  onApply={onInputModeChange}
+                />
+              )}
             </span>
             <input
               type="number"
               min="0"
-              step={(takeProfit.priceInputMode ?? "price") === "percent" ? "0.1" : "0.01"}
+              step={inputMode === "percent" ? "0.1" : "0.01"}
               value={takeProfit.price}
               onChange={(event) => updateRow(takeProfit.id, { price: event.target.value })}
-              placeholder={(takeProfit.priceInputMode ?? "price") === "percent" ? "TP distance %" : "Target price"}
+              placeholder={inputMode === "percent" ? "TP distance %" : "Target price"}
             />
           </label>
           <label>
@@ -2812,7 +2858,8 @@ function buildSubmittedBracket(
   stopLossInputMode: DemoStopLossInputMode,
   side: DemoTradeSide,
   referencePrice: number,
-  takeProfits: TakeProfitDraft[]
+  takeProfits: TakeProfitDraft[],
+  takeProfitInputMode: DemoTakeProfitInputMode
 ) {
   if (!isBracketEnabled) {
     return {
@@ -2825,7 +2872,7 @@ function buildSubmittedBracket(
     stopLoss: resolveSubmittedStopLoss(stopLoss, stopLossInputMode, side, referencePrice),
     takeProfits: takeProfits.map((takeProfit) => ({
       id: takeProfit.id,
-      price: resolveSubmittedTakeProfitPrice(takeProfit, side, referencePrice),
+      price: resolveSubmittedTakeProfitPrice(takeProfit.price, takeProfitInputMode, side, referencePrice),
       closePercent: parseNumber(takeProfit.closePercent)
     }))
   };
@@ -2849,12 +2896,13 @@ function resolveSubmittedStopLoss(
 }
 
 function resolveSubmittedTakeProfitPrice(
-  takeProfit: TakeProfitDraft,
+  value: string,
+  mode: DemoTakeProfitInputMode,
   side: DemoTradeSide,
   referencePrice: number
 ): number {
-  const parsedValue = parseNumber(takeProfit.price);
-  if ((takeProfit.priceInputMode ?? "price") === "price" || parsedValue <= 0) return parsedValue;
+  const parsedValue = parseNumber(value);
+  if (mode === "price" || parsedValue <= 0) return parsedValue;
   if (!Number.isFinite(referencePrice) || referencePrice <= 0) return 0;
 
   const targetDistance = clamp(parsedValue, 0, 100) / 100;
