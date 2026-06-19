@@ -83,6 +83,12 @@ interface DemoOverlayLineLayout {
   markerY: number;
 }
 
+interface PositionRiskProgressSegment {
+  startPercent: number;
+  widthPercent: number;
+  tone: "positive" | "negative";
+}
+
 const emptyTakeProfits: TakeProfitDraft[] = [
   { id: "tp-1", price: "", closePercent: "100" }
 ];
@@ -707,7 +713,7 @@ export function DemoTrade() {
               onChange={(event) => setNextStartingBalance(event.target.value)}
             />
           </label>
-          <button className="ghost-button compact candle-hover-button" type="button" onClick={requestBalanceReset}>
+          <button className="ghost-button compact" type="button" onClick={requestBalanceReset}>
             <RotateCcw size={16} />
             Reset and Apply New Balance
           </button>
@@ -2319,6 +2325,7 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
   const riskScale = buildPositionRiskMarkers(position, markPrice);
   const markers = riskScale.markers;
   const markerLayouts = resolveRiskMarkerLayouts(markers);
+  const riskProgress = buildRiskMapProgressSegment(markers, position, markPrice);
 
   return (
     <div className="position-risk-map">
@@ -2328,12 +2335,23 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
       </div>
       <div className={`position-risk-track ${riskScale.mode}`} aria-label="Position price and risk levels">
         <span className="position-risk-axis" />
+        {riskProgress ? (
+          <span
+            className={`position-risk-progress ${riskProgress.tone}`}
+            style={
+              {
+                "--risk-progress-left": `${riskProgress.startPercent}%`,
+                "--risk-progress-width": `${riskProgress.widthPercent}%`
+              } as CSSProperties
+            }
+          />
+        ) : null}
         {markerLayouts.map((marker) => (
           <span
             className={`position-risk-guide ${marker.tone} ${marker.placement}`}
             style={
               {
-                "--risk-left": `${marker.labelPercent}%`,
+                "--risk-left": `${marker.percent}%`,
                 "--risk-lane": marker.lane
               } as CSSProperties
             }
@@ -2366,6 +2384,27 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
       </div>
     </div>
   );
+}
+
+function buildRiskMapProgressSegment(
+  markers: PositionRiskMarker[],
+  position: DemoOpenPosition,
+  markPrice: number | null
+): PositionRiskProgressSegment | null {
+  const entryMarker = markers.find((marker) => marker.tone === "entry");
+  const markMarker = markers.find((marker) => marker.tone === "mark");
+  const activeMarkPrice = isFiniteNumber(markPrice) && markPrice > 0 ? markPrice : markMarker?.price ?? position.markPrice;
+  if (!entryMarker || !markMarker || !Number.isFinite(activeMarkPrice) || activeMarkPrice <= 0) return null;
+
+  const widthPercent = Math.abs(markMarker.percent - entryMarker.percent);
+  if (widthPercent <= 0) return null;
+
+  const isPositive = position.side === "long" ? activeMarkPrice >= position.entryPrice : activeMarkPrice <= position.entryPrice;
+  return {
+    startPercent: Math.min(entryMarker.percent, markMarker.percent),
+    widthPercent,
+    tone: isPositive ? "positive" : "negative"
+  };
 }
 
 function isFiniteNumber(value: number | null | undefined): value is number {
@@ -2797,7 +2836,7 @@ function resolveOverlayMarkerLayouts(layouts: DemoOverlayLineLayout[], minY: num
   const minGap = 30;
   const sorted = layouts
     .map((layout, index) => ({ ...layout, index }))
-    .sort((a, b) => a.markerY - b.markerY || a.index - b.index);
+    .sort((a, b) => a.markerY - b.markerY || b.line.price - a.line.price || a.index - b.index);
 
   sorted.forEach((layout) => {
     layout.markerY = clamp(layout.markerY, minY, maxY);

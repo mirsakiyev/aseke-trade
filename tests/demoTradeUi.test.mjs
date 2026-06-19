@@ -116,6 +116,7 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.doesNotMatch(pageSource, /latestCandleTone/);
   assert.match(pageSource, /resolveOverlayMarkerLayouts/);
   assert.match(pageSource, /resolveOverlayMarkerCluster/);
+  assert.match(pageSource, /a\.markerY - b\.markerY \|\| b\.line\.price - a\.line\.price \|\| a\.index - b\.index/);
   assert.match(pageSource, /chart-marker-connector/);
   assert.match(pageSource, /isOverlayPriceMarker/);
   assert.match(pageSource, /chart-price-marker-label/);
@@ -129,6 +130,8 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(stylesSource, /trade-overlay-line\.target \.chart-price-marker/);
   assert.match(stylesSource, /trade-overlay-line\.danger \.chart-price-marker/);
   assert.match(stylesSource, /trade-overlay-line\.liquidation \.chart-price-marker/);
+  assert.match(stylesSource, /demo-timeframe-tabs button\.active \{[^}]*border-color: rgba\(229, 228, 226, 0\.34\)/);
+  assert.doesNotMatch(stylesSource, /demo-timeframe-tabs button\.active \{[^}]*rgba\(126, 224, 167/);
   assert.match(stylesSource, /aspect-ratio: 1/);
   assert.match(pageSource, /DEMO_TRADE_LIVE_REFRESH_MS = 1000/);
   assert.match(pageSource, /DEMO_TRADE_CANDLE_SYNC_MS = 10000/);
@@ -142,6 +145,42 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(marketDataSource, /"1M"/);
   assert.doesNotMatch(pageSource, /Zoom In|Zoom Out|Pan Left|Pan Right/);
   assert.doesNotMatch(pageSource, /ArrowLeft|ArrowRight/);
+});
+
+test("Demo Trade position risk map centers guide lines on smaller price dots", () => {
+  assert.match(pageSource, /function PositionRiskMap/);
+  assert.match(pageSource, /buildPositionRiskMarkers/);
+  assert.match(pageSource, /resolveRiskMarkerLayouts/);
+  assert.match(pageSource, /"--risk-left": `\$\{marker\.percent\}%`/);
+  assert.match(stylesSource, /--risk-axis-y: 132px/);
+  assert.match(stylesSource, /--risk-dot-size: 8\.4px/);
+  assert.match(stylesSource, /--risk-dot-radius: 4\.2px/);
+  assert.match(stylesSource, /top: calc\(var\(--risk-axis-y\) - var\(--risk-dot-radius\)\)/);
+  assert.match(stylesSource, /height: max\(10px, calc\(var\(--risk-axis-y\) - 36px - \(var\(--risk-lane, 0\) \* 40px\)\)\)/);
+  assert.match(stylesSource, /inset: -3\.6px/);
+});
+
+test("Demo Trade position risk map shows entry-to-mark progress by PnL direction", () => {
+  assert.match(pageSource, /interface PositionRiskProgressSegment/);
+  assert.match(pageSource, /buildRiskMapProgressSegment\(markers, position, markPrice\)/);
+  assert.match(pageSource, /className=\{`position-risk-progress \$\{riskProgress\.tone\}`\}/);
+  assert.match(pageSource, /"--risk-progress-left": `\$\{riskProgress\.startPercent\}%`/);
+  assert.match(pageSource, /"--risk-progress-width": `\$\{riskProgress\.widthPercent\}%`/);
+  assert.match(pageSource, /position\.side === "long" \? activeMarkPrice >= position\.entryPrice : activeMarkPrice <= position\.entryPrice/);
+  assert.match(stylesSource, /position-risk-progress\.positive/);
+  assert.match(stylesSource, /position-risk-progress\.negative/);
+  assert.match(stylesSource, /animation: risk-progress-pulse 2\.4s ease-in-out infinite/);
+  assert.match(stylesSource, /@keyframes risk-progress-pulse/);
+  assert.match(stylesSource, /\.position-risk-dot\.mark::after,\s*\.position-risk-progress/);
+});
+
+test("Demo Trade reset balance button uses standard compact hover", () => {
+  const resetButtonIndex = pageSource.indexOf('onClick={requestBalanceReset}');
+  assert.ok(resetButtonIndex !== -1);
+  const resetButtonSource = pageSource.slice(Math.max(0, resetButtonIndex - 140), resetButtonIndex + 180);
+  assert.match(resetButtonSource, /className="ghost-button compact"/);
+  assert.doesNotMatch(resetButtonSource, /candle-hover-button/);
+  assert.match(resetButtonSource, /Reset and Apply New Balance/);
 });
 
 test("Demo Trade page includes trade ticket, management, CSV export, and reset modal", () => {

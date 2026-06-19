@@ -5481,6 +5481,9 @@ select:focus {
 
 .position-risk-track {
   position: relative;
+  --risk-axis-y: 132px;
+  --risk-dot-size: 8.4px;
+  --risk-dot-radius: 4.2px;
   min-height: 218px;
   overflow: hidden;
   padding: 0.45rem 0.55rem 0.65rem;
@@ -5488,7 +5491,7 @@ select:focus {
 
 .position-risk-axis {
   position: absolute;
-  top: 132px;
+  top: var(--risk-axis-y);
   right: 0.6rem;
   left: 0.6rem;
   height: 2px;
@@ -5525,21 +5528,43 @@ select:focus {
 
 .position-risk-guide.above {
   top: calc(36px + (var(--risk-lane, 0) * 40px));
-  height: max(10px, calc(96px - (var(--risk-lane, 0) * 40px)));
+  height: max(10px, calc(var(--risk-axis-y) - 36px - (var(--risk-lane, 0) * 40px)));
 }
 
 .position-risk-guide.below {
-  top: 140px;
-  height: 26px;
+  top: var(--risk-axis-y);
+  height: 34px;
+}
+
+.position-risk-progress {
+  position: absolute;
+  top: calc(var(--risk-axis-y) - 2px);
+  left: var(--risk-progress-left);
+  z-index: 2;
+  width: max(2px, var(--risk-progress-width));
+  height: 4px;
+  border-radius: 999px;
+  opacity: 0.88;
+  animation: risk-progress-pulse 2.4s ease-in-out infinite;
+}
+
+.position-risk-progress.positive {
+  background: linear-gradient(90deg, rgba(126, 224, 167, 0.42), rgba(20, 188, 70, 0.98), rgba(126, 224, 167, 0.58));
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.36);
+}
+
+.position-risk-progress.negative {
+  background: linear-gradient(90deg, rgba(255, 107, 107, 0.46), rgba(255, 36, 36, 0.98), rgba(255, 107, 107, 0.58));
+  box-shadow: 0 0 14px rgba(255, 91, 95, 0.38);
 }
 
 .position-risk-dot {
   position: absolute;
-  top: 125px;
+  top: calc(var(--risk-axis-y) - var(--risk-dot-radius));
   left: var(--risk-left);
-  z-index: 2;
-  width: 14px;
-  height: 14px;
+  z-index: 3;
+  width: var(--risk-dot-size);
+  height: var(--risk-dot-size);
   border: 2px solid #050809;
   border-radius: 999px;
   background: var(--platinum);
@@ -5550,7 +5575,7 @@ select:focus {
 .position-risk-marker {
   position: absolute;
   left: var(--risk-left);
-  z-index: 3;
+  z-index: 4;
   display: grid;
   min-width: 88px;
   max-width: 118px;
@@ -5660,7 +5685,7 @@ select:focus {
 .position-risk-dot.mark::after {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -3.6px;
   border: 1px solid rgba(40, 198, 175, 0.6);
   border-radius: inherit;
   opacity: 0.72;
@@ -5685,8 +5710,21 @@ select:focus {
   }
 }
 
+@keyframes risk-progress-pulse {
+  0%,
+  100% {
+    opacity: 0.74;
+    filter: saturate(0.95);
+  }
+  50% {
+    opacity: 1;
+    filter: saturate(1.2);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .position-risk-dot.mark::after {
+  .position-risk-dot.mark::after,
+  .position-risk-progress {
     opacity: 0.35;
     animation: none;
   }
@@ -5801,8 +5839,8 @@ select:focus {
 }
 
 .demo-timeframe-tabs button.active {
-  border-color: rgba(126, 224, 167, 0.32);
-  background: rgba(126, 224, 167, 0.12);
+  border-color: rgba(229, 228, 226, 0.34);
+  background: rgba(229, 228, 226, 0.12);
   color: var(--platinum);
 }
 
