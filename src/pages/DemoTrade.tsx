@@ -36,6 +36,7 @@ import {
   type DemoTradeState
 } from "../lib/demoTradeMath";
 import {
+  DEMO_TRADE_CHART_CANDLE_LIMIT,
   demoTradeSymbols,
   demoTradeTimeframes,
   fetchDemoTradeCandleResult,
@@ -296,7 +297,7 @@ export function DemoTrade() {
     setMarketError(null);
     setIsMarketLoading(true);
     try {
-      const snapshot = await fetchDemoTradeMarketSnapshot(activeSymbol.symbol, timeframe);
+      const snapshot = await fetchDemoTradeMarketSnapshot(activeSymbol.symbol, timeframe, DEMO_TRADE_CHART_CANDLE_LIMIT);
       setCandles(applyLivePriceToCandles(snapshot.candles, snapshot.ticker.price, timeframe, Date.parse(snapshot.ticker.timestamp)));
       setCurrentPrice(snapshot.ticker.price);
       setMarketSource(snapshot.source);
@@ -322,7 +323,7 @@ export function DemoTrade() {
         .catch(() => setMarketError("Live BTC price update failed. Retrying..."));
     }, DEMO_TRADE_LIVE_REFRESH_MS);
     const candleTimer = window.setInterval(() => {
-      fetchDemoTradeCandleResult(activeSymbol.symbol, timeframe)
+      fetchDemoTradeCandleResult(activeSymbol.symbol, timeframe, DEMO_TRADE_CHART_CANDLE_LIMIT)
         .then((result) => {
           const price = currentPriceRef.current;
           setCandles(price ? applyLivePriceToCandles(result.candles, price, timeframe) : result.candles);
@@ -1885,6 +1886,7 @@ function DemoTradeChart({
   const [crosshair, setCrosshair] = useState<{ x: number; y: number; price: number } | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; offset: number; pricePan: number; pointerId: number } | null>(null);
   const priceScaleStartRef = useRef<{ y: number; scale: number; pointerId: number } | null>(null);
+  const wheelPanRemainderRef = useRef(0);
   const maxOffset = Math.max(0, candles.length - visibleCount);
   const futurePaddingCandles = Math.min(90, Math.max(24, Math.floor(visibleCount * 0.5)));
   const safeOffset = clamp(offset, -futurePaddingCandles, maxOffset);
@@ -1935,6 +1937,7 @@ function DemoTradeChart({
     setOffset(0);
     setPriceScale(1);
     setPricePan(0);
+    wheelPanRemainderRef.current = 0;
   }, [timeframe]);
 
   useEffect(() => {
@@ -1991,7 +1994,7 @@ function DemoTradeChart({
     }
     if (!dragStartRef.current) return;
     event.preventDefault();
-    const deltaCandles = Math.round((event.clientX - dragStartRef.current.x) / Math.max(5, candleGap));
+    const deltaCandles = Math.round((dragStartRef.current.x - event.clientX) / Math.max(5, candleGap));
     const pricePerPixel = visiblePriceRange / Math.max(1, chartHeight);
     const deltaY = event.clientY - dragStartRef.current.y;
     setOffset(clamp(dragStartRef.current.offset + deltaCandles, -futurePaddingCandles, Math.max(0, candles.length - visibleCount)));
@@ -2006,12 +2009,30 @@ function DemoTradeChart({
   const handleChartWheel = (event: WheelEvent<SVGSVGElement>) => {
     const pointer = getSvgPointer(event, width, height);
     const isOverPriceScale = pointer.x >= axisX;
-    if (!isOverPriceScale && !event.ctrlKey && !event.metaKey) return;
+    const isPriceScaleGesture = isOverPriceScale || event.ctrlKey || event.metaKey;
+
+    if (isPriceScaleGesture) {
+      event.preventDefault();
+      setCrosshair(null);
+      const scaleFactor = Math.exp(event.deltaY / DEMO_CHART_PRICE_SCALE_WHEEL_SENSITIVITY);
+      setPriceScale((scale) => clamp(scale * scaleFactor, MIN_DEMO_CHART_PRICE_SCALE, MAX_DEMO_CHART_PRICE_SCALE));
+      return;
+    }
+
+    const horizontalDelta = Math.abs(event.deltaX) >= Math.abs(event.deltaY)
+      ? event.deltaX
+      : event.shiftKey
+        ? event.deltaY
+        : 0;
+    if (horizontalDelta === 0) return;
 
     event.preventDefault();
     setCrosshair(null);
-    const scaleFactor = Math.exp(event.deltaY / DEMO_CHART_PRICE_SCALE_WHEEL_SENSITIVITY);
-    setPriceScale((scale) => clamp(scale * scaleFactor, MIN_DEMO_CHART_PRICE_SCALE, MAX_DEMO_CHART_PRICE_SCALE));
+    wheelPanRemainderRef.current += horizontalDelta / Math.max(6, candleGap);
+    const deltaCandles = Math.trunc(wheelPanRemainderRef.current);
+    if (deltaCandles === 0) return;
+    wheelPanRemainderRef.current -= deltaCandles;
+    setOffset((value) => clamp(value - deltaCandles, -futurePaddingCandles, maxOffset));
   };
 
   const stopRightDrag = (event?: PointerEvent<SVGSVGElement>) => {
@@ -2762,7 +2783,7 @@ function applyLivePriceToCandles(
       close: price,
       volume: 0
     });
-    return nextCandles.slice(-240);
+    return nextCandles.slice(-DEMO_TRADE_CHART_CANDLE_LIMIT);
   }
 
   nextCandles[nextCandles.length - 1] = {

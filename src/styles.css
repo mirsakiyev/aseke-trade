@@ -5765,15 +5765,19 @@ select:focus {
 }
 
 .position-risk-track.side-long .position-risk-marker.entry {
-  border-color: rgba(126, 224, 167, 0.42);
-  background: linear-gradient(135deg, rgba(126, 224, 167, 0.14), rgba(7, 10, 12, 0.94) 58%);
-  box-shadow: 0 0 18px rgba(126, 224, 167, 0.08);
+  border-color: rgba(126, 224, 167, 0.46);
+  background: rgba(126, 224, 167, 0.13);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 224, 167, 0.06),
+    0 0 18px rgba(126, 224, 167, 0.09);
 }
 
 .position-risk-track.side-short .position-risk-marker.entry {
-  border-color: rgba(255, 107, 107, 0.42);
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.13), rgba(7, 10, 12, 0.94) 58%);
-  box-shadow: 0 0 18px rgba(255, 107, 107, 0.08);
+  border-color: rgba(255, 107, 107, 0.46);
+  background: rgba(255, 107, 107, 0.13);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 107, 107, 0.06),
+    0 0 18px rgba(255, 107, 107, 0.09);
 }
 
 .position-risk-dot.entry {

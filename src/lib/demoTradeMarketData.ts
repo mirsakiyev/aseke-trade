@@ -63,6 +63,9 @@ const coinbaseSpotPriceUrl = "https://api.coinbase.com/v2/prices/BTC-USD/spot";
 const fetchTimeoutMs = 6000;
 const demoTradeMarketCacheKey = "aseke-demo-trade-market-cache-v1";
 const demoTradeMarketCacheMaxAgeMs = 24 * 60 * 60 * 1000;
+export const DEMO_TRADE_CHART_CANDLE_LIMIT = 720;
+const demoTradeMinCandleLimit = 40;
+const demoTradeMaxCandleLimit = 1000;
 
 interface DemoTradeCachedMarketData {
   version: 1;
@@ -101,7 +104,7 @@ let preferredCandleProviderKey: string | null = null;
 export async function fetchDemoTradeCandles(
   symbol = "BTCUSDT",
   timeframe: DemoTradeTimeframe = "1h",
-  limit = 140
+  limit = DEMO_TRADE_CHART_CANDLE_LIMIT
 ): Promise<DemoTradeCandle[]> {
   const result = await fetchDemoTradeCandleResult(symbol, timeframe, limit);
   return result.candles;
@@ -110,7 +113,7 @@ export async function fetchDemoTradeCandles(
 export async function fetchDemoTradeCandleResult(
   symbol = "BTCUSDT",
   timeframe: DemoTradeTimeframe = "1h",
-  limit = 140
+  limit = DEMO_TRADE_CHART_CANDLE_LIMIT
 ): Promise<DemoTradeCandleResult> {
   const safeSymbol = normalizeDemoSymbol(symbol);
   const safeLimit = normalizeCandleLimit(limit);
@@ -162,7 +165,7 @@ export async function fetchDemoTradeTicker(symbol = "BTCUSDT"): Promise<DemoTrad
 export async function fetchDemoTradeMarketSnapshot(
   symbol = "BTCUSDT",
   timeframe: DemoTradeTimeframe = "1h",
-  limit = 140
+  limit = DEMO_TRADE_CHART_CANDLE_LIMIT
 ): Promise<DemoTradeMarketSnapshot> {
   const [candleResult, ticker] = await Promise.all([
     fetchDemoTradeCandleResult(symbol, timeframe, limit),
@@ -507,7 +510,7 @@ function rawCandleMultiplier(timeframe: DemoTradeTimeframe): number {
 }
 
 function normalizeCandleLimit(limit: number): number {
-  return Math.min(Math.max(Math.round(limit), 40), 240);
+  return Math.min(Math.max(Math.round(limit), demoTradeMinCandleLimit), demoTradeMaxCandleLimit);
 }
 
 function formatSnapshotSource(tickerSource: string, candleSource: string): string {
@@ -532,7 +535,7 @@ function writeCachedCandles(timeframe: DemoTradeTimeframe, candles: DemoTradeCan
   cache.candles = {
     ...(cache.candles ?? {}),
     [timeframe]: {
-      candles: candles.slice(-240),
+      candles: candles.slice(-demoTradeMaxCandleLimit),
       source,
       savedAt: Date.now()
     }
