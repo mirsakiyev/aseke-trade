@@ -137,6 +137,10 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /DEMO_TRADE_CANDLE_SYNC_MS = 10000/);
   assert.match(pageSource, /applyLivePriceToCandles/);
   assert.match(pageSource, /buildCandleShape/);
+  assert.match(pageSource, /snapCandleBodyWidth\(clamp\(candleGap \* 0\.76, 7, 20\)\)/);
+  assert.match(pageSource, /const candleX = snapSvgCoordinate/);
+  assert.match(pageSource, /function snapSvgCoordinate/);
+  assert.match(stylesSource, /\.candle-body \{[\s\S]*stroke-width: 0[\s\S]*shape-rendering: crispEdges/);
   assert.match(pageSource, /minWickHeight/);
   assert.doesNotMatch(pageSource, /clampPricePan|minPricePan|maxPricePan|clampedPricePan/);
   assert.doesNotMatch(pageSource, /chartTop|chartBottom/);
@@ -152,12 +156,23 @@ test("Demo Trade position risk map centers guide lines on smaller price dots", (
   assert.match(pageSource, /buildPositionRiskMarkers/);
   assert.match(pageSource, /resolveRiskMarkerLayouts/);
   assert.match(pageSource, /"--risk-left": `\$\{marker\.percent\}%`/);
+  assert.match(pageSource, /position-risk-guide-link/);
+  assert.match(pageSource, /"--risk-link-left": `\$\{Math\.min\(marker\.percent, marker\.labelPercent\)\}%`/);
+  assert.match(pageSource, /"--risk-link-width": `\$\{Math\.abs\(marker\.labelPercent - marker\.percent\)\}%`/);
   assert.match(stylesSource, /--risk-axis-y: 132px/);
   assert.match(stylesSource, /--risk-dot-size: 8\.4px/);
   assert.match(stylesSource, /--risk-dot-radius: 4\.2px/);
   assert.match(stylesSource, /top: calc\(var\(--risk-axis-y\) - var\(--risk-dot-radius\)\)/);
   assert.match(stylesSource, /height: max\(10px, calc\(var\(--risk-axis-y\) - 36px - \(var\(--risk-lane, 0\) \* 40px\)\)\)/);
+  assert.match(stylesSource, /position-risk-guide-link\.below \{[\s\S]*top: calc\(var\(--risk-axis-y\) \+ 34px\)/);
   assert.match(stylesSource, /inset: -3\.6px/);
+});
+
+test("Demo Trade compressed risk map uses ellipsis break marker", () => {
+  assert.match(stylesSource, /position-risk-axis::before \{[\s\S]*content: "\.\.\."/);
+  assert.match(stylesSource, /position-risk-axis::before \{[\s\S]*border-radius: 999px/);
+  assert.match(stylesSource, /position-risk-track\.compressed-left \.position-risk-axis::before \{[\s\S]*display: flex/);
+  assert.doesNotMatch(stylesSource, /position-risk-axis::before \{[\s\S]*skewX/);
 });
 
 test("Demo Trade position risk map shows entry-to-mark progress by PnL direction", () => {
@@ -430,6 +445,9 @@ test("BTC market data provider is isolated and uses public REST data", () => {
   assert.match(marketDataSource, /demoTradeMarketCacheKey/);
   assert.match(marketDataSource, /readCachedTicker/);
   assert.match(marketDataSource, /readCachedCandles/);
+  assert.match(marketDataSource, /function normalizeCandleBounds/);
+  assert.match(marketDataSource, /high: Math\.max\(open, high, low, close\)/);
+  assert.match(marketDataSource, /candle\.high >= Math\.max\(candle\.open, candle\.close\)/);
   assert.match(pageSource, /fetchDemoTradeMarketSnapshot/);
   assert.match(pageSource, /fetchDemoTradeCandleResult/);
   assert.match(pageSource, /Showing cached data while retrying/);

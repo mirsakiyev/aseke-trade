@@ -1909,7 +1909,7 @@ function DemoTradeChart({
   const chartWidth = axisX - padding.left;
   const chartHeight = height - padding.top - padding.bottom;
   const candleGap = chartWidth / Math.max(visibleCount, 1);
-  const candleWidth = clamp(candleGap * 0.76, 7, 20);
+  const candleWidth = snapCandleBodyWidth(clamp(candleGap * 0.76, 7, 20));
   const isFastTimeframe = timeframe === "1m" || timeframe === "5m";
   const minBodyHeight = isFastTimeframe ? 5 : 3;
   const minWickHeight = isFastTimeframe ? 12 : 5;
@@ -2077,7 +2077,8 @@ function DemoTradeChart({
           })}
           <g clipPath="url(#demo-trade-chart-plot)">
             {visibleCandles.map((candle, index) => {
-              const x = padding.left + index * candleGap + candleGap / 2;
+              const candleX = snapSvgCoordinate(padding.left + index * candleGap + (candleGap - candleWidth) / 2);
+              const x = candleX + candleWidth / 2;
               const openY = yForPrice(candle.open);
               const closeY = yForPrice(candle.close);
               const highY = yForPrice(candle.high);
@@ -2097,7 +2098,7 @@ function DemoTradeChart({
                   <line className="candle-wick" x1={x} x2={x} y1={candleShape.wickY1} y2={candleShape.wickY2} />
                   <rect
                     className="candle-body"
-                    x={x - candleWidth / 2}
+                    x={candleX}
                     y={candleShape.bodyY}
                     width={candleWidth}
                     height={candleShape.bodyHeight}
@@ -2356,6 +2357,19 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
               } as CSSProperties
             }
             key={`${marker.label}-guide-${marker.price}`}
+          />
+        ))}
+        {markerLayouts.map((marker) => (
+          <span
+            className={`position-risk-guide-link ${marker.tone} ${marker.placement}`}
+            style={
+              {
+                "--risk-link-left": `${Math.min(marker.percent, marker.labelPercent)}%`,
+                "--risk-link-width": `${Math.abs(marker.labelPercent - marker.percent)}%`,
+                "--risk-lane": marker.lane
+              } as CSSProperties
+            }
+            key={`${marker.label}-guide-link-${marker.price}`}
           />
         ))}
         {markerLayouts.map((marker) => (
@@ -2778,12 +2792,12 @@ function buildCandleShape({
   minWickHeight: number;
 }) {
   const rawBodyHeight = Math.abs(openY - closeY);
-  const bodyHeight = Math.max(minBodyHeight, rawBodyHeight);
+  const bodyHeight = snapSvgLength(Math.max(minBodyHeight, rawBodyHeight));
   const bodyCenter = (openY + closeY) / 2;
-  const bodyY = bodyCenter - bodyHeight / 2;
+  const bodyY = snapSvgCoordinate(bodyCenter - bodyHeight / 2);
   const renderedBodyCenter = bodyY + bodyHeight / 2;
-  const wickY1 = Math.min(highY, lowY, bodyY, renderedBodyCenter - minWickHeight / 2);
-  const wickY2 = Math.max(highY, lowY, bodyY + bodyHeight, renderedBodyCenter + minWickHeight / 2);
+  const wickY1 = snapSvgCoordinate(Math.min(highY, lowY, bodyY, renderedBodyCenter - minWickHeight / 2));
+  const wickY2 = snapSvgCoordinate(Math.max(highY, lowY, bodyY + bodyHeight, renderedBodyCenter + minWickHeight / 2));
 
   return {
     bodyY,
@@ -2791,6 +2805,18 @@ function buildCandleShape({
     wickY1,
     wickY2
   };
+}
+
+function snapSvgCoordinate(value: number): number {
+  return Math.round(value);
+}
+
+function snapSvgLength(value: number): number {
+  return Math.max(1, Math.round(value));
+}
+
+function snapCandleBodyWidth(value: number): number {
+  return Math.max(2, Math.round(value));
 }
 
 function getSvgPointer(event: PointerEvent<SVGSVGElement>, width: number, height: number) {

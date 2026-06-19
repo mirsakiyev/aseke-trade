@@ -425,8 +425,7 @@ function normalizeKline(row: unknown): DemoTradeCandle | null {
   const close = Number(row[4]);
   const volume = Number(row[5]);
 
-  if (![timestamp, open, high, low, close, volume].every(Number.isFinite)) return null;
-  return { timestamp, open, high, low, close, volume };
+  return normalizeCandleBounds(timestamp, open, high, low, close, volume);
 }
 
 function normalizeCoinbaseCandle(row: unknown): DemoTradeCandle | null {
@@ -439,8 +438,26 @@ function normalizeCoinbaseCandle(row: unknown): DemoTradeCandle | null {
   const close = Number(row[4]);
   const volume = Number(row[5]);
 
+  return normalizeCandleBounds(timestamp, open, high, low, close, volume);
+}
+
+function normalizeCandleBounds(
+  timestamp: number,
+  open: number,
+  high: number,
+  low: number,
+  close: number,
+  volume: number
+): DemoTradeCandle | null {
   if (![timestamp, open, high, low, close, volume].every(Number.isFinite)) return null;
-  return { timestamp, open, high, low, close, volume };
+  return {
+    timestamp,
+    open,
+    high: Math.max(open, high, low, close),
+    low: Math.min(open, high, low, close),
+    close,
+    volume
+  };
 }
 
 function aggregateCandles(candles: DemoTradeCandle[], timeframe: DemoTradeTimeframe): DemoTradeCandle[] {
@@ -575,7 +592,9 @@ function isFreshCacheEntry(savedAt: number): boolean {
 }
 
 function isValidCandle(candle: DemoTradeCandle): boolean {
-  return [candle.timestamp, candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite);
+  return [candle.timestamp, candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)
+    && candle.high >= Math.max(candle.open, candle.close)
+    && candle.low <= Math.min(candle.open, candle.close);
 }
 
 async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {

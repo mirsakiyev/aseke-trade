@@ -5500,20 +5500,28 @@ select:focus {
 }
 
 .position-risk-axis::before {
-  content: "";
+  content: "...";
   position: absolute;
-  top: -6px;
+  top: -12px;
   display: none;
-  width: 17px;
-  height: 14px;
-  border-right: 2px solid rgba(229, 228, 226, 0.52);
-  border-left: 2px solid rgba(229, 228, 226, 0.28);
-  transform: skewX(-18deg);
+  width: 26px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(229, 228, 226, 0.18);
+  border-radius: 999px;
+  background: rgba(7, 10, 12, 0.94);
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 0.7;
+  transform: translateX(-50%);
 }
 
 .position-risk-track.compressed-left .position-risk-axis::before {
   left: 22%;
-  display: block;
+  display: flex;
 }
 
 .position-risk-guide {
@@ -5526,14 +5534,32 @@ select:focus {
   transform: translateX(-50%);
 }
 
+.position-risk-guide-link {
+  position: absolute;
+  left: var(--risk-link-left);
+  z-index: 1;
+  width: var(--risk-link-width);
+  height: 1px;
+  border-radius: 999px;
+  background: rgba(229, 228, 226, 0.28);
+}
+
 .position-risk-guide.above {
   top: calc(36px + (var(--risk-lane, 0) * 40px));
   height: max(10px, calc(var(--risk-axis-y) - 36px - (var(--risk-lane, 0) * 40px)));
 }
 
+.position-risk-guide-link.above {
+  top: calc(36px + (var(--risk-lane, 0) * 40px));
+}
+
 .position-risk-guide.below {
   top: var(--risk-axis-y);
   height: 34px;
+}
+
+.position-risk-guide-link.below {
+  top: calc(var(--risk-axis-y) + 34px);
 }
 
 .position-risk-progress {
@@ -5630,7 +5656,8 @@ select:focus {
   line-height: 1.05;
 }
 
-.position-risk-guide.take-profit {
+.position-risk-guide.take-profit,
+.position-risk-guide-link.take-profit {
   background: rgba(126, 224, 167, 0.42);
 }
 
@@ -5648,7 +5675,9 @@ select:focus {
 }
 
 .position-risk-guide.stop,
-.position-risk-guide.liquidation {
+.position-risk-guide.liquidation,
+.position-risk-guide-link.stop,
+.position-risk-guide-link.liquidation {
   background: rgba(255, 107, 107, 0.42);
 }
 
@@ -5669,7 +5698,8 @@ select:focus {
   color: var(--danger);
 }
 
-.position-risk-guide.mark {
+.position-risk-guide.mark,
+.position-risk-guide-link.mark {
   background: rgba(184, 214, 222, 0.42);
 }
 
@@ -5730,7 +5760,8 @@ select:focus {
   }
 }
 
-.position-risk-guide.entry {
+.position-risk-guide.entry,
+.position-risk-guide-link.entry {
   background: rgba(97, 181, 201, 0.42);
 }
 
@@ -5906,7 +5937,8 @@ select:focus {
 }
 
 .candle-body {
-  shape-rendering: geometricPrecision;
+  stroke-width: 0;
+  shape-rendering: crispEdges;
 }
 
 .trade-overlay-line line {
