@@ -9,7 +9,7 @@ import {
   ZoomIn,
   ZoomOut
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -100,6 +100,10 @@ const PERCENT_SLIDER_THUMB_SIZE = 12;
 const DEMO_CONTRACT_BTC_SIZE = 0.0001;
 const MIN_DEMO_LEVERAGE = 1;
 const MAX_DEMO_LEVERAGE = 100;
+const MIN_DEMO_CHART_PRICE_SCALE = 0.16;
+const MAX_DEMO_CHART_PRICE_SCALE = 8;
+const DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY = 150;
+const DEMO_CHART_PRICE_SCALE_WHEEL_SENSITIVITY = 420;
 const DEMO_TRADE_LOAD_ERROR_MESSAGE = "Demo trade progress could not be loaded from your account. Cross-device sync is paused until the account connection recovers.";
 const DEMO_TRADE_SAVE_ERROR_MESSAGE = "Demo trade progress could not be saved to your account. Keep this tab open and try again.";
 
@@ -1941,6 +1945,12 @@ function DemoTradeChart({
     setVisibleCount((count) => clamp(count + amount, 28, Math.min(160, Math.max(candles.length, 40))));
   };
 
+  const resetPriceView = () => {
+    setPriceScale(1);
+    setPricePan(0);
+    setCrosshair(null);
+  };
+
   const startRightDrag = (event: PointerEvent<SVGSVGElement>) => {
     if (event.button !== 0 && event.button !== 2) return;
     event.preventDefault();
@@ -1972,7 +1982,11 @@ function DemoTradeChart({
     if (priceScaleStartRef.current) {
       event.preventDefault();
       const deltaY = event.clientY - priceScaleStartRef.current.y;
-      setPriceScale(clamp(priceScaleStartRef.current.scale * Math.exp(deltaY / 180), 0.45, 4));
+      setPriceScale(clamp(
+        priceScaleStartRef.current.scale * Math.exp(deltaY / DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY),
+        MIN_DEMO_CHART_PRICE_SCALE,
+        MAX_DEMO_CHART_PRICE_SCALE
+      ));
       return;
     }
     if (!dragStartRef.current) return;
@@ -1987,6 +2001,17 @@ function DemoTradeChart({
   const handleChartPointerMove = (event: PointerEvent<SVGSVGElement>) => {
     updateCrosshair(event);
     moveRightDrag(event);
+  };
+
+  const handleChartWheel = (event: WheelEvent<SVGSVGElement>) => {
+    const pointer = getSvgPointer(event, width, height);
+    const isOverPriceScale = pointer.x >= axisX;
+    if (!isOverPriceScale && !event.ctrlKey && !event.metaKey) return;
+
+    event.preventDefault();
+    setCrosshair(null);
+    const scaleFactor = Math.exp(event.deltaY / DEMO_CHART_PRICE_SCALE_WHEEL_SENSITIVITY);
+    setPriceScale((scale) => clamp(scale * scaleFactor, MIN_DEMO_CHART_PRICE_SCALE, MAX_DEMO_CHART_PRICE_SCALE));
   };
 
   const stopRightDrag = (event?: PointerEvent<SVGSVGElement>) => {
@@ -2052,6 +2077,8 @@ function DemoTradeChart({
           onPointerCancel={stopRightDrag}
           onLostPointerCapture={stopRightDrag}
           onPointerLeave={leaveChart}
+          onWheel={handleChartWheel}
+          onDoubleClick={resetPriceView}
         >
           <defs>
             <clipPath id="demo-trade-chart-plot">
@@ -2334,7 +2361,7 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
         <span>Price / risk map</span>
         <strong>{formatRiskMapRange(markers)}</strong>
       </div>
-      <div className={`position-risk-track ${riskScale.mode}`} aria-label="Position price and risk levels">
+      <div className={`position-risk-track ${riskScale.mode} side-${position.side}`} aria-label="Position price and risk levels">
         <span className="position-risk-axis" />
         {riskProgress ? (
           <span
@@ -2434,7 +2461,7 @@ function resolvePositionMarkPrice(position: DemoOpenPosition, currentPrice: numb
 function buildPositionRiskMarkers(position: DemoOpenPosition, markPrice: number | null) {
   const rawMarkers: PositionRiskMarkerDraft[] = [];
 
-  if (position.liquidationPrice && position.liquidationPrice > 0) {
+  if (position.leverage > 1 && isFiniteNumber(position.liquidationPrice) && position.liquidationPrice > 0) {
     rawMarkers.push({ label: "LIQ", price: position.liquidationPrice, tone: "liquidation" });
   }
   if (position.stopLoss > 0) {
@@ -2819,7 +2846,7 @@ function snapCandleBodyWidth(value: number): number {
   return Math.max(2, Math.round(value));
 }
 
-function getSvgPointer(event: PointerEvent<SVGSVGElement>, width: number, height: number) {
+function getSvgPointer(event: { clientX: number; clientY: number; currentTarget: SVGSVGElement }, width: number, height: number) {
   const bounds = event.currentTarget.getBoundingClientRect();
   return {
     x: ((event.clientX - bounds.left) / Math.max(1, bounds.width)) * width,

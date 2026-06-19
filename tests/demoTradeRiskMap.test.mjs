@@ -18,6 +18,12 @@ function marker(scale, label) {
   return item;
 }
 
+function layout(layouts, label) {
+  const item = layouts.find((entry) => entry.label === label);
+  assert.ok(item, `${label} layout should exist`);
+  return item;
+}
+
 function activeSpread(scale) {
   const activePercents = scale.markers.filter((entry) => entry.tone !== "liquidation").map((entry) => entry.percent);
   return Math.max(...activePercents) - Math.min(...activePercents);
@@ -85,6 +91,23 @@ test("close long liquidation keeps the normal linear scale", () => {
   assert.ok(marker(scale, "LIQ").percent < marker(scale, "SL").percent);
   assert.ok(marker(scale, "MARK").percent < marker(scale, "TP1").percent);
   assertLaneSpacing(riskMap.resolveRiskMarkerLayouts(scale.markers));
+});
+
+test("stacked take-profit labels place higher target numbers above lower ones", () => {
+  const scale = riskMap.resolvePositionRiskScale([
+    { label: "LIQ", price: 50696, tone: "liquidation" },
+    { label: "SL", price: 61500, tone: "stop" },
+    { label: "ENTRY", price: 63053, tone: "entry" },
+    { label: "MARK", price: 62916, tone: "mark" },
+    { label: "TP1", detailLabel: "33.3%", price: 65555, tone: "take-profit" },
+    { label: "TP2", detailLabel: "33.3%", price: 67000, tone: "take-profit" },
+    { label: "TP3", detailLabel: "33.4%", price: 67000, tone: "take-profit" }
+  ]);
+  const layouts = riskMap.resolveRiskMarkerLayouts(scale.markers);
+
+  assert.ok(layout(layouts, "TP3").lane < layout(layouts, "TP2").lane);
+  assert.ok(layout(layouts, "TP2").lane < layout(layouts, "TP1").lane);
+  assertLaneSpacing(layouts);
 });
 
 test("far short liquidation uses a compressed left scale so liquidation stays left", () => {

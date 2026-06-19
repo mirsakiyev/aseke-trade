@@ -89,6 +89,8 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /onContextMenu=\{\(event\) => event\.preventDefault\(\)\}/);
   assert.match(pageSource, /onPointerDown=\{startRightDrag\}/);
   assert.match(pageSource, /onLostPointerCapture=\{stopRightDrag\}/);
+  assert.match(pageSource, /onWheel=\{handleChartWheel\}/);
+  assert.match(pageSource, /onDoubleClick=\{resetPriceView\}/);
   assert.match(pageSource, /dragStartRef\.current \|\| priceScaleStartRef\.current\) return/);
   assert.match(pageSource, /setPointerCapture/);
   assert.match(pageSource, /event\.clientX - dragStartRef\.current\.x/);
@@ -96,6 +98,14 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /pricePan/);
   assert.match(pageSource, /visiblePriceRange/);
   assert.match(pageSource, /setPricePan\(dragStartRef\.current\.pricePan \+ deltaY \* pricePerPixel\)/);
+  assert.match(pageSource, /MIN_DEMO_CHART_PRICE_SCALE = 0\.16/);
+  assert.match(pageSource, /MAX_DEMO_CHART_PRICE_SCALE = 8/);
+  assert.match(pageSource, /DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY = 150/);
+  assert.match(pageSource, /DEMO_CHART_PRICE_SCALE_WHEEL_SENSITIVITY = 420/);
+  assert.match(pageSource, /priceScaleStartRef\.current\.scale \* Math\.exp\(deltaY \/ DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY\)/);
+  assert.match(pageSource, /event\.deltaY \/ DEMO_CHART_PRICE_SCALE_WHEEL_SENSITIVITY/);
+  assert.match(pageSource, /setPriceScale\(\(scale\) => clamp\(scale \* scaleFactor, MIN_DEMO_CHART_PRICE_SCALE, MAX_DEMO_CHART_PRICE_SCALE\)\)/);
+  assert.doesNotMatch(pageSource, /0\.45, 4/);
   assert.match(pageSource, /priceScaleStartRef/);
   assert.match(pageSource, /crosshair/);
   assert.match(pageSource, /updateCrosshair/);
@@ -155,6 +165,9 @@ test("Demo Trade position risk map centers guide lines on smaller price dots", (
   assert.match(pageSource, /function PositionRiskMap/);
   assert.match(pageSource, /buildPositionRiskMarkers/);
   assert.match(pageSource, /resolveRiskMarkerLayouts/);
+  assert.match(pageSource, /position\.leverage > 1 && isFiniteNumber\(position\.liquidationPrice\) && position\.liquidationPrice > 0/);
+  assert.match(pageSource, /if \(!Number\.isFinite\(value\) \|\| value <= 0\) return "--"/);
+  assert.match(riskMapSource, /marker\.price > 0/);
   assert.match(pageSource, /"--risk-left": `\$\{marker\.percent\}%`/);
   assert.match(pageSource, /position-risk-guide-link/);
   assert.match(pageSource, /"--risk-link-left": `\$\{Math\.min\(marker\.percent, marker\.labelPercent\)\}%`/);
@@ -169,10 +182,12 @@ test("Demo Trade position risk map centers guide lines on smaller price dots", (
 });
 
 test("Demo Trade compressed risk map uses ellipsis break marker", () => {
-  assert.match(stylesSource, /position-risk-axis::before \{[\s\S]*content: "\.\.\."/);
-  assert.match(stylesSource, /position-risk-axis::before \{[\s\S]*border-radius: 999px/);
-  assert.match(stylesSource, /position-risk-track\.compressed-left \.position-risk-axis::before \{[\s\S]*display: flex/);
-  assert.doesNotMatch(stylesSource, /position-risk-axis::before \{[\s\S]*skewX/);
+  assert.match(stylesSource, /position-risk-axis::before \{[^}]*content: "\.\.\."/);
+  assert.match(stylesSource, /position-risk-axis::before \{[^}]*color: rgba\(255, 107, 107, 0\.72\)/);
+  assert.match(stylesSource, /position-risk-track\.compressed-left \.position-risk-axis::before \{[^}]*display: block/);
+  assert.doesNotMatch(stylesSource, /position-risk-axis::before \{[^}]*border-radius/);
+  assert.doesNotMatch(stylesSource, /position-risk-axis::before \{[^}]*background:/);
+  assert.doesNotMatch(stylesSource, /position-risk-axis::before \{[^}]*skewX/);
 });
 
 test("Demo Trade position risk map shows entry-to-mark progress by PnL direction", () => {
@@ -182,8 +197,11 @@ test("Demo Trade position risk map shows entry-to-mark progress by PnL direction
   assert.match(pageSource, /"--risk-progress-left": `\$\{riskProgress\.startPercent\}%`/);
   assert.match(pageSource, /"--risk-progress-width": `\$\{riskProgress\.widthPercent\}%`/);
   assert.match(pageSource, /position\.side === "long" \? activeMarkPrice >= position\.entryPrice : activeMarkPrice <= position\.entryPrice/);
+  assert.match(pageSource, /position-risk-track \$\{riskScale\.mode\} side-\$\{position\.side\}/);
   assert.match(stylesSource, /position-risk-progress\.positive/);
   assert.match(stylesSource, /position-risk-progress\.negative/);
+  assert.match(stylesSource, /position-risk-track\.side-long \.position-risk-marker\.entry/);
+  assert.match(stylesSource, /position-risk-track\.side-short \.position-risk-marker\.entry/);
   assert.match(stylesSource, /animation: risk-progress-pulse 2\.4s ease-in-out infinite/);
   assert.match(stylesSource, /@keyframes risk-progress-pulse/);
   assert.match(stylesSource, /\.position-risk-dot\.mark::after,\s*\.position-risk-progress/);
@@ -358,6 +376,8 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /position-risk-guide/);
   assert.match(riskMapSource, /getRiskMarkerPlacement/);
   assert.match(riskMapSource, /getRiskMarkerLaneCount/);
+  assert.match(riskMapSource, /function getRiskMarkerLaneOrder/);
+  assert.match(riskMapSource, /marker\.tone === "take-profit" \? lanes\.reverse\(\) : lanes/);
   assert.match(riskMapSource, /getRiskMarkerAnchor/);
   assert.match(riskMapSource, /placeRiskLabelsInLanes/);
   assert.match(pageSource, /"--risk-left": `\$\{marker\.labelPercent\}%`/);

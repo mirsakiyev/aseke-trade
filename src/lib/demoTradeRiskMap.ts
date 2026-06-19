@@ -161,10 +161,13 @@ function placeRiskLabelsInLanes(
   const laneRightEdges = Array.from({ length: laneCount }, () => -Infinity);
 
   markers.forEach((marker) => {
-    const openLane = laneRightEdges.findIndex((rightEdge) => marker.labelPercent - rightEdge >= minGap);
-    const lane = openLane >= 0 ? openLane : laneRightEdges.indexOf(Math.min(...laneRightEdges));
+    const laneOrder = getRiskMarkerLaneOrder(marker, laneCount);
+    const openLane = laneOrder.find((lane) => marker.labelPercent - laneRightEdges[lane] >= minGap);
+    const lane = openLane ?? laneOrder.reduce((bestLane, lane) => (
+      laneRightEdges[lane] < laneRightEdges[bestLane] ? lane : bestLane
+    ), laneOrder[0]);
     marker.lane = Math.max(0, lane);
-    if (openLane < 0) {
+    if (openLane === undefined) {
       marker.labelPercent = clampValue(laneRightEdges[lane] + minGap, 8, 92);
     }
     laneRightEdges[marker.lane] = marker.labelPercent;
@@ -174,6 +177,11 @@ function placeRiskLabelsInLanes(
     const laneMarkers = markers.filter((marker) => marker.lane === lane);
     nudgeRiskLaneInsideBounds(laneMarkers, minGap);
   });
+}
+
+function getRiskMarkerLaneOrder(marker: PositionRiskMarkerLayout, laneCount: number): number[] {
+  const lanes = Array.from({ length: laneCount }, (_, lane) => lane);
+  return marker.tone === "take-profit" ? lanes.reverse() : lanes;
 }
 
 function nudgeRiskLaneInsideBounds(markers: Array<PositionRiskMarkerLayout & { index: number }>, minGap: number): void {
