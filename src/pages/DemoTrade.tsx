@@ -52,6 +52,12 @@ import {
   saveGuestDemoTradeState,
   saveRegisteredDemoTradeState
 } from "../lib/demoTradePersistence";
+import {
+  resolvePositionRiskScale,
+  resolveRiskMarkerLayouts,
+  type PositionRiskMarker,
+  type PositionRiskMarkerDraft
+} from "../lib/demoTradeRiskMap";
 
 interface TakeProfitDraft {
   id: string;
@@ -62,10 +68,6 @@ interface TakeProfitDraft {
 type DemoOrderType = "market" | "limit";
 type DemoQuantityUnit = "usdt" | "btc" | "cont";
 type DemoOverlayTone = "mark" | "entry" | "target" | "hit" | "danger" | "liquidation";
-type PositionRiskMarkerTone = "liquidation" | "stop" | "mark" | "entry" | "take-profit";
-type PositionRiskMarkerPlacement = "above" | "below";
-type PositionRiskMarkerAnchor = "start" | "center" | "end";
-
 interface DemoOverlayLine {
   label: string;
   price: number;
@@ -78,27 +80,13 @@ interface DemoOverlayLineLayout {
   markerY: number;
 }
 
-interface PositionRiskMarker {
-  label: string;
-  detailLabel?: string;
-  price: number;
-  tone: PositionRiskMarkerTone;
-  percent: number;
-}
-
-interface PositionRiskMarkerLayout extends PositionRiskMarker {
-  labelPercent: number;
-  placement: PositionRiskMarkerPlacement;
-  anchor: PositionRiskMarkerAnchor;
-  lane: number;
-}
-
 const emptyTakeProfits: TakeProfitDraft[] = [
   { id: "tp-1", price: "", closePercent: "100" }
 ];
 
 const DEMO_TRADE_LIVE_REFRESH_MS = 1000;
 const DEMO_TRADE_CANDLE_SYNC_MS = 10000;
+const DEMO_TRADE_HISTORY_PAGE_SIZE = 10;
 const PERCENT_SLIDER_THUMB_SIZE = 12;
 const DEMO_CONTRACT_BTC_SIZE = 0.0001;
 const MIN_DEMO_LEVERAGE = 1;
@@ -1538,9 +1526,6 @@ function DemoTradeChart({
   const priceForY = (y: number) => paddedMax - ((y - padding.top) / chartHeight) * (paddedMax - paddedMin);
   const priceTicks = Array.from({ length: 8 }, (_, index) => paddedMax - ((paddedMax - paddedMin) / 7) * index);
   const verticalGridCount = Math.min(10, Math.max(4, Math.floor(visibleCount / 10)));
-  const latestVisibleCandle = visibleCandles[visibleCandles.length - 1];
-  const latestPreviousClose = visibleCandles[visibleCandles.length - 2]?.close ?? latestVisibleCandle?.open ?? 0;
-  const latestCandleTone = latestVisibleCandle && isBullishCandle(latestVisibleCandle, latestPreviousClose) ? "up" : "down";
   const overlayLineLayouts = resolveOverlayMarkerLayouts(
     overlayLines.map((line) => {
       const lineY = clamp(yForPrice(line.price), padding.top + 10, height - padding.bottom - 10);
@@ -1734,9 +1719,7 @@ function DemoTradeChart({
           {overlayLineLayouts.map(({ line, lineY, markerY }) => {
             const hasPriceMarker = isOverlayPriceMarker(line.tone);
             const isMarkerShifted = Math.abs(markerY - lineY) > 1;
-            const overlayClassName = ["trade-overlay-line", line.tone, line.tone === "mark" ? latestCandleTone : ""]
-              .filter(Boolean)
-              .join(" ");
+            const overlayClassName = ["trade-overlay-line", line.tone].join(" ");
             return (
               <g className={overlayClassName} key={`${line.label}-${line.price}`}>
                 <line x1={padding.left} x2={axisX} y1={lineY} y2={lineY} />
@@ -1948,7 +1931,8 @@ function PositionSummaryItem({
 }
 
 function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; markPrice: number | null }) {
-  const markers = buildPositionRiskMarkers(position, markPrice);
+  const riskScale = buildPositionRiskMarkers(position, markPrice);
+  const markers = riskScale.markers;
   const markerLayouts = resolveRiskMarkerLayouts(markers);
 
   return (
@@ -1957,7 +1941,7 @@ function PositionRiskMap({ position, markPrice }: { position: DemoOpenPosition; 
         <span>Price / risk map</span>
         <strong>{formatRiskMapRange(markers)}</strong>
       </div>
-      <div className="position-risk-track" aria-label="Position price and risk levels">
+      <div className={`position-risk-track ${riskScale.mode}`} aria-label="Position price and risk levels">
         <span className="position-risk-axis" />
         {markerLayouts.map((marker) => (
           <span
@@ -2009,8 +1993,8 @@ function resolvePositionMarkPrice(position: DemoOpenPosition, currentPrice: numb
   return null;
 }
 
-function buildPositionRiskMarkers(position: DemoOpenPosition, markPrice: number | null): PositionRiskMarker[] {
-  const rawMarkers: Array<Omit<PositionRiskMarker, "percent">> = [];
+function buildPositionRiskMarkers(position: DemoOpenPosition, markPrice: number | null) {
+  const rawMarkers: PositionRiskMarkerDraft[] = [];
 
   if (position.liquidationPrice && position.liquidationPrice > 0) {
     rawMarkers.push({ label: "LIQ", price: position.liquidationPrice, tone: "liquidation" });
@@ -2035,107 +2019,7 @@ function buildPositionRiskMarkers(position: DemoOpenPosition, markPrice: number 
     }
   });
 
-  const prices = rawMarkers.map((marker) => marker.price);
-  if (!prices.length) return [];
-
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const rawRange = Math.max(maxPrice - minPrice, Math.max(Math.abs(maxPrice) * 0.004, 1));
-  const paddedMin = minPrice - rawRange * 0.08;
-  const paddedMax = maxPrice + rawRange * 0.08;
-  const range = Math.max(paddedMax - paddedMin, 1);
-
-  return rawMarkers.map((marker) => ({
-    ...marker,
-    percent: clamp(((marker.price - paddedMin) / range) * 100, 0, 100)
-  }));
-}
-
-function resolveRiskMarkerLayouts(markers: PositionRiskMarker[]): PositionRiskMarkerLayout[] {
-  if (!markers.length) return [];
-
-  const minGap = clamp(96 / Math.max(1, markers.length - 1), 12, 17);
-  const layouts = markers.map((marker, index) => ({
-    ...marker,
-    index,
-    labelPercent: clamp(marker.percent, 8, 92),
-    placement: getRiskMarkerPlacement(marker),
-    anchor: "center" as PositionRiskMarkerAnchor,
-    lane: 0
-  }));
-
-  (["above", "below"] as PositionRiskMarkerPlacement[]).forEach((placement) => {
-    const group = layouts
-      .filter((marker) => marker.placement === placement)
-      .sort((a, b) => a.labelPercent - b.labelPercent || a.index - b.index);
-
-    placeRiskLabelsInLanes(group, placement === "above" ? getRiskMarkerLaneCount(group.length) : 1, minGap);
-  });
-
-  layouts.forEach((marker) => {
-    marker.anchor = getRiskMarkerAnchor(marker.labelPercent);
-  });
-
-  return layouts
-    .sort((a, b) => a.index - b.index)
-    .map(({ index, ...marker }) => marker);
-}
-
-function getRiskMarkerPlacement(marker: PositionRiskMarker): PositionRiskMarkerPlacement {
-  return marker.tone === "mark" ? "below" : "above";
-}
-
-function getRiskMarkerLaneCount(markerCount: number): number {
-  return clamp(Math.ceil(markerCount / 2), 2, 3);
-}
-
-function getRiskMarkerAnchor(labelPercent: number): PositionRiskMarkerAnchor {
-  if (labelPercent <= 10) return "start";
-  if (labelPercent >= 90) return "end";
-  return "center";
-}
-
-function placeRiskLabelsInLanes(
-  markers: Array<PositionRiskMarkerLayout & { index: number }>,
-  laneCount: number,
-  minGap: number
-): void {
-  if (!markers.length) return;
-
-  const laneRightEdges = Array.from({ length: laneCount }, () => -Infinity);
-
-  markers.forEach((marker) => {
-    const openLane = laneRightEdges.findIndex((rightEdge) => marker.labelPercent - rightEdge >= minGap);
-    const lane = openLane >= 0 ? openLane : laneRightEdges.indexOf(Math.min(...laneRightEdges));
-    marker.lane = Math.max(0, lane);
-    if (openLane < 0) {
-      marker.labelPercent = clamp(laneRightEdges[lane] + minGap, 8, 92);
-    }
-    laneRightEdges[marker.lane] = marker.labelPercent;
-  });
-
-  Array.from({ length: laneCount }, (_, lane) => {
-    const laneMarkers = markers.filter((marker) => marker.lane === lane);
-    nudgeRiskLaneInsideBounds(laneMarkers, minGap);
-  });
-}
-
-function nudgeRiskLaneInsideBounds(markers: Array<PositionRiskMarkerLayout & { index: number }>, minGap: number): void {
-  if (markers.length < 2) return;
-
-  for (let index = 1; index < markers.length; index += 1) {
-    markers[index].labelPercent = Math.max(markers[index].labelPercent, markers[index - 1].labelPercent + minGap);
-  }
-
-  const rightOverflow = markers[markers.length - 1].labelPercent - 92;
-  if (rightOverflow > 0) markers.forEach((marker) => (marker.labelPercent -= rightOverflow));
-
-  for (let index = markers.length - 2; index >= 0; index -= 1) {
-    markers[index].labelPercent = Math.min(markers[index].labelPercent, markers[index + 1].labelPercent - minGap);
-  }
-
-  const leftOverflow = 8 - markers[0].labelPercent;
-  if (leftOverflow > 0) markers.forEach((marker) => (marker.labelPercent += leftOverflow));
+  return resolvePositionRiskScale(rawMarkers);
 }
 
 function formatRiskMapRange(markers: PositionRiskMarker[]): string {
@@ -2233,6 +2117,19 @@ function PerformanceStats({ stats }: { stats: ReturnType<typeof calculateDemoTra
 }
 
 function TradeHistoryTable({ trades, onExport }: { trades: DemoTradeState["tradeHistory"]; onExport: () => void }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(trades.length / DEMO_TRADE_HISTORY_PAGE_SIZE));
+  const safePage = clamp(currentPage, 1, totalPages);
+  const paginationItems = useMemo(() => getTradeHistoryPaginationItems(safePage, totalPages), [safePage, totalPages]);
+  const paginatedTrades = useMemo(() => {
+    const start = (safePage - 1) * DEMO_TRADE_HISTORY_PAGE_SIZE;
+    return trades.slice(start, start + DEMO_TRADE_HISTORY_PAGE_SIZE);
+  }, [safePage, trades]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   return (
     <section className="section-panel demo-history-panel no-hover-effect">
       <div className="section-heading compact-heading">
@@ -2246,41 +2143,92 @@ function TradeHistoryTable({ trades, onExport }: { trades: DemoTradeState["trade
         </button>
       </div>
       {trades.length ? (
-        <div className="table-scroll">
-          <table className="past-trades-table demo-history-table">
-            <thead>
-              <tr>
-                <th scope="col">Trade ID</th>
-                <th scope="col">Side</th>
-                <th scope="col">Entry</th>
-                <th scope="col">Exit</th>
-                <th scope="col">Realized PnL</th>
-                <th scope="col">Return</th>
-                <th scope="col">Status</th>
-                <th scope="col">Closed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trades.map((trade) => (
-                <tr key={trade.tradeId}>
-                  <td>{trade.tradeId}</td>
-                  <td>{trade.side.toUpperCase()}</td>
-                  <td>{formatCurrency(trade.entryPrice)}</td>
-                  <td>{formatCurrency(trade.exitPrice)}</td>
-                  <td className={trade.realizedPnl >= 0 ? "positive" : "negative"}>{formatCurrency(trade.realizedPnl)}</td>
-                  <td>{trade.returnPercent.toFixed(2)}%</td>
-                  <td>{trade.status}</td>
-                  <td>{formatDateTime(trade.closedAt)}</td>
+        <>
+          <div className="table-scroll">
+            <table className="past-trades-table demo-history-table">
+              <thead>
+                <tr>
+                  <th scope="col">Trade ID</th>
+                  <th scope="col">Side</th>
+                  <th scope="col">Entry</th>
+                  <th scope="col">Exit</th>
+                  <th scope="col">Realized PnL</th>
+                  <th scope="col">Return</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Closed</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {paginatedTrades.map((trade) => (
+                  <tr key={trade.tradeId}>
+                    <td>{trade.tradeId}</td>
+                    <td>{trade.side.toUpperCase()}</td>
+                    <td>{formatCurrency(trade.entryPrice)}</td>
+                    <td>{formatCurrency(trade.exitPrice)}</td>
+                    <td className={trade.realizedPnl >= 0 ? "positive" : "negative"}>{formatCurrency(trade.realizedPnl)}</td>
+                    <td>{trade.returnPercent.toFixed(2)}%</td>
+                    <td>{trade.status}</td>
+                    <td>{formatDateTime(trade.closedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 ? (
+            <nav className="demo-history-pagination" aria-label="Trade history pages">
+              <span>
+                Page {safePage} of {totalPages}
+              </span>
+              <div>
+                {paginationItems.map((item) => (
+                  typeof item === "number" ? (
+                    <button
+                      className={item === safePage ? "active" : ""}
+                      type="button"
+                      onClick={() => setCurrentPage(item)}
+                      aria-current={item === safePage ? "page" : undefined}
+                      aria-label={`Show trade history page ${item}`}
+                      key={item}
+                    >
+                      {item}
+                    </button>
+                  ) : (
+                    <span className="demo-history-pagination-ellipsis" aria-hidden="true" key={item}>
+                      ...
+                    </span>
+                  )
+                ))}
+              </div>
+            </nav>
+          ) : null}
+        </>
       ) : (
         <p className="muted">Closed demo trades and action history will appear here.</p>
       )}
     </section>
   );
+}
+
+function getTradeHistoryPaginationItems(currentPage: number, totalPages: number): Array<number | "start-ellipsis" | "end-ellipsis"> {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+  const orderedPages = Array.from(pages)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((a, b) => a - b);
+
+  const items: Array<number | "start-ellipsis" | "end-ellipsis"> = [];
+  orderedPages.forEach((page, index) => {
+    const previousPage = orderedPages[index - 1];
+    if (previousPage && page - previousPage > 1) {
+      items.push(previousPage === 1 ? "start-ellipsis" : "end-ellipsis");
+    }
+    items.push(page);
+  });
+
+  return items;
 }
 
 function Metric({ label, value, tone, title }: { label: string; value: string; tone?: "positive" | "negative"; title?: string }) {

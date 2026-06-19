@@ -9,6 +9,7 @@ const stylesSource = await readFile(new URL("../src/styles.css", import.meta.url
 const persistenceSource = await readFile(new URL("../src/lib/demoTradePersistence.ts", import.meta.url), "utf8");
 const reconciliationSource = await readFile(new URL("../src/lib/demoTradeReconciliation.ts", import.meta.url), "utf8");
 const marketDataSource = await readFile(new URL("../src/lib/demoTradeMarketData.ts", import.meta.url), "utf8");
+const riskMapSource = await readFile(new URL("../src/lib/demoTradeRiskMap.ts", import.meta.url), "utf8");
 const reconcileFunctionSource = await readFile(new URL("../supabase/functions/demo-trade-reconcile/index.ts", import.meta.url), "utf8");
 const migrationSource = await readFile(new URL("../supabase/migrations/202606160001_demo_trade.sql", import.meta.url), "utf8");
 const grantMigrationSource = await readFile(new URL("../supabase/migrations/202606180001_demo_trade_persistence_grants.sql", import.meta.url), "utf8");
@@ -109,7 +110,7 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /ZoomIn/);
   assert.match(pageSource, /ZoomOut/);
   assert.match(pageSource, /isBullishCandle/);
-  assert.match(pageSource, /latestCandleTone/);
+  assert.doesNotMatch(pageSource, /latestCandleTone/);
   assert.match(pageSource, /resolveOverlayMarkerLayouts/);
   assert.match(pageSource, /resolveOverlayMarkerCluster/);
   assert.match(pageSource, /chart-marker-connector/);
@@ -118,8 +119,7 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(stylesSource, /chart-marker-connector/);
   assert.match(stylesSource, /trade-overlay-line\.mark line:not\(\.chart-marker-connector\)/);
   assert.match(stylesSource, /stroke-dasharray: 1 7/);
-  assert.match(stylesSource, /trade-overlay-line\.mark\.up \.chart-price-marker/);
-  assert.match(stylesSource, /trade-overlay-line\.mark\.down \.chart-price-marker/);
+  assert.match(stylesSource, /trade-overlay-line\.mark \.chart-price-marker/);
   assert.match(stylesSource, /trade-overlay-line\.entry \.chart-price-marker/);
   assert.match(stylesSource, /trade-overlay-line\.target \.chart-price-marker/);
   assert.match(stylesSource, /trade-overlay-line\.danger \.chart-price-marker/);
@@ -229,6 +229,11 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /function PositionRiskMap/);
   assert.match(pageSource, /buildPositionRiskMarkers/);
   assert.match(pageSource, /resolveRiskMarkerLayouts/);
+  assert.match(pageSource, /resolvePositionRiskScale\(rawMarkers\)/);
+  assert.match(riskMapSource, /resolveCompressedLiquidationScale/);
+  assert.match(riskMapSource, /compressed-left/);
+  assert.match(riskMapSource, /isInvertedRiskScale/);
+  assert.match(riskMapSource, /FAR_LIQUIDATION_ACTIVE_BAND_LEFT/);
   assert.match(pageSource, /detailLabel: formatTakeProfitClosePercent\(takeProfit\.closePercent\)/);
   assert.match(pageSource, /function rebalanceTakeProfitPercents/);
   assert.match(pageSource, /function splitTakeProfitPercents/);
@@ -248,10 +253,10 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(pageSource, /function formatRiskMapPrice/);
   assert.match(pageSource, /function formatTakeProfitClosePercent/);
   assert.match(pageSource, /position-risk-guide/);
-  assert.match(pageSource, /getRiskMarkerPlacement/);
-  assert.match(pageSource, /getRiskMarkerLaneCount/);
-  assert.match(pageSource, /getRiskMarkerAnchor/);
-  assert.match(pageSource, /placeRiskLabelsInLanes/);
+  assert.match(riskMapSource, /getRiskMarkerPlacement/);
+  assert.match(riskMapSource, /getRiskMarkerLaneCount/);
+  assert.match(riskMapSource, /getRiskMarkerAnchor/);
+  assert.match(riskMapSource, /placeRiskLabelsInLanes/);
   assert.match(pageSource, /"--risk-left": `\$\{marker\.labelPercent\}%`/);
   assert.match(pageSource, /position-summary-grid/);
   assert.match(pageSource, /position-risk-map/);
@@ -267,6 +272,8 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.doesNotMatch(pageSource, /futures-pending-limit/);
   assert.match(stylesSource, /position-risk-marker/);
   assert.match(stylesSource, /position-risk-guide/);
+  assert.match(stylesSource, /position-risk-track\.compressed-left/);
+  assert.doesNotMatch(stylesSource, /position-risk-track\.compressed-right/);
   assert.match(stylesSource, /position-risk-dot\.mark::after/);
   assert.match(stylesSource, /mark-price-pulse/);
   assert.match(stylesSource, /prefers-reduced-motion: reduce/);
@@ -296,7 +303,15 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(stylesSource, /manual-close-button[\s\S]*box-shadow: none/);
   assert.match(pageSource, /Export CSV/);
   assert.match(pageSource, /ghost-button compact candle-hover-button/);
+  assert.match(pageSource, /DEMO_TRADE_HISTORY_PAGE_SIZE = 10/);
+  assert.match(pageSource, /function getTradeHistoryPaginationItems/);
+  assert.match(pageSource, /const paginatedTrades = useMemo/);
+  assert.match(pageSource, /trades\.slice\(start, start \+ DEMO_TRADE_HISTORY_PAGE_SIZE\)/);
+  assert.match(pageSource, /Trade history pages/);
+  assert.match(pageSource, /aria-current=\{item === safePage \? "page" : undefined\}/);
   assert.match(stylesSource, /demo-history-panel \.section-heading \{[\s\S]*justify-content: space-between/);
+  assert.match(stylesSource, /demo-history-pagination/);
+  assert.match(stylesSource, /demo-history-pagination button\.active/);
   const performancePanelIndex = pageSource.indexOf("<PerformanceStats stats={stats} />");
   const balancePanelIndex = pageSource.indexOf('className="section-panel demo-balance-panel no-hover-effect"');
   assert.ok(performancePanelIndex !== -1 && balancePanelIndex !== -1 && performancePanelIndex < balancePanelIndex);
