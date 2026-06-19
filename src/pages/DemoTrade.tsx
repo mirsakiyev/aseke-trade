@@ -62,12 +62,15 @@ import {
 interface TakeProfitDraft {
   id: string;
   price: string;
+  priceInputMode: DemoTakeProfitInputMode;
   closePercent: string;
 }
 
 type DemoOrderType = "market" | "limit";
 type DemoQuantityUnit = "usdt" | "btc" | "cont";
-type DemoOverlayTone = "mark" | "entry" | "target" | "hit" | "danger" | "liquidation";
+type DemoStopLossInputMode = "price" | "percent";
+type DemoTakeProfitInputMode = "price" | "percent";
+type DemoOverlayTone = "mark" | "entry" | "pending" | "target" | "hit" | "danger" | "liquidation";
 interface DemoOverlayLine {
   label: string;
   price: number;
@@ -81,7 +84,7 @@ interface DemoOverlayLineLayout {
 }
 
 const emptyTakeProfits: TakeProfitDraft[] = [
-  { id: "tp-1", price: "", closePercent: "100" }
+  { id: "tp-1", price: "", priceInputMode: "price", closePercent: "100" }
 ];
 
 const DEMO_TRADE_LIVE_REFRESH_MS = 1000;
@@ -98,6 +101,36 @@ const quantityUnitLabels: Record<DemoQuantityUnit, string> = {
   usdt: "USDT",
   btc: "BTC",
   cont: "Cont"
+};
+
+const stopLossModeLabels: Record<DemoStopLossInputMode, string> = {
+  price: "Price",
+  percent: "%"
+};
+
+const stopLossModeSubLabels: Record<DemoStopLossInputMode, string> = {
+  price: "Exact SL price",
+  percent: "Distance from entry"
+};
+
+const takeProfitModeLabels: Record<DemoTakeProfitInputMode, string> = {
+  price: "Price",
+  percent: "%"
+};
+
+const takeProfitModeSubLabels: Record<DemoTakeProfitInputMode, string> = {
+  price: "Exact TP price",
+  percent: "Distance from entry"
+};
+
+const marginModeLabels: Record<DemoMarginMode, string> = {
+  isolated: "Isolated",
+  cross: "Cross"
+};
+
+const marginModeSubLabels: Record<DemoMarginMode, string> = {
+  isolated: "Separate margin",
+  cross: "Shared balance"
 };
 
 export function DemoTrade() {
@@ -120,6 +153,7 @@ export function DemoTrade() {
   const [amount, setAmount] = useState("");
   const [leverage, setLeverage] = useState("5");
   const [isBracketEnabled, setIsBracketEnabled] = useState(false);
+  const [stopLossInputMode, setStopLossInputMode] = useState<DemoStopLossInputMode>("price");
   const [stopLoss, setStopLoss] = useState("");
   const [takeProfits, setTakeProfits] = useState<TakeProfitDraft[]>(emptyTakeProfits);
   const [formErrors, setFormErrors] = useState<string[]>([]);
@@ -308,6 +342,7 @@ export function DemoTrade() {
       position.takeProfits.map((takeProfit) => ({
         id: takeProfit.id,
         price: String(takeProfit.price),
+        priceInputMode: "price",
         closePercent: String(takeProfit.closePercent)
       }))
     );
@@ -315,11 +350,11 @@ export function DemoTrade() {
 
   const openTrade = (requestedSide: DemoTradeSide) => {
     const entryPrice = currentPrice ?? candles[candles.length - 1]?.close ?? 0;
-    const submittedBracket = buildSubmittedBracket(isBracketEnabled, stopLoss, takeProfits);
     const amountValue = parseNumber(amount);
 
     if (orderType === "limit") {
       const nextLimitPrice = parseNumber(limitPrice);
+      const submittedBracket = buildSubmittedBracket(isBracketEnabled, stopLoss, stopLossInputMode, requestedSide, nextLimitPrice, takeProfits);
       const nextErrors: string[] = [];
       if (!user) nextErrors.push("Limit orders are available for registered users only.");
       if (!Number.isFinite(nextLimitPrice) || nextLimitPrice <= 0) nextErrors.push("Enter a valid limit price.");
@@ -356,6 +391,7 @@ export function DemoTrade() {
       return;
     }
 
+    const submittedBracket = buildSubmittedBracket(isBracketEnabled, stopLoss, stopLossInputMode, requestedSide, entryPrice, takeProfits);
     const result = openDemoPosition(demoState, {
       userId: user?.id ?? null,
       sessionId: demoState.sessionId,
@@ -400,14 +436,17 @@ export function DemoTrade() {
   };
 
   const updateTps = () => {
+    const position = demoState.openPosition;
+    if (!position) return;
+
     const result = updateDemoTakeProfits(
       demoState,
       positionTakeProfits.map((takeProfit) => ({
         id: takeProfit.id,
-        price: parseNumber(takeProfit.price),
+        price: resolveSubmittedTakeProfitPrice(takeProfit, position.side, position.entryPrice),
         closePercent: parseNumber(takeProfit.closePercent),
-        isHit: demoState.openPosition?.takeProfits.find((item) => item.id === takeProfit.id)?.isHit ?? false,
-        hitAt: demoState.openPosition?.takeProfits.find((item) => item.id === takeProfit.id)?.hitAt ?? null
+        isHit: position.takeProfits.find((item) => item.id === takeProfit.id)?.isHit ?? false,
+        hitAt: position.takeProfits.find((item) => item.id === takeProfit.id)?.hitAt ?? null
       }))
     );
     if (!result.ok) {
@@ -491,7 +530,7 @@ export function DemoTrade() {
       <section className="page-title-row demo-trade-title-row">
         <div>
           <p className="eyebrow">Demo Trade</p>
-          <h1>Practice BTC trades with virtual funds</h1>
+          <h1>Practice Futures trades with virtual funds</h1>
           <p>
             Demo Trade uses virtual funds for education and practice. It does not place real trades.
           </p>
@@ -539,6 +578,7 @@ export function DemoTrade() {
             candles={candles}
             currentPrice={currentPrice}
             position={demoState.openPosition}
+            pendingLimitOrder={demoState.pendingLimitOrder}
             timeframe={timeframe}
             onTimeframeChange={setTimeframe}
           />
@@ -585,6 +625,7 @@ export function DemoTrade() {
               quantityUnit={quantityUnit}
               leverage={leverage}
               isBracketEnabled={isBracketEnabled}
+              stopLossInputMode={stopLossInputMode}
               limitPrice={limitPrice}
               stopLoss={stopLoss}
               takeProfits={takeProfits}
@@ -601,6 +642,7 @@ export function DemoTrade() {
                 setIsBracketEnabled(enabled);
                 if (enabled && takeProfits.length === 0) setTakeProfits(emptyTakeProfits);
               }}
+              onStopLossInputModeChange={setStopLossInputMode}
               onLimitPriceChange={setLimitPrice}
               onStopLossChange={setStopLoss}
               onTakeProfitsChange={setTakeProfits}
@@ -681,6 +723,7 @@ function TradeEntryForm({
   quantityUnit,
   leverage,
   isBracketEnabled,
+  stopLossInputMode,
   limitPrice,
   stopLoss,
   takeProfits,
@@ -694,6 +737,7 @@ function TradeEntryForm({
   onQuantityUnitChange,
   onLeverageChange,
   onBracketEnabledChange,
+  onStopLossInputModeChange,
   onLimitPriceChange,
   onStopLossChange,
   onTakeProfitsChange,
@@ -705,6 +749,7 @@ function TradeEntryForm({
   quantityUnit: DemoQuantityUnit;
   leverage: string;
   isBracketEnabled: boolean;
+  stopLossInputMode: DemoStopLossInputMode;
   limitPrice: string;
   stopLoss: string;
   takeProfits: TakeProfitDraft[];
@@ -718,6 +763,7 @@ function TradeEntryForm({
   onQuantityUnitChange: (unit: DemoQuantityUnit) => void;
   onLeverageChange: (value: string) => void;
   onBracketEnabledChange: (enabled: boolean) => void;
+  onStopLossInputModeChange: (mode: DemoStopLossInputMode) => void;
   onLimitPriceChange: (value: string) => void;
   onStopLossChange: (value: string) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
@@ -773,18 +819,7 @@ function TradeEntryForm({
       </div>
 
       <div className="futures-mode-row">
-        <label className="futures-mode-field">
-          <span>Margin Mode</span>
-          <select
-            className="futures-mode-chip"
-            value={marginMode}
-            onChange={(event) => onMarginModeChange(event.target.value as DemoMarginMode)}
-            aria-label="Margin mode"
-          >
-            <option value="isolated">Isolated</option>
-            <option value="cross">Cross</option>
-          </select>
-        </label>
+        <MarginModeSelector marginMode={marginMode} onApply={onMarginModeChange} />
         <LeverageSelector leverage={leverage} onApply={onLeverageChange} />
       </div>
 
@@ -870,8 +905,18 @@ function TradeEntryForm({
         {isBracketEnabled && (
           <>
             <label>
-              Stop Loss
-              <input type="number" min="0" step="0.01" value={stopLoss} onChange={(event) => onStopLossChange(event.target.value)} />
+              <span className="futures-quantity-label">
+                Stop Loss
+                <StopLossModeSelector mode={stopLossInputMode} onApply={onStopLossInputModeChange} />
+              </span>
+              <input
+                type="number"
+                min="0"
+                step={stopLossInputMode === "percent" ? "0.1" : "0.01"}
+                value={stopLoss}
+                onChange={(event) => onStopLossChange(event.target.value)}
+                placeholder={stopLossInputMode === "percent" ? "SL distance %" : "Stop price"}
+              />
             </label>
             <TakeProfitEditor takeProfits={takeProfits} onChange={onTakeProfitsChange} />
           </>
@@ -919,6 +964,95 @@ function TradeEntryForm({
       </dl>
 
       <ErrorList errors={errors} />
+    </div>
+  );
+}
+
+function MarginModeSelector({
+  marginMode,
+  onApply
+}: {
+  marginMode: DemoMarginMode;
+  onApply: (value: DemoMarginMode) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftMode, setDraftMode] = useState<DemoMarginMode>(marginMode);
+  const selectorRef = useRef<HTMLDivElement | null>(null);
+
+  const openSelector = () => {
+    setDraftMode(marginMode);
+    setIsOpen(true);
+  };
+
+  const closeSelector = () => {
+    setDraftMode(marginMode);
+    setIsOpen(false);
+  };
+
+  const applyDraft = () => {
+    onApply(draftMode);
+    setIsOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event: globalThis.PointerEvent) => {
+      if (!selectorRef.current?.contains(event.target as Node)) closeSelector();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSelector();
+      if (event.key === "Enter") applyDraft();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [draftMode, isOpen, marginMode]);
+
+  return (
+    <div className="futures-mode-field futures-margin-control" ref={selectorRef}>
+      <span>Margin Mode</span>
+      <button
+        className="futures-mode-chip futures-margin-trigger"
+        type="button"
+        aria-label="Set margin mode"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        onClick={() => (isOpen ? closeSelector() : openSelector())}
+      >
+        <strong>{marginModeLabels[marginMode]}</strong>
+        <span aria-hidden="true">{"\u25BE"}</span>
+      </button>
+
+      {isOpen && (
+        <section className="margin-mode-popover" role="dialog" aria-label="Set margin mode">
+          <h3>MARGIN MODE</h3>
+          <div className="margin-mode-option-grid" role="radiogroup" aria-label="Margin mode">
+            {(["isolated", "cross"] as DemoMarginMode[]).map((mode) => (
+              <button
+                className={draftMode === mode ? "active" : ""}
+                type="button"
+                role="radio"
+                aria-checked={draftMode === mode}
+                onClick={() => setDraftMode(mode)}
+                key={mode}
+              >
+                <strong>{marginModeLabels[mode]}</strong>
+                <span>{marginModeSubLabels[mode]}</span>
+              </button>
+            ))}
+          </div>
+          <button className="primary-button compact margin-mode-apply-button" type="button" onClick={applyDraft}>
+            Apply
+          </button>
+        </section>
+      )}
     </div>
   );
 }
@@ -1133,6 +1267,184 @@ function QuantityUnitSelector({
           </div>
           <p>{unitSettingsCopy(draftUnit, referencePrice)}</p>
           <button className="primary-button compact unit-apply-button" type="button" onClick={applyDraft}>
+            Apply
+          </button>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function StopLossModeSelector({
+  mode,
+  onApply
+}: {
+  mode: DemoStopLossInputMode;
+  onApply: (mode: DemoStopLossInputMode) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftMode, setDraftMode] = useState<DemoStopLossInputMode>(mode);
+  const selectorRef = useRef<HTMLDivElement | null>(null);
+
+  const openSelector = () => {
+    setDraftMode(mode);
+    setIsOpen(true);
+  };
+
+  const closeSelector = () => {
+    setDraftMode(mode);
+    setIsOpen(false);
+  };
+
+  const applyDraft = () => {
+    onApply(draftMode);
+    setIsOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event: globalThis.PointerEvent) => {
+      if (!selectorRef.current?.contains(event.target as Node)) closeSelector();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSelector();
+      if (event.key === "Enter") applyDraft();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [draftMode, isOpen, mode]);
+
+  return (
+    <div className="stop-loss-mode-control" ref={selectorRef}>
+      <button
+        className="stop-loss-mode-trigger"
+        type="button"
+        aria-label="Set stop loss input mode"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        onClick={() => (isOpen ? closeSelector() : openSelector())}
+      >
+        <strong>{stopLossModeLabels[mode]}</strong>
+        <span aria-hidden="true">{"\u25BE"}</span>
+      </button>
+
+      {isOpen && (
+        <section className="stop-loss-mode-popover" role="dialog" aria-label="Set stop loss input mode">
+          <h3>STOP LOSS BY</h3>
+          <div className="stop-loss-mode-option-grid" role="radiogroup" aria-label="Stop loss input mode">
+            {(["price", "percent"] as DemoStopLossInputMode[]).map((item) => (
+              <button
+                className={draftMode === item ? "active" : ""}
+                type="button"
+                role="radio"
+                aria-checked={draftMode === item}
+                onClick={() => setDraftMode(item)}
+                key={item}
+              >
+                <strong>{stopLossModeLabels[item]}</strong>
+                <span>{stopLossModeSubLabels[item]}</span>
+              </button>
+            ))}
+          </div>
+          <p>{draftMode === "percent" ? "For longs, SL is below entry. For shorts, SL is above entry." : "Enter the exact stop-loss price."}</p>
+          <button className="primary-button compact stop-loss-mode-apply-button" type="button" onClick={applyDraft}>
+            Apply
+          </button>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function TakeProfitModeSelector({
+  mode,
+  onApply
+}: {
+  mode: DemoTakeProfitInputMode;
+  onApply: (mode: DemoTakeProfitInputMode) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftMode, setDraftMode] = useState<DemoTakeProfitInputMode>(mode);
+  const selectorRef = useRef<HTMLDivElement | null>(null);
+
+  const openSelector = () => {
+    setDraftMode(mode);
+    setIsOpen(true);
+  };
+
+  const closeSelector = () => {
+    setDraftMode(mode);
+    setIsOpen(false);
+  };
+
+  const applyDraft = () => {
+    onApply(draftMode);
+    setIsOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event: globalThis.PointerEvent) => {
+      if (!selectorRef.current?.contains(event.target as Node)) closeSelector();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSelector();
+      if (event.key === "Enter") applyDraft();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [draftMode, isOpen, mode]);
+
+  return (
+    <div className="take-profit-mode-control" ref={selectorRef}>
+      <button
+        className="take-profit-mode-trigger"
+        type="button"
+        aria-label="Set take profit input mode"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        onClick={() => (isOpen ? closeSelector() : openSelector())}
+      >
+        <strong>{takeProfitModeLabels[mode]}</strong>
+        <span aria-hidden="true">{"\u25BE"}</span>
+      </button>
+
+      {isOpen && (
+        <section className="take-profit-mode-popover" role="dialog" aria-label="Set take profit input mode">
+          <h3>TAKE PROFIT BY</h3>
+          <div className="take-profit-mode-option-grid" role="radiogroup" aria-label="Take profit input mode">
+            {(["price", "percent"] as DemoTakeProfitInputMode[]).map((item) => (
+              <button
+                className={draftMode === item ? "active" : ""}
+                type="button"
+                role="radio"
+                aria-checked={draftMode === item}
+                onClick={() => setDraftMode(item)}
+                key={item}
+              >
+                <strong>{takeProfitModeLabels[item]}</strong>
+                <span>{takeProfitModeSubLabels[item]}</span>
+              </button>
+            ))}
+          </div>
+          <p>{draftMode === "percent" ? "For longs, TP is above entry. For shorts, TP is below entry." : "Enter the exact take-profit price."}</p>
+          <button className="primary-button compact take-profit-mode-apply-button" type="button" onClick={applyDraft}>
             Apply
           </button>
         </section>
@@ -1420,7 +1732,7 @@ function TakeProfitEditor({
   };
 
   const addRow = () => {
-    const nextRows = [...takeProfits, { id: `tp-${Date.now()}`, price: "", closePercent: "" }];
+    const nextRows = [...takeProfits, { id: `tp-${Date.now()}`, price: "", priceInputMode: "price" as DemoTakeProfitInputMode, closePercent: "" }];
     onChange(rebalanceTakeProfitPercents(nextRows));
   };
 
@@ -1433,13 +1745,20 @@ function TakeProfitEditor({
       {takeProfits.map((takeProfit, index) => (
         <div className="tp-draft-row" key={takeProfit.id}>
           <label>
-            TP{index + 1} Price
+            <span className="tp-price-label">
+              TP{index + 1} {takeProfit.priceInputMode === "percent" ? "%" : "Price"}
+              <TakeProfitModeSelector
+                mode={takeProfit.priceInputMode ?? "price"}
+                onApply={(priceInputMode) => updateRow(takeProfit.id, { priceInputMode })}
+              />
+            </span>
             <input
               type="number"
               min="0"
-              step="0.01"
+              step={(takeProfit.priceInputMode ?? "price") === "percent" ? "0.1" : "0.01"}
               value={takeProfit.price}
               onChange={(event) => updateRow(takeProfit.id, { price: event.target.value })}
+              placeholder={(takeProfit.priceInputMode ?? "price") === "percent" ? "TP distance %" : "Target price"}
             />
           </label>
           <label>
@@ -1472,12 +1791,14 @@ function DemoTradeChart({
   candles,
   currentPrice,
   position,
+  pendingLimitOrder,
   timeframe,
   onTimeframeChange
 }: {
   candles: DemoTradeCandle[];
   currentPrice: number | null;
   position: DemoOpenPosition | null;
+  pendingLimitOrder: DemoPendingLimitOrder | null;
   timeframe: DemoTradeTimeframe;
   onTimeframeChange: (timeframe: DemoTradeTimeframe) => void;
 }) {
@@ -1497,7 +1818,7 @@ function DemoTradeChart({
   const dataWindowCount = Math.max(1, visibleCount - futureSlots);
   const end = Math.max(0, candles.length - Math.max(safeOffset, 0));
   const visibleCandles = candles.slice(Math.max(0, end - dataWindowCount), end);
-  const overlayLines = buildOverlayLines(position, currentPrice);
+  const overlayLines = buildOverlayLines(position, pendingLimitOrder, currentPrice);
   const autoscaleOverlayPrices = overlayLines
     .filter((line) => line.tone !== "liquidation")
     .map((line) => line.price);
@@ -2377,9 +2698,16 @@ function getSvgPointer(event: PointerEvent<SVGSVGElement>, width: number, height
   };
 }
 
-function buildOverlayLines(position: DemoOpenPosition | null, currentPrice: number | null): DemoOverlayLine[] {
+function buildOverlayLines(
+  position: DemoOpenPosition | null,
+  pendingLimitOrder: DemoPendingLimitOrder | null,
+  currentPrice: number | null
+): DemoOverlayLine[] {
   const lines: DemoOverlayLine[] = [];
   if (currentPrice) lines.push({ label: "Mark", price: currentPrice, tone: "mark" });
+  if (!position && pendingLimitOrder?.limitPrice) {
+    lines.push({ label: "Limit", price: pendingLimitOrder.limitPrice, tone: "pending" });
+  }
   if (!position) return lines;
 
   lines.push({ label: "Entry", price: position.entryPrice, tone: "entry" });
@@ -2396,7 +2724,7 @@ function isBracketPriceMarker(tone: DemoOverlayTone): boolean {
 }
 
 function isOverlayPriceMarker(tone: DemoOverlayTone): boolean {
-  return tone === "mark" || tone === "entry" || isBracketPriceMarker(tone);
+  return tone === "mark" || tone === "entry" || tone === "pending" || isBracketPriceMarker(tone);
 }
 
 function resolveOverlayMarkerLayouts(layouts: DemoOverlayLineLayout[], minY: number, maxY: number): DemoOverlayLineLayout[] {
@@ -2481,6 +2809,9 @@ function parseNumber(value: string): number {
 function buildSubmittedBracket(
   isBracketEnabled: boolean,
   stopLoss: string,
+  stopLossInputMode: DemoStopLossInputMode,
+  side: DemoTradeSide,
+  referencePrice: number,
   takeProfits: TakeProfitDraft[]
 ) {
   if (!isBracketEnabled) {
@@ -2491,13 +2822,46 @@ function buildSubmittedBracket(
   }
 
   return {
-    stopLoss: parseNumber(stopLoss),
+    stopLoss: resolveSubmittedStopLoss(stopLoss, stopLossInputMode, side, referencePrice),
     takeProfits: takeProfits.map((takeProfit) => ({
       id: takeProfit.id,
-      price: parseNumber(takeProfit.price),
+      price: resolveSubmittedTakeProfitPrice(takeProfit, side, referencePrice),
       closePercent: parseNumber(takeProfit.closePercent)
     }))
   };
+}
+
+function resolveSubmittedStopLoss(
+  value: string,
+  mode: DemoStopLossInputMode,
+  side: DemoTradeSide,
+  referencePrice: number
+): number {
+  const parsedValue = parseNumber(value);
+  if (mode === "price" || parsedValue <= 0) return parsedValue;
+  if (!Number.isFinite(referencePrice) || referencePrice <= 0) return 0;
+
+  const stopDistance = clamp(parsedValue, 0, 100) / 100;
+  const stopPrice = side === "long"
+    ? referencePrice * (1 - stopDistance)
+    : referencePrice * (1 + stopDistance);
+  return floorTo(stopPrice, 2);
+}
+
+function resolveSubmittedTakeProfitPrice(
+  takeProfit: TakeProfitDraft,
+  side: DemoTradeSide,
+  referencePrice: number
+): number {
+  const parsedValue = parseNumber(takeProfit.price);
+  if ((takeProfit.priceInputMode ?? "price") === "price" || parsedValue <= 0) return parsedValue;
+  if (!Number.isFinite(referencePrice) || referencePrice <= 0) return 0;
+
+  const targetDistance = clamp(parsedValue, 0, 100) / 100;
+  const targetPrice = side === "long"
+    ? referencePrice * (1 + targetDistance)
+    : referencePrice * (1 - targetDistance);
+  return floorTo(targetPrice, 2);
 }
 
 function quantityInputToNotional(value: number, unit: DemoQuantityUnit, price: number): number {
