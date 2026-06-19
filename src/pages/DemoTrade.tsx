@@ -708,6 +708,10 @@ export function DemoTrade() {
               <h2>Reset / re-up</h2>
             </div>
           </div>
+          <div className="demo-balance-note">
+            <strong>Clean reset</strong>
+            <span>Your demo stats rebuild from the new starting balance.</span>
+          </div>
           <label>
             Starting Balance
             <input
@@ -722,10 +726,6 @@ export function DemoTrade() {
             <RotateCcw size={16} />
             Reset and Apply New Balance
           </button>
-          <div className="demo-balance-note">
-            <strong>Clean reset</strong>
-            <span>Your demo stats rebuild from the new starting balance.</span>
-          </div>
         </article>
       </section>
 
@@ -1994,7 +1994,7 @@ function DemoTradeChart({
     }
     if (!dragStartRef.current) return;
     event.preventDefault();
-    const deltaCandles = Math.round((dragStartRef.current.x - event.clientX) / Math.max(5, candleGap));
+    const deltaCandles = Math.round((event.clientX - dragStartRef.current.x) / Math.max(5, candleGap));
     const pricePerPixel = visiblePriceRange / Math.max(1, chartHeight);
     const deltaY = event.clientY - dragStartRef.current.y;
     setOffset(clamp(dragStartRef.current.offset + deltaCandles, -futurePaddingCandles, Math.max(0, candles.length - visibleCount)));
@@ -2159,7 +2159,11 @@ function DemoTradeChart({
           {overlayLineLayouts.map(({ line, lineY, markerY }) => {
             const hasPriceMarker = isOverlayPriceMarker(line.tone);
             const isMarkerShifted = Math.abs(markerY - lineY) > 1;
-            const overlayClassName = ["trade-overlay-line", line.tone].join(" ");
+            const overlayClassName = [
+              "trade-overlay-line",
+              line.tone,
+              line.tone === "entry" && position ? `side-${position.side}` : ""
+            ].filter(Boolean).join(" ");
             return (
               <g className={overlayClassName} key={`${line.label}-${line.price}`}>
                 <line x1={padding.left} x2={axisX} y1={lineY} y2={lineY} />

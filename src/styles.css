@@ -5759,9 +5759,31 @@ select:focus {
   background: rgba(97, 181, 201, 0.42);
 }
 
+.position-risk-track.side-long .position-risk-guide.entry,
+.position-risk-track.side-long .position-risk-guide-link.entry {
+  background: rgba(126, 224, 167, 0.5);
+}
+
+.position-risk-track.side-short .position-risk-guide.entry,
+.position-risk-track.side-short .position-risk-guide-link.entry {
+  background: rgba(255, 107, 107, 0.5);
+}
+
 .position-risk-dot.entry,
 .position-risk-marker.entry {
   border-color: rgba(97, 181, 201, 0.46);
+}
+
+.position-risk-track.side-long .position-risk-dot.entry {
+  border-color: rgba(126, 224, 167, 0.58);
+  background: var(--success);
+  box-shadow: 0 0 12px rgba(126, 224, 167, 0.2);
+}
+
+.position-risk-track.side-short .position-risk-dot.entry {
+  border-color: rgba(255, 107, 107, 0.58);
+  background: var(--danger);
+  box-shadow: 0 0 12px rgba(255, 107, 107, 0.2);
 }
 
 .position-risk-track.side-long .position-risk-marker.entry {
@@ -5985,7 +6007,7 @@ select:focus {
 }
 
 .trade-overlay-line.entry line {
-  stroke: rgba(184, 214, 222, 0.92);
+  stroke: rgba(229, 228, 226, 0.68);
 }
 
 .trade-overlay-line.pending line {
@@ -6009,6 +6031,14 @@ select:focus {
 
 .trade-overlay-line.entry .chart-price-marker {
   fill: rgba(97, 181, 201, 0.92);
+}
+
+.trade-overlay-line.entry.side-long .chart-price-marker {
+  fill: rgba(69, 174, 116, 0.92);
+}
+
+.trade-overlay-line.entry.side-short .chart-price-marker {
+  fill: rgba(210, 71, 77, 0.92);
 }
 
 .trade-overlay-line.pending .chart-price-marker {
@@ -6090,7 +6120,12 @@ select:focus {
 }
 
 .demo-balance-panel {
-  align-content: start;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.demo-balance-panel > .ghost-button {
+  align-self: end;
 }
 
 .demo-balance-copy {
@@ -6104,22 +6139,22 @@ select:focus {
 .demo-balance-note {
   display: grid;
   gap: 0.28rem;
-  margin-top: 0.18rem;
-  padding: 0.72rem 0.78rem;
-  border: 1px solid rgba(126, 224, 167, 0.16);
+  padding: 0.58rem 0.66rem;
+  border: 1px solid rgba(229, 228, 226, 0.08);
   border-radius: 8px;
-  background: linear-gradient(135deg, rgba(126, 224, 167, 0.09), rgba(97, 181, 201, 0.06));
+  background: rgba(229, 228, 226, 0.035);
+  opacity: 0.76;
 }
 
 .demo-balance-note strong {
-  color: var(--success);
+  color: rgba(184, 196, 207, 0.72);
   font-size: 0.74rem;
   font-weight: 950;
   text-transform: uppercase;
 }
 
 .demo-balance-note span {
-  color: var(--muted);
+  color: rgba(184, 196, 207, 0.62);
   font-size: 0.82rem;
   font-weight: 760;
   line-height: 1.35;

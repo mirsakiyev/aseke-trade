@@ -93,7 +93,7 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /onDoubleClick=\{resetPriceView\}/);
   assert.match(pageSource, /dragStartRef\.current \|\| priceScaleStartRef\.current\) return/);
   assert.match(pageSource, /setPointerCapture/);
-  assert.match(pageSource, /dragStartRef\.current\.x - event\.clientX/);
+  assert.match(pageSource, /event\.clientX - dragStartRef\.current\.x/);
   assert.match(pageSource, /futurePaddingCandles/);
   assert.match(pageSource, /pricePan/);
   assert.match(pageSource, /visiblePriceRange/);
@@ -135,6 +135,7 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /resolveOverlayMarkerLayouts/);
   assert.match(pageSource, /resolveOverlayMarkerCluster/);
   assert.match(pageSource, /a\.markerY - b\.markerY \|\| b\.line\.price - a\.line\.price \|\| a\.index - b\.index/);
+  assert.match(pageSource, /line\.tone === "entry" && position \? `side-\$\{position\.side\}` : ""/);
   assert.match(pageSource, /chart-marker-connector/);
   assert.match(pageSource, /isOverlayPriceMarker/);
   assert.match(pageSource, /chart-price-marker-label/);
@@ -143,6 +144,10 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(stylesSource, /stroke-dasharray: 1 7/);
   assert.match(stylesSource, /trade-overlay-line\.mark \.chart-price-marker/);
   assert.match(stylesSource, /trade-overlay-line\.entry \.chart-price-marker/);
+  assert.match(stylesSource, /trade-overlay-line\.entry line \{[^}]*stroke: rgba\(229, 228, 226, 0\.68\)/);
+  assert.match(stylesSource, /trade-overlay-line\.entry\.side-long \.chart-price-marker \{[^}]*fill: rgba\(69, 174, 116, 0\.92\)/);
+  assert.match(stylesSource, /trade-overlay-line\.entry\.side-short \.chart-price-marker \{[^}]*fill: rgba\(210, 71, 77, 0\.92\)/);
+  assert.doesNotMatch(stylesSource, /trade-overlay-line\.entry line \{[^}]*rgba\(184, 214, 222/);
   assert.match(stylesSource, /trade-overlay-line\.pending line/);
   assert.match(stylesSource, /trade-overlay-line\.pending \.chart-price-marker/);
   assert.match(stylesSource, /trade-overlay-line\.target \.chart-price-marker/);
@@ -210,6 +215,10 @@ test("Demo Trade position risk map shows entry-to-mark progress by PnL direction
   assert.match(stylesSource, /position-risk-progress\.negative/);
   assert.match(stylesSource, /position-risk-track\.side-long \.position-risk-marker\.entry/);
   assert.match(stylesSource, /position-risk-track\.side-short \.position-risk-marker\.entry/);
+  assert.match(stylesSource, /position-risk-track\.side-long \.position-risk-guide\.entry,[\s\S]*position-risk-track\.side-long \.position-risk-guide-link\.entry \{[\s\S]*background: rgba\(126, 224, 167, 0\.5\)/);
+  assert.match(stylesSource, /position-risk-track\.side-short \.position-risk-guide\.entry,[\s\S]*position-risk-track\.side-short \.position-risk-guide-link\.entry \{[\s\S]*background: rgba\(255, 107, 107, 0\.5\)/);
+  assert.match(stylesSource, /position-risk-track\.side-long \.position-risk-dot\.entry \{[\s\S]*background: var\(--success\)/);
+  assert.match(stylesSource, /position-risk-track\.side-short \.position-risk-dot\.entry \{[\s\S]*background: var\(--danger\)/);
   assert.match(stylesSource, /position-risk-track\.side-long \.position-risk-marker\.entry \{[^}]*background: rgba\(126, 224, 167, 0\.13\)/);
   assert.match(stylesSource, /position-risk-track\.side-short \.position-risk-marker\.entry \{[^}]*background: rgba\(255, 107, 107, 0\.13\)/);
   assert.doesNotMatch(stylesSource, /position-risk-track\.side-long \.position-risk-marker\.entry \{[^}]*linear-gradient/);
@@ -222,10 +231,21 @@ test("Demo Trade position risk map shows entry-to-mark progress by PnL direction
 test("Demo Trade reset balance button uses standard compact hover", () => {
   const resetButtonIndex = pageSource.indexOf('onClick={requestBalanceReset}');
   assert.ok(resetButtonIndex !== -1);
+  const balancePanelIndex = pageSource.indexOf('className="section-panel demo-balance-panel no-hover-effect"');
+  assert.ok(balancePanelIndex !== -1);
+  const balancePanelSource = pageSource.slice(balancePanelIndex, pageSource.indexOf("</article>", balancePanelIndex));
+  assert.ok(balancePanelSource.indexOf("Clean reset") < balancePanelSource.indexOf("Starting Balance"));
+  assert.ok(balancePanelSource.indexOf("Starting Balance") < balancePanelSource.indexOf("Reset and Apply New Balance"));
   const resetButtonSource = pageSource.slice(Math.max(0, resetButtonIndex - 140), resetButtonIndex + 180);
   assert.match(resetButtonSource, /className="ghost-button compact"/);
   assert.doesNotMatch(resetButtonSource, /candle-hover-button/);
   assert.match(resetButtonSource, /Reset and Apply New Balance/);
+  assert.match(stylesSource, /demo-balance-panel \{[\s\S]*grid-template-rows: auto auto auto minmax\(0, 1fr\)/);
+  assert.match(stylesSource, /demo-balance-panel > \.ghost-button \{[\s\S]*align-self: end/);
+  assert.match(stylesSource, /demo-balance-note \{[\s\S]*border: 1px solid rgba\(229, 228, 226, 0\.08\)/);
+  assert.match(stylesSource, /demo-balance-note \{[\s\S]*background: rgba\(229, 228, 226, 0\.035\)/);
+  assert.match(stylesSource, /demo-balance-note strong \{[\s\S]*color: rgba\(184, 196, 207, 0\.72\)/);
+  assert.doesNotMatch(stylesSource, /demo-balance-note strong \{[^}]*color: var\(--success\)/);
 });
 
 test("Demo Trade page includes trade ticket, management, CSV export, and reset modal", () => {
@@ -452,7 +472,7 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.ok(performancePanelIndex !== -1 && balancePanelIndex !== -1 && performancePanelIndex < balancePanelIndex);
   assert.match(stylesSource, /demo-summary-grid \{[\s\S]*grid-template-columns: minmax\(0, 1\.75fr\) minmax\(300px, 0\.62fr\)/);
   assert.match(stylesSource, /demo-summary-grid \{[\s\S]*align-items: stretch/);
-  assert.match(stylesSource, /demo-balance-panel \{[\s\S]*align-content: start/);
+  assert.match(stylesSource, /demo-balance-panel \{[\s\S]*align-content: stretch/);
   assert.match(pageSource, /Set a fresh practice balance before resetting/);
   assert.match(pageSource, /Your demo stats rebuild from the new starting balance/);
   assert.match(stylesSource, /demo-balance-copy/);
