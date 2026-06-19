@@ -61,14 +61,13 @@ Deno.serve(async (request) => {
 async function reconcileAllActiveDemoTrades(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("demo_trade_states")
-    .select("user_id,state")
-    .not("open_position", "is", null);
+    .select("user_id,state");
 
   if (error) {
     throw new ApiError(500, "demo_trade_state_lookup_failed", "Active demo trades could not be loaded.");
   }
 
-  const rows = (data ?? []) as DemoTradeStateRow[];
+  const rows = ((data ?? []) as DemoTradeStateRow[]).filter(hasReconcilableDemoState);
   const results = [];
   for (const row of rows) {
     results.push(await reconcileStateRow(supabase, row));
@@ -108,17 +107,18 @@ async function reconcileUserDemoTrade(supabase: SupabaseClient, userId: string) 
 async function reconcileStateRow(supabase: SupabaseClient, row: DemoTradeStateRow) {
   const state = row.state;
   const position = state.openPosition;
-  if (!position) {
+  const pendingOrder = state.pendingLimitOrder;
+  if (!position && !pendingOrder) {
     return { userId: row.user_id, state, events: [] as DemoTradeExecutionEvent[], checkedThrough: null };
   }
 
-  const startMs = resolveStartTime(position.lastCheckedAt ?? position.openedAt);
+  const startMs = resolveStartTime(position?.lastCheckedAt ?? position?.openedAt ?? pendingOrder?.updatedAt ?? pendingOrder?.createdAt);
   const endMs = Date.now();
   if (!startMs || startMs >= endMs) {
     return { userId: row.user_id, state, events: [] as DemoTradeExecutionEvent[], checkedThrough: null };
   }
 
-  const candles = await fetchHistoricalCandles(position.symbol, startMs + 1, endMs);
+  const candles = await fetchHistoricalCandles(position?.symbol ?? pendingOrder?.symbol ?? state.symbol, startMs + 1, endMs);
   const reconciliation = reconcileDemoTradeStateWithCandles(state, candles, new Date(endMs).toISOString());
   if (!reconciliation.checkedThrough && reconciliation.events.length === 0) {
     return { userId: row.user_id, state, events: [] as DemoTradeExecutionEvent[], checkedThrough: null };
@@ -127,7 +127,7 @@ async function reconcileStateRow(supabase: SupabaseClient, row: DemoTradeStateRo
   const { data, error } = await supabase.rpc("save_reconciled_demo_trade_state", {
     next_state: reconciliation.state,
     base_updated_at: state.updatedAt,
-    base_trade_id: position.tradeId,
+    base_trade_id: position?.tradeId ?? null,
     execution_events: reconciliation.events
   });
 
@@ -142,6 +142,10 @@ async function reconcileStateRow(supabase: SupabaseClient, row: DemoTradeStateRo
     events: reconciliation.events,
     checkedThrough: reconciliation.checkedThrough
   };
+}
+
+function hasReconcilableDemoState(row: DemoTradeStateRow): boolean {
+  return Boolean(row.state.openPosition || row.state.pendingLimitOrder);
 }
 
 async function fetchHistoricalCandles(

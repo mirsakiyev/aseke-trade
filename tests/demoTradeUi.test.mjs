@@ -15,6 +15,7 @@ const migrationSource = await readFile(new URL("../supabase/migrations/202606160
 const grantMigrationSource = await readFile(new URL("../supabase/migrations/202606180001_demo_trade_persistence_grants.sql", import.meta.url), "utf8");
 const staleSaveMigrationSource = await readFile(new URL("../supabase/migrations/202606180002_demo_trade_stale_save_guard.sql", import.meta.url), "utf8");
 const serverReconciliationMigrationSource = await readFile(new URL("../supabase/migrations/202606180003_demo_trade_server_reconciliation.sql", import.meta.url), "utf8");
+const serviceRoleGrantsMigrationSource = await readFile(new URL("../supabase/migrations/202606190002_demo_trade_service_role_grants.sql", import.meta.url), "utf8");
 
 test("Demo Trade page renders as a public route", () => {
   assert.match(appSource, /import \{ DemoTrade \} from "\.\/pages\/DemoTrade"/);
@@ -55,20 +56,31 @@ test("Demo Trade page includes guest and authenticated persistence paths", () =>
 
 test("registered Demo Trade has backend reconciliation primitives", () => {
   assert.match(reconciliationSource, /reconcileDemoTradeStateWithCandles/);
+  assert.match(reconciliationSource, /eventType: "limit_fill"/);
   assert.match(reconciliationSource, /liquidation first, then stop loss, then take profits/);
   assert.match(reconcileFunctionSource, /fetchHistoricalCandles/);
   assert.match(reconcileFunctionSource, /save_reconciled_demo_trade_state/);
   assert.match(reconcileFunctionSource, /scope === "all"/);
+  assert.match(reconcileFunctionSource, /hasReconcilableDemoState/);
+  assert.match(reconcileFunctionSource, /row\.state\.openPosition \|\| row\.state\.pendingLimitOrder/);
+  assert.match(reconcileFunctionSource, /position\?\.lastCheckedAt \?\? position\?\.openedAt \?\? pendingOrder\?\.updatedAt \?\? pendingOrder\?\.createdAt/);
+  assert.doesNotMatch(reconcileFunctionSource, /\.not\("open_position", "is", null\)/);
   assert.match(serverReconciliationMigrationSource, /demo_trade_execution_events/);
+  assert.match(serverReconciliationMigrationSource, /'limit_fill'/);
   assert.match(serverReconciliationMigrationSource, /unique \(user_id, trade_id, event_key\)/);
   assert.match(serverReconciliationMigrationSource, /for update/);
   assert.match(serverReconciliationMigrationSource, /cron\.schedule/);
   assert.match(serverReconciliationMigrationSource, /demo-trade-reconcile-every-5-minutes/);
+  assert.match(serviceRoleGrantsMigrationSource, /grant select, insert, update on table public\.demo_trade_states to service_role/);
+  assert.match(serviceRoleGrantsMigrationSource, /grant select, insert on table public\.demo_trade_execution_events to service_role/);
 });
 
 test("Demo Trade does not account-save ordinary market ticks over bracket edits", () => {
   assert.match(pageSource, /pendingMarketStateToPersistRef/);
   assert.match(pageSource, /shouldPersistMarketState/);
+  assert.match(pageSource, /isCachedMarketSource/);
+  assert.match(pageSource, /if \(!isCachedMarketSource\(ticker\.source\)\) \{[\s\S]*applyMarketPriceToDemoState\(ticker\.price, ticker\.timestamp\)/);
+  assert.match(pageSource, /if \(!isCachedMarketSource\(snapshot\.ticker\.source\)\) \{[\s\S]*applyMarketPriceToDemoState\(snapshot\.ticker\.price, snapshot\.ticker\.timestamp\)/);
   assert.match(pageSource, /applyMarketPriceToDemoState/);
   assert.match(pageSource, /persistDemoState\(pendingMarketState\)/);
   assert.doesNotMatch(pageSource, /window\.setTimeout\(\(\) => \{\s*const save = user/);
@@ -473,7 +485,7 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.match(stylesSource, /demo-summary-grid \{[\s\S]*grid-template-columns: minmax\(0, 1\.75fr\) minmax\(300px, 0\.62fr\)/);
   assert.match(stylesSource, /demo-summary-grid \{[\s\S]*align-items: stretch/);
   assert.match(stylesSource, /demo-balance-panel \{[\s\S]*align-content: stretch/);
-  assert.match(pageSource, /Set a fresh practice balance before resetting/);
+  assert.match(pageSource, /Clean reset/);
   assert.match(pageSource, /Your demo stats rebuild from the new starting balance/);
   assert.match(stylesSource, /demo-balance-copy/);
   assert.match(stylesSource, /demo-balance-note/);

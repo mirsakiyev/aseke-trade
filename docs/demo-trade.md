@@ -30,9 +30,10 @@ Registered users are saved to Supabase in `public.demo_trade_states` through `sa
 
 Registered-user execution is reconciled server-side by the `demo-trade-reconcile` Supabase Edge Function. The function:
 
-- loads active registered-user demo states from Supabase
+- loads registered-user demo states with active positions or pending limit orders from Supabase
 - fetches BTC/USDT historical one-minute candles from public Binance endpoints
-- checks candle high/low ranges from `lastCheckedAt` through now
+- checks candle high/low ranges from `lastCheckedAt` or pending-order `updatedAt` through now
+- fills pending long/short limit orders when historical candles touch the limit level
 - executes liquidation, stop loss, and take-profit events at the configured trigger level
 - records idempotent execution rows in `public.demo_trade_execution_events`
 - saves the reconciled state through `save_reconciled_demo_trade_state`, which locks the user row before updating it
@@ -44,10 +45,39 @@ The `/demo-trade` page asks this backend function to reconcile the signed-in use
 
 If those settings are absent, deploy the `demo-trade-reconcile` Edge Function and create the scheduled call from the Supabase dashboard or CLI.
 
+Production checklist:
+
+1. Deploy the Edge Function:
+
+   ```bash
+   supabase functions deploy demo-trade-reconcile
+   ```
+
+2. Set server-only secrets for the function:
+
+   ```bash
+   supabase secrets set SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+   ```
+
+3. Configure the database settings used by the scheduling migration:
+
+   ```sql
+   alter database postgres set app.settings.demo_trade_reconcile_url = 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/demo-trade-reconcile';
+   alter database postgres set app.settings.demo_trade_reconcile_token = 'YOUR_SERVICE_ROLE_KEY';
+   ```
+
+4. Run migrations after those settings are present, or create an equivalent Supabase scheduled job that posts `{"scope":"all"}` to the Edge Function every five minutes with `Authorization: Bearer YOUR_SERVICE_ROLE_KEY`.
+
+5. Confirm the schedule exists:
+
+   ```sql
+   select * from cron.job where jobname = 'demo-trade-reconcile-every-5-minutes';
+   ```
+
 ## Known V1 Limitations
 
 - BTC/USDT is the only supported symbol.
 - Only one open position is allowed at a time.
-- Market entry is supported; limit orders are not included.
+- Market entries and simple pending limit orders are supported. Stop orders, stop-limit orders, order expiry, trailing stops, and position expiry are not included.
 - The chart is a custom SVG candlestick chart with app-controlled overlays. It is not a TradingView widget.
 - Guest trades remain browser/session based and are not reconciled while the guest is away.

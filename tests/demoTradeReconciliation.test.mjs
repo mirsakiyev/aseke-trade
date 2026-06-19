@@ -62,6 +62,28 @@ function openPosition(overrides = {}) {
   return result.state;
 }
 
+function pendingLimitOrder(overrides = {}) {
+  const result = demoTrade.placeDemoLimitOrder(createState(), {
+    sessionId: "offline-session",
+    userId: "10000000-0000-4000-8000-000000000001",
+    symbol: "BTCUSDT",
+    side: "long",
+    marginMode: "isolated",
+    sizeMode: "notional",
+    amount: 500,
+    leverage: 5,
+    entryPrice: 95,
+    limitPrice: 95,
+    currentPrice: 100,
+    stopLoss: 90,
+    takeProfits: [{ id: "tp-1", price: 110, closePercent: 100 }],
+    ...overrides
+  }, "2026-06-16T12:01:00.000Z");
+
+  assert.equal(result.ok, true);
+  return result.state;
+}
+
 function candle(minute, { high, low, close = 100, open = 100 }) {
   const timestamp = Date.parse(`2026-06-16T12:${String(minute).padStart(2, "0")}:00.000Z`);
   return {
@@ -90,6 +112,18 @@ test("long trade hits SL while offline even if price later returns above entry",
   assert.equal(result.state.tradeHistory[0].exitPrice, 90);
   assert.equal(result.events[0].eventType, "stop_loss");
   assertClose(result.state.currentBalance, 990);
+});
+
+test("backend reconciliation core processes stored state without browser runtime", () => {
+  assert.equal(typeof globalThis.window, "undefined");
+
+  const result = reconcile(openPosition(), [
+    candle(2, { high: 101, low: 89, close: 100 })
+  ]);
+
+  assert.equal(result.state.openPosition, null);
+  assert.equal(result.events[0].eventType, "stop_loss");
+  assert.equal(result.state.tradeHistory[0].closeReason, "stop_loss");
 });
 
 test("long trade hits TP while offline even if price later returns below entry", () => {
@@ -127,6 +161,54 @@ test("short trade hits TP while offline", () => {
   assert.equal(result.state.tradeHistory[0].status, "TAKE_PROFIT_HIT");
   assert.equal(result.state.tradeHistory[0].exitPrice, 90);
   assertClose(result.state.currentBalance, 1010);
+});
+
+test("leveraged long trade hits liquidation while offline", () => {
+  const result = reconcile(
+    openPosition({ leverage: 10, stopLoss: 0, takeProfits: [] }),
+    [candle(2, { high: 101, low: 90.4, close: 91 })]
+  );
+
+  assert.equal(result.state.openPosition, null);
+  assert.equal(result.state.tradeHistory[0].status, "LIQUIDATED");
+  assert.equal(result.state.tradeHistory[0].closeReason, "liquidation");
+  assert.equal(result.events[0].eventType, "liquidation");
+  assertClose(result.state.currentBalance, 900);
+});
+
+test("pending long limit order fills while offline when candle reaches limit", () => {
+  const result = reconcile(pendingLimitOrder(), [
+    candle(2, { high: 101, low: 94, close: 96 })
+  ]);
+
+  assert.equal(result.state.pendingLimitOrder, null);
+  assert.equal(result.state.openPosition.entryPrice, 95);
+  assert.equal(result.state.openPosition.status, "OPEN");
+  assert.equal(result.events[0].eventType, "limit_fill");
+  assert.equal(result.events[0].triggerPrice, 95);
+  assert.equal(result.events[0].quantityClosed, 0);
+  assertClose(result.state.availableBalance, 900);
+});
+
+test("pending short limit order fills while offline when candle reaches limit", () => {
+  const result = reconcile(
+    pendingLimitOrder({
+      side: "short",
+      entryPrice: 105,
+      limitPrice: 105,
+      currentPrice: 100,
+      stopLoss: 110,
+      takeProfits: [{ id: "tp-1", price: 95, closePercent: 100 }]
+    }),
+    [candle(2, { high: 106, low: 99, close: 104 })]
+  );
+
+  assert.equal(result.state.pendingLimitOrder, null);
+  assert.equal(result.state.openPosition.side, "short");
+  assert.equal(result.state.openPosition.entryPrice, 105);
+  assert.equal(result.events[0].eventType, "limit_fill");
+  assert.equal(result.events[0].triggerPrice, 105);
+  assertClose(result.state.availableBalance, 900);
 });
 
 test("multiple TPs close only their assigned position portions", () => {
@@ -192,4 +274,19 @@ test("duplicate checker runs do not double-credit the same TP", () => {
   assert.equal(secondPass.events.length, 0);
   assertClose(secondPass.state.realizedPnl, firstPass.state.realizedPnl);
   assertClose(secondPass.state.openPosition.remainingQuantity, firstPass.state.openPosition.remainingQuantity);
+});
+
+test("duplicate checker runs do not double-fill the same pending limit order", () => {
+  const firstPass = reconcile(pendingLimitOrder(), [
+    candle(2, { high: 101, low: 94, close: 96 })
+  ]);
+  const secondPass = reconcile(firstPass.state, [
+    candle(2, { high: 101, low: 94, close: 96 })
+  ]);
+
+  assert.equal(firstPass.events.length, 1);
+  assert.equal(firstPass.events[0].eventType, "limit_fill");
+  assert.equal(secondPass.events.length, 0);
+  assert.equal(secondPass.state.pendingLimitOrder, null);
+  assert.equal(secondPass.state.openPosition.tradeId, firstPass.state.openPosition.tradeId);
 });

@@ -9,7 +9,7 @@ create table if not exists public.demo_trade_execution_events (
   user_id uuid not null references auth.users(id) on delete cascade,
   trade_id text not null,
   event_key text not null,
-  event_type text not null check (event_type in ('stop_loss', 'take_profit', 'liquidation', 'manual')),
+  event_type text not null check (event_type in ('limit_fill', 'stop_loss', 'take_profit', 'liquidation', 'manual')),
   symbol text not null default 'BTCUSDT',
   side text not null check (side in ('long', 'short')),
   take_profit_id text,

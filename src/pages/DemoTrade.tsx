@@ -229,8 +229,10 @@ export function DemoTrade() {
     setCurrentPrice(ticker.price);
     if (updateSource) setMarketSource(ticker.source);
     setCandles((items) => applyLivePriceToCandles(items, ticker.price, timeframe, Date.parse(ticker.timestamp)));
-    applyMarketPriceToDemoState(ticker.price, ticker.timestamp);
-    setMarketError(ticker.source.includes(" cached") ? "Live BTC price is temporarily unavailable. Showing cached price while retrying." : null);
+    if (!isCachedMarketSource(ticker.source)) {
+      applyMarketPriceToDemoState(ticker.price, ticker.timestamp);
+    }
+    setMarketError(isCachedMarketSource(ticker.source) ? "Live BTC price is temporarily unavailable. Showing cached price while retrying." : null);
   }, [applyMarketPriceToDemoState, timeframe]);
 
   useEffect(() => {
@@ -301,7 +303,9 @@ export function DemoTrade() {
       setCandles(applyLivePriceToCandles(snapshot.candles, snapshot.ticker.price, timeframe, Date.parse(snapshot.ticker.timestamp)));
       setCurrentPrice(snapshot.ticker.price);
       setMarketSource(snapshot.source);
-      applyMarketPriceToDemoState(snapshot.ticker.price, snapshot.ticker.timestamp);
+      if (!isCachedMarketSource(snapshot.ticker.source)) {
+        applyMarketPriceToDemoState(snapshot.ticker.price, snapshot.ticker.timestamp);
+      }
       setMarketError(snapshot.isCached ? "Live BTC market data is temporarily unavailable. Showing cached data while retrying." : null);
     } catch (error) {
       setMarketError(error instanceof Error ? error.message : "BTC data could not be loaded.");
@@ -2764,6 +2768,10 @@ function shouldPersistMarketState(previous: DemoTradeState, next: DemoTradeState
       || nextTakeProfit.hitAt !== previousTakeProfit.hitAt
     ));
   });
+}
+
+function isCachedMarketSource(source: string): boolean {
+  return source.includes(" cached");
 }
 
 function applyLivePriceToCandles(

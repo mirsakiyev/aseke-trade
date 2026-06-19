@@ -2,6 +2,7 @@ import {
   applyMarketPrice,
   markDemoPositionPrice,
   type DemoOpenPosition,
+  type DemoPendingLimitOrder,
   type DemoTakeProfit,
   type DemoTradeState
 } from "./demoTradeMath.ts";
@@ -15,7 +16,7 @@ export interface DemoTradeReconciliationCandle {
   close: number;
 }
 
-export type DemoTradeExecutionType = "stop_loss" | "take_profit" | "liquidation";
+export type DemoTradeExecutionType = "limit_fill" | "stop_loss" | "take_profit" | "liquidation";
 
 export interface DemoTradeExecutionEvent {
   eventKey: string;
@@ -54,7 +55,7 @@ export function reconcileDemoTradeStateWithCandles(
   candles: DemoTradeReconciliationCandle[],
   now = new Date().toISOString()
 ): DemoTradeReconciliationResult {
-  if (!state.openPosition || !candles.length) {
+  if ((!state.openPosition && !state.pendingLimitOrder) || !candles.length) {
     return { state, events: [], checkedThrough: null };
   }
 
@@ -65,8 +66,37 @@ export function reconcileDemoTradeStateWithCandles(
     .sort((first, second) => first.timestamp - second.timestamp);
 
   for (const candle of sortedCandles) {
+    if (!nextState.openPosition && nextState.pendingLimitOrder) {
+      const order = nextState.pendingLimitOrder;
+      if (isLimitOrderHit(order, candle)) {
+        const beforeState = nextState;
+        nextState = applyMarketPrice(beforeState, order.limitPrice, candleIso(candle));
+        const openedPosition = nextState.openPosition;
+        if (openedPosition) {
+          events.push({
+            eventKey: `${order.orderId}:limit_fill`,
+            tradeId: openedPosition.tradeId,
+            eventType: "limit_fill",
+            symbol: order.symbol,
+            side: order.side,
+            takeProfitId: null,
+            triggerPrice: order.limitPrice,
+            executionPrice: order.limitPrice,
+            closePercent: null,
+            quantityClosed: 0,
+            realizedPnl: 0,
+            occurredAt: candleIso(candle),
+            source: "historical_candle",
+            candleOpenTime: candleIso(candle),
+            candleCloseTime: candleCloseIso(candle),
+            wasAmbiguous: didCandleTouchAnyBracket(openedPosition, candle)
+          });
+        }
+      }
+    }
+
     const position = nextState.openPosition;
-    if (!position) break;
+    if (!position) continue;
 
     const triggers = chooseCandleTriggers(position, candle);
     for (const trigger of triggers) {
@@ -155,6 +185,16 @@ function sortedTakeProfits(position: DemoOpenPosition): DemoTakeProfit[] {
   );
 }
 
+function isLimitOrderHit(order: DemoPendingLimitOrder, candle: DemoTradeReconciliationCandle): boolean {
+  return order.side === "long" ? candle.low <= order.limitPrice : candle.high >= order.limitPrice;
+}
+
+function didCandleTouchAnyBracket(position: DemoOpenPosition, candle: DemoTradeReconciliationCandle): boolean {
+  return isLiquidationHit(position, candle)
+    || isStopLossHit(position, candle)
+    || position.takeProfits.some((takeProfit) => !takeProfit.isHit && isTakeProfitHit(position, takeProfit, candle));
+}
+
 function isStopLossHit(position: DemoOpenPosition, candle: DemoTradeReconciliationCandle): boolean {
   if (!Number.isFinite(position.stopLoss) || position.stopLoss <= 0) return false;
   return position.side === "long" ? candle.low <= position.stopLoss : candle.high >= position.stopLoss;
@@ -178,12 +218,15 @@ function markStateChecked(
   candle: DemoTradeReconciliationCandle | undefined,
   checkedAt: string
 ): DemoTradeState {
-  if (!state.openPosition) return state;
+  if (!state.openPosition && !state.pendingLimitOrder) return state;
 
-  const nextState = candle ? markDemoPositionPrice(state, candle.close, checkedAt) : cloneState(state);
+  const nextState = candle && state.openPosition ? markDemoPositionPrice(state, candle.close, checkedAt) : cloneState(state);
   if (nextState.openPosition) {
     nextState.openPosition.lastCheckedAt = checkedAt;
     nextState.openPosition.updatedAt = checkedAt;
+  }
+  if (nextState.pendingLimitOrder) {
+    nextState.pendingLimitOrder.updatedAt = checkedAt;
   }
   nextState.updatedAt = checkedAt;
   return nextState;
