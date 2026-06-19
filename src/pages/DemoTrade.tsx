@@ -161,6 +161,7 @@ export function DemoTrade() {
   const [nextStartingBalance, setNextStartingBalance] = useState("1000");
   const [showResetModal, setShowResetModal] = useState(false);
   const [positionStopLoss, setPositionStopLoss] = useState("");
+  const [positionStopLossInputMode, setPositionStopLossInputMode] = useState<DemoStopLossInputMode>("price");
   const [positionLeverage, setPositionLeverage] = useState("5");
   const [positionTakeProfitInputMode, setPositionTakeProfitInputMode] = useState<DemoTakeProfitInputMode>("price");
   const [positionTakeProfits, setPositionTakeProfits] = useState<TakeProfitDraft[]>([]);
@@ -332,6 +333,7 @@ export function DemoTrade() {
     if (!position) {
       setPositionTakeProfits([]);
       setPositionStopLoss("");
+      setPositionStopLossInputMode("price");
       setPositionTakeProfitInputMode("price");
       setManualClosePercent("100");
       setPositionAddAmount("");
@@ -339,6 +341,7 @@ export function DemoTrade() {
     }
 
     setPositionStopLoss(position.stopLoss > 0 ? String(position.stopLoss) : "");
+    setPositionStopLossInputMode("price");
     setPositionLeverage(String(position.leverage));
     setManualClosePercent("100");
     setPositionTakeProfits(
@@ -440,7 +443,7 @@ export function DemoTrade() {
 
     let nextState = demoState;
     const now = new Date().toISOString();
-    const nextStopLoss = parseNumber(positionStopLoss);
+    const nextStopLoss = resolveSubmittedStopLoss(positionStopLoss, positionStopLossInputMode, position.side, position.entryPrice);
     const stopLossChanged = positionStopLoss.trim() !== "" || position.stopLoss > 0;
 
     if (stopLossChanged && nextStopLoss !== position.stopLoss) {
@@ -625,6 +628,7 @@ export function DemoTrade() {
             <PositionManager
               position={demoState.openPosition}
               stopLoss={positionStopLoss}
+              stopLossInputMode={positionStopLossInputMode}
               leverage={positionLeverage}
               takeProfitInputMode={positionTakeProfitInputMode}
               takeProfits={positionTakeProfits}
@@ -635,6 +639,7 @@ export function DemoTrade() {
               currentPrice={currentPrice ?? demoState.openPosition.markPrice}
               errors={positionErrors}
               onStopLossChange={setPositionStopLoss}
+              onStopLossInputModeChange={setPositionStopLossInputMode}
               onLeverageChange={setPositionLeverage}
               onTakeProfitInputModeChange={setPositionTakeProfitInputMode}
               onTakeProfitsChange={setPositionTakeProfits}
@@ -692,7 +697,6 @@ export function DemoTrade() {
               <h2>Reset / re-up</h2>
             </div>
           </div>
-          <p className="demo-balance-copy">Set a fresh practice balance before resetting.</p>
           <label>
             Starting Balance
             <input
@@ -1493,6 +1497,7 @@ function TakeProfitModeSelector({
 function PositionManager({
   position,
   stopLoss,
+  stopLossInputMode,
   leverage,
   takeProfitInputMode,
   takeProfits,
@@ -1503,6 +1508,7 @@ function PositionManager({
   currentPrice,
   errors,
   onStopLossChange,
+  onStopLossInputModeChange,
   onLeverageChange,
   onTakeProfitInputModeChange,
   onTakeProfitsChange,
@@ -1515,6 +1521,7 @@ function PositionManager({
 }: {
   position: DemoOpenPosition;
   stopLoss: string;
+  stopLossInputMode: DemoStopLossInputMode;
   leverage: string;
   takeProfitInputMode: DemoTakeProfitInputMode;
   takeProfits: TakeProfitDraft[];
@@ -1525,6 +1532,7 @@ function PositionManager({
   currentPrice: number;
   errors: string[];
   onStopLossChange: (value: string) => void;
+  onStopLossInputModeChange: (mode: DemoStopLossInputMode) => void;
   onLeverageChange: (value: string) => void;
   onTakeProfitInputModeChange: (mode: DemoTakeProfitInputMode) => void;
   onTakeProfitsChange: (items: TakeProfitDraft[]) => void;
@@ -1610,8 +1618,18 @@ function PositionManager({
 
       <div className="position-settings-grid">
         <label>
-          Stop Loss
-          <input type="number" min="0" step="0.01" value={stopLoss} onChange={(event) => onStopLossChange(event.target.value)} />
+          <span className="futures-quantity-label">
+            Stop Loss
+            <StopLossModeSelector mode={stopLossInputMode} onApply={onStopLossInputModeChange} />
+          </span>
+          <input
+            type="number"
+            min="0"
+            step={stopLossInputMode === "percent" ? "0.1" : "0.01"}
+            value={stopLoss}
+            onChange={(event) => onStopLossChange(event.target.value)}
+            placeholder={stopLossInputMode === "percent" ? "SL distance %" : "Stop price"}
+          />
         </label>
         <LeverageSelector leverage={leverage} onApply={onLeverageChange} />
       </div>

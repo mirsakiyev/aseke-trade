@@ -245,6 +245,10 @@ test("Demo Trade page includes trade ticket, management, CSV export, and reset m
   assert.doesNotMatch(pageSource, /Trigger Price|pendingTriggerOrder|isTriggerPriceReached/);
   assert.match(pageSource, /function PositionManager/);
   assert.match(pageSource, /const savePositionChanges = \(\) => \{/);
+  assert.match(pageSource, /positionStopLossInputMode/);
+  assert.match(pageSource, /resolveSubmittedStopLoss\(positionStopLoss, positionStopLossInputMode, position\.side, position\.entryPrice\)/);
+  assert.match(pageSource, /<StopLossModeSelector mode=\{stopLossInputMode\} onApply=\{onStopLossInputModeChange\} \/>/);
+  assert.match(pageSource, /placeholder=\{stopLossInputMode === "percent" \? "SL distance %" : "Stop price"\}/);
   assert.match(pageSource, /onSaveChanges=\{savePositionChanges\}/);
   assert.match(pageSource, /Save Changes/);
   assert.match(pageSource, /haveTakeProfitDraftsChanged/);
