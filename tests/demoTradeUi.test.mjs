@@ -83,6 +83,8 @@ test("Demo Trade does not account-save ordinary market ticks over bracket edits"
   assert.match(pageSource, /if \(!isCachedMarketSource\(snapshot\.ticker\.source\)\) \{[\s\S]*applyMarketPriceToDemoState\(snapshot\.ticker\.price, snapshot\.ticker\.timestamp\)/);
   assert.match(pageSource, /applyMarketPriceToDemoState/);
   assert.match(pageSource, /persistDemoState\(pendingMarketState\)/);
+  assert.match(pageSource, /const commitDemoState = useCallback\(\(nextState: DemoTradeState\) => \{\s*pendingMarketStateToPersistRef\.current = null;/);
+  assert.match(pageSource, /pendingMarketStateToPersistRef\.current = null;\s*if \(pendingMarketState !== demoState\) return;\s*persistDemoState\(pendingMarketState\)/);
   assert.doesNotMatch(pageSource, /window\.setTimeout\(\(\) => \{\s*const save = user/);
 });
 

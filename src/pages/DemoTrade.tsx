@@ -214,6 +214,7 @@ export function DemoTrade() {
   }, [handleDemoStateSaveError, isHydrated, user]);
 
   const commitDemoState = useCallback((nextState: DemoTradeState) => {
+    pendingMarketStateToPersistRef.current = null;
     setDemoState(nextState);
     persistDemoState(nextState);
   }, [persistDemoState]);
@@ -290,6 +291,7 @@ export function DemoTrade() {
     if (!pendingMarketState) return;
 
     pendingMarketStateToPersistRef.current = null;
+    if (pendingMarketState !== demoState) return;
     persistDemoState(pendingMarketState);
   }, [demoState, persistDemoState]);
 
