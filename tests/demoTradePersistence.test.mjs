@@ -53,7 +53,7 @@ function createState(overrides = {}) {
 
 function createOpenPosition(overrides = {}) {
   return {
-    tradeId: "trade-1",
+    tradeId: overrides.tradeId ?? "trade-1",
     userId: "user-1",
     sessionId: "session-1",
     symbol: "BTCUSDT",
@@ -84,21 +84,28 @@ function createOpenPosition(overrides = {}) {
   };
 }
 
-test("terminal closed trade wins over a refreshed open copy of the same trade", () => {
-  const closedTrade = {
-    ...createOpenPosition({
-      status: "MANUALLY_CLOSED",
-      exitPrice: 105,
-      markPrice: 105,
-      remainingQuantity: 0,
-      remainingMargin: 0,
-      closeReason: "manual",
-      closedAt: "2026-06-16T12:03:00.000Z",
-      updatedAt: "2026-06-16T12:03:00.000Z"
-    }),
-    exitPrice: 105,
-    closedAt: "2026-06-16T12:03:00.000Z"
+function closePosition(position, overrides = {}) {
+  return {
+    ...position,
+    status: overrides.status ?? "MANUALLY_CLOSED",
+    exitPrice: overrides.exitPrice ?? position.markPrice,
+    markPrice: overrides.exitPrice ?? position.markPrice,
+    remainingQuantity: 0,
+    remainingMargin: 0,
+    unrealizedPnl: 0,
+    closeReason: overrides.closeReason ?? "manual",
+    closedAt: overrides.closedAt ?? position.updatedAt,
+    updatedAt: overrides.updatedAt ?? overrides.closedAt ?? position.updatedAt,
+    ...overrides
   };
+}
+
+test("terminal closed trade wins over a refreshed open copy of the same trade", () => {
+  const closedTrade = closePosition(createOpenPosition(), {
+    exitPrice: 105,
+    closedAt: "2026-06-16T12:03:00.000Z",
+    updatedAt: "2026-06-16T12:03:00.000Z"
+  });
   const localClosed = createState({
     openPosition: null,
     tradeHistory: [closedTrade],
@@ -123,20 +130,13 @@ test("remote terminal close also wins over a local open copy of the same trade",
   const remoteClosed = createState({
     openPosition: null,
     tradeHistory: [
-      {
-        ...createOpenPosition({
-          status: "STOP_LOSS_HIT",
-          exitPrice: 90,
-          markPrice: 90,
-          remainingQuantity: 0,
-          remainingMargin: 0,
-          closeReason: "stop_loss",
-          closedAt: "2026-06-16T12:04:00.000Z",
-          updatedAt: "2026-06-16T12:04:00.000Z"
-        }),
+      closePosition(createOpenPosition(), {
+        status: "STOP_LOSS_HIT",
         exitPrice: 90,
-        closedAt: "2026-06-16T12:04:00.000Z"
-      }
+        closeReason: "stop_loss",
+        closedAt: "2026-06-16T12:04:00.000Z",
+        updatedAt: "2026-06-16T12:04:00.000Z"
+      })
     ],
     updatedAt: "2026-06-16T12:04:00.000Z"
   });
@@ -145,4 +145,58 @@ test("remote terminal close also wins over a local open copy of the same trade",
   assert.equal(chosen, remoteClosed);
   assert.equal(chosen.openPosition, null);
   assert.equal(chosen.tradeHistory[0].status, "STOP_LOSS_HIT");
+});
+
+test("closed history for an older trade prevents that old remote trade from reappearing", () => {
+  const firstTrade = createOpenPosition({
+    tradeId: "trade-1",
+    openedAt: "2026-06-16T12:01:00.000Z",
+    updatedAt: "2026-06-16T12:02:00.000Z"
+  });
+  const secondTrade = createOpenPosition({
+    tradeId: "trade-2",
+    openedAt: "2026-06-16T12:10:00.000Z",
+    updatedAt: "2026-06-16T12:11:00.000Z"
+  });
+  const localClosedBoth = createState({
+    openPosition: null,
+    tradeHistory: [
+      closePosition(secondTrade, { closedAt: "2026-06-16T12:12:00.000Z", updatedAt: "2026-06-16T12:12:00.000Z" }),
+      closePosition(firstTrade, { closedAt: "2026-06-16T12:03:00.000Z", updatedAt: "2026-06-16T12:03:00.000Z" })
+    ],
+    updatedAt: "2026-06-16T12:12:00.000Z"
+  });
+  const remoteOldOpen = createState({
+    openPosition: createOpenPosition({ tradeId: "trade-1", updatedAt: "2026-06-16T12:13:00.000Z" }),
+    tradeHistory: [],
+    updatedAt: "2026-06-16T12:13:00.000Z"
+  });
+
+  const chosen = persistence.chooseLatestState(localClosedBoth, remoteOldOpen);
+  assert.equal(chosen, localClosedBoth);
+  assert.equal(chosen.openPosition, null);
+  assert.equal(chosen.tradeHistory[0].tradeId, "trade-2");
+});
+
+test("new local open trade wins over stale remote open trade already closed in history", () => {
+  const firstTrade = createOpenPosition({ tradeId: "trade-1" });
+  const localNewOpen = createState({
+    openPosition: createOpenPosition({
+      tradeId: "trade-2",
+      openedAt: "2026-06-16T12:10:00.000Z",
+      updatedAt: "2026-06-16T12:10:00.000Z"
+    }),
+    tradeHistory: [
+      closePosition(firstTrade, { closedAt: "2026-06-16T12:03:00.000Z", updatedAt: "2026-06-16T12:03:00.000Z" })
+    ],
+    updatedAt: "2026-06-16T12:10:00.000Z"
+  });
+  const remoteOldOpen = createState({
+    openPosition: createOpenPosition({ tradeId: "trade-1", updatedAt: "2026-06-16T12:11:00.000Z" }),
+    updatedAt: "2026-06-16T12:11:00.000Z"
+  });
+
+  const chosen = persistence.chooseLatestState(localNewOpen, remoteOldOpen);
+  assert.equal(chosen, localNewOpen);
+  assert.equal(chosen.openPosition.tradeId, "trade-2");
 });

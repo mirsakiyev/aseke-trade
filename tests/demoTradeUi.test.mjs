@@ -16,6 +16,7 @@ const grantMigrationSource = await readFile(new URL("../supabase/migrations/2026
 const staleSaveMigrationSource = await readFile(new URL("../supabase/migrations/202606180002_demo_trade_stale_save_guard.sql", import.meta.url), "utf8");
 const serverReconciliationMigrationSource = await readFile(new URL("../supabase/migrations/202606180003_demo_trade_server_reconciliation.sql", import.meta.url), "utf8");
 const serviceRoleGrantsMigrationSource = await readFile(new URL("../supabase/migrations/202606190002_demo_trade_service_role_grants.sql", import.meta.url), "utf8");
+const terminalCloseGuardMigrationSource = await readFile(new URL("../supabase/migrations/202606190004_demo_trade_terminal_close_guard.sql", import.meta.url), "utf8");
 
 test("Demo Trade page renders as a public route", () => {
   assert.match(appSource, /import \{ DemoTrade \} from "\.\/pages\/DemoTrade"/);
@@ -73,6 +74,9 @@ test("registered Demo Trade has backend reconciliation primitives", () => {
   assert.match(serverReconciliationMigrationSource, /demo-trade-reconcile-every-5-minutes/);
   assert.match(serviceRoleGrantsMigrationSource, /grant select, insert, update on table public\.demo_trade_states to service_role/);
   assert.match(serviceRoleGrantsMigrationSource, /grant select, insert on table public\.demo_trade_execution_events to service_role/);
+  assert.match(terminalCloseGuardMigrationSource, /demo_trade_state_has_closed_trade/);
+  assert.match(terminalCloseGuardMigrationSource, /jsonb_array_elements\(coalesce\(next_state->'tradeHistory'/);
+  assert.match(terminalCloseGuardMigrationSource, /or public\.demo_trade_state_has_closed_trade/);
 });
 
 test("Demo Trade does not account-save ordinary market ticks over bracket edits", () => {

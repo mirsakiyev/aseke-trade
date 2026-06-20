@@ -107,22 +107,26 @@ export async function saveRegisteredDemoTradeState(userId: string, state: DemoTr
     throw new Error(REGISTERED_SAVE_ERROR_MESSAGE);
   }
 
-  const { error } = await supabase.rpc("save_demo_trade_state", {
+  const { data, error } = await supabase.rpc("save_demo_trade_state", {
     next_state: payload
   });
 
-  if (!error) return;
-  if (isValidationError(error)) {
-    throw new Error(REGISTERED_SAVE_ERROR_MESSAGE);
+  let existingState = normalizeStoredDemoState((data as { state?: unknown } | null)?.state);
+  if (!error && !isTerminalTradeStateOverOpenState(payload, existingState)) return;
+  if (error) {
+    if (isValidationError(error)) {
+      throw new Error(REGISTERED_SAVE_ERROR_MESSAGE);
+    }
+
+    const { data: existingData } = await supabase
+      .from("demo_trade_states")
+      .select("state")
+      .eq("user_id", userId)
+      .maybeSingle();
+    existingState = normalizeStoredDemoState((existingData as { state?: unknown } | null)?.state);
   }
 
-  const { data: existingData } = await supabase
-    .from("demo_trade_states")
-    .select("state")
-    .eq("user_id", userId)
-    .maybeSingle();
-  const existingState = normalizeStoredDemoState((existingData as { state?: unknown } | null)?.state);
-  if (existingState && isFirstStateNewer(existingState, payload)) {
+  if (existingState && isFirstStateNewer(existingState, payload) && !isTerminalTradeStateOverOpenState(payload, existingState)) {
     return;
   }
 
@@ -259,12 +263,12 @@ function chooseTerminalTradeState(
 }
 
 function isTerminalTradeStateOverOpenState(
-  terminalCandidate: DemoTradeState,
-  openCandidate: DemoTradeState
+  terminalCandidate: DemoTradeState | null,
+  openCandidate: DemoTradeState | null
 ): boolean {
-  const closedTrade = terminalCandidate.tradeHistory[0];
-  const openPosition = openCandidate.openPosition;
-  return Boolean(closedTrade && openPosition && closedTrade.tradeId === openPosition.tradeId);
+  const openPosition = openCandidate?.openPosition;
+  if (!terminalCandidate || !openPosition) return false;
+  return terminalCandidate.tradeHistory.some((closedTrade) => closedTrade.tradeId === openPosition.tradeId);
 }
 
 function normalizeStoredDemoState(value: unknown): DemoTradeState | null {
