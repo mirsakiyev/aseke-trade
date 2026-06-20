@@ -62,10 +62,11 @@ export async function loadRegisteredDemoTradeState(userId: string): Promise<Regi
   const reconciledState = await reconcileRegisteredDemoTradeState();
   if (reconciledState) {
     const latestState = chooseLatestState(localState, reconciledState);
+    const isAccountSyncAvailable = await repairRemoteIfLocalTerminalStateWins(userId, localState, reconciledState, latestState);
     if (latestState && typeof window !== "undefined") {
       writeStoredState(registeredStateKey(userId), latestState, window.localStorage);
     }
-    return { state: latestState, isAccountSyncAvailable: true };
+    return { state: latestState, isAccountSyncAvailable };
   }
 
   const { data, error } = await supabase
@@ -84,10 +85,11 @@ export async function loadRegisteredDemoTradeState(userId: string): Promise<Regi
 
   const remoteState = normalizeStoredDemoState((data as { state?: unknown }).state);
   const latestState = chooseLatestState(localState, remoteState);
+  const isAccountSyncAvailable = await repairRemoteIfLocalTerminalStateWins(userId, localState, remoteState, latestState);
   if (latestState && typeof window !== "undefined") {
     writeStoredState(registeredStateKey(userId), latestState, window.localStorage);
   }
-  return { state: latestState, isAccountSyncAvailable: true };
+  return { state: latestState, isAccountSyncAvailable };
 }
 
 export async function saveRegisteredDemoTradeState(userId: string, state: DemoTradeState): Promise<void> {
@@ -200,12 +202,15 @@ function writeStoredState(key: string, state: DemoTradeState, storage: Storage):
   writeStorageItem(key, JSON.stringify(state), storage);
 }
 
-function chooseLatestState(
+export function chooseLatestState(
   firstState: DemoTradeState | null,
   secondState: DemoTradeState | null
 ): DemoTradeState | null {
   if (!firstState) return secondState;
   if (!secondState) return firstState;
+
+  const terminalState = chooseTerminalTradeState(firstState, secondState);
+  if (terminalState) return terminalState;
 
   if (isFirstStateNewer(firstState, secondState)) {
     return mergeBracketOrdersForSameOpenPosition(firstState, secondState);
@@ -224,6 +229,42 @@ function isFirstStateNewer(firstState: DemoTradeState, secondState: DemoTradeSta
   if (!Number.isFinite(firstTime)) return false;
   if (!Number.isFinite(secondTime)) return true;
   return firstTime > secondTime;
+}
+
+async function repairRemoteIfLocalTerminalStateWins(
+  userId: string,
+  localState: DemoTradeState | null,
+  remoteState: DemoTradeState | null,
+  latestState: DemoTradeState | null
+): Promise<boolean> {
+  if (!localState || !remoteState || latestState !== localState || !isTerminalTradeStateOverOpenState(localState, remoteState)) {
+    return true;
+  }
+
+  try {
+    await saveRegisteredDemoTradeState(userId, localState);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function chooseTerminalTradeState(
+  firstState: DemoTradeState,
+  secondState: DemoTradeState
+): DemoTradeState | null {
+  if (isTerminalTradeStateOverOpenState(firstState, secondState)) return firstState;
+  if (isTerminalTradeStateOverOpenState(secondState, firstState)) return secondState;
+  return null;
+}
+
+function isTerminalTradeStateOverOpenState(
+  terminalCandidate: DemoTradeState,
+  openCandidate: DemoTradeState
+): boolean {
+  const closedTrade = terminalCandidate.tradeHistory[0];
+  const openPosition = openCandidate.openPosition;
+  return Boolean(closedTrade && openPosition && closedTrade.tradeId === openPosition.tradeId);
 }
 
 function normalizeStoredDemoState(value: unknown): DemoTradeState | null {
