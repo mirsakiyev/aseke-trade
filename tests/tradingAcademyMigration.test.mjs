@@ -10,6 +10,10 @@ const signalReworkMigration = await readFile(
   new URL("../supabase/migrations/202606120003_rework_trading_signals.sql", import.meta.url),
   "utf8"
 );
+const signalAutomationMigration = await readFile(
+  new URL("../supabase/migrations/202606190003_trading_signal_automation.sql", import.meta.url),
+  "utf8"
+);
 const leaderboardAvatarMigration = await readFile(
   new URL("../supabase/migrations/202606120005_public_leaderboard_avatars.sql", import.meta.url),
   "utf8"
@@ -76,4 +80,27 @@ test("trading signal rework adds leverage, timeline, TP allocation, and subscrib
   assert.match(signalReworkMigration, /new\.original_signal := old\.original_signal/i);
   assert.match(signalReworkMigration, /public\.has_premium_access\(\)/i);
   assert.doesNotMatch(signalReworkMigration, /and is_active = true/i);
+});
+
+test("trading signal automation migration adds backend reconciliation primitives", () => {
+  for (const expected of [
+    "last_checked_at timestamptz",
+    "last_auto_update_price numeric",
+    "last_auto_update_source text",
+    "public.trading_signal_update_count",
+    "public.save_reconciled_trading_signal",
+    "for update",
+    "trading-signal-reconcile-every-minute",
+    "* * * * *",
+    "app.settings.trading_signal_reconcile_url",
+    "app.settings.trading_signal_reconcile_token"
+  ]) {
+    assert.match(signalAutomationMigration, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
+  }
+
+  assert.match(signalAutomationMigration, /new_update_count > old_update_count/i);
+  assert.match(signalAutomationMigration, /old_update_count\.\.new_update_count - 1/i);
+  assert.match(signalAutomationMigration, /revoke execute on function public\.save_reconciled_trading_signal/i);
+  assert.match(signalAutomationMigration, /grant execute on function public\.save_reconciled_trading_signal\(jsonb, text, integer\) to service_role/i);
+  assert.match(signalAutomationMigration, /notify pgrst, 'reload schema'/i);
 });

@@ -352,6 +352,9 @@ export interface TradingSignal {
   manual_close_price: string | number | null;
   final_price: string | number | null;
   final_roi: string | number | null;
+  last_checked_at?: string | null;
+  last_auto_update_price?: string | number | null;
+  last_auto_update_source?: string | null;
   is_active?: boolean;
   created_by_admin_id: string | null;
   created_at: string;

@@ -105,10 +105,18 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /onDoubleClick=\{resetPriceView\}/);
   assert.match(pageSource, /dragStartRef\.current \|\| priceScaleStartRef\.current\) return/);
   assert.match(pageSource, /setPointerCapture/);
-  assert.match(pageSource, /event\.clientX - dragStartRef\.current\.x/);
+  assert.match(pageSource, /event\.pointerType === "mouse" && event\.buttons === 0/);
+  assert.match(pageSource, /const rawDeltaX = event\.clientX - dragStartRef\.current\.x/);
+  assert.match(pageSource, /dragPreviewX/);
+  assert.match(pageSource, /className="chart-candle-layer" transform=\{dragPreviewX \? `translate\(\$\{dragPreviewX\} 0\)` : undefined\}/);
   assert.match(pageSource, /futurePaddingCandles/);
   assert.match(pageSource, /pricePan/);
   assert.match(pageSource, /visiblePriceRange/);
+  assert.match(pageSource, /DEMO_CHART_DRAG_ACTIVATION_PX = 4/);
+  assert.match(pageSource, /DEMO_CHART_AXIS_SCALE_VERTICAL_BIAS = 1\.15/);
+  assert.match(pageSource, /DEMO_CHART_BOUNDARY_DRAG_RESISTANCE = 0\.22/);
+  assert.match(pageSource, /absDeltaX > absDeltaY \* DEMO_CHART_AXIS_SCALE_VERTICAL_BIAS/);
+  assert.match(pageSource, /setDragPreviewX\(didHitBoundary \? rawPreviewX \* DEMO_CHART_BOUNDARY_DRAG_RESISTANCE : rawPreviewX\)/);
   assert.match(pageSource, /setPricePan\(dragStartRef\.current\.pricePan \+ deltaY \* pricePerPixel\)/);
   assert.match(pageSource, /DEMO_TRADE_CHART_CANDLE_LIMIT/);
   assert.match(pageSource, /fetchDemoTradeMarketSnapshot\(activeSymbol\.symbol, timeframe, DEMO_TRADE_CHART_CANDLE_LIMIT\)/);
@@ -118,7 +126,7 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /MAX_DEMO_CHART_PRICE_SCALE = 8/);
   assert.match(pageSource, /DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY = 150/);
   assert.match(pageSource, /DEMO_CHART_PRICE_SCALE_WHEEL_SENSITIVITY = 420/);
-  assert.match(pageSource, /priceScaleStartRef\.current\.scale \* Math\.exp\(deltaY \/ DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY\)/);
+  assert.match(pageSource, /activeScaleStart\.scale \* Math\.exp\(activeDeltaY \/ DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY\)/);
   assert.match(pageSource, /event\.deltaY \/ DEMO_CHART_PRICE_SCALE_WHEEL_SENSITIVITY/);
   assert.match(pageSource, /setPriceScale\(\(scale\) => clamp\(scale \* scaleFactor, MIN_DEMO_CHART_PRICE_SCALE, MAX_DEMO_CHART_PRICE_SCALE\)\)/);
   assert.match(pageSource, /wheelPanRemainderRef/);

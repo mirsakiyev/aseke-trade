@@ -10,6 +10,11 @@ const cryptoMarketsSource = await readFile(new URL("../src/lib/cryptoMarkets.ts"
 const marketIndicesSource = await readFile(new URL("../src/lib/marketIndices.ts", import.meta.url), "utf8");
 const netlifyMarketIndicesSource = await readFile(new URL("../netlify/functions/market-indices.ts", import.meta.url), "utf8");
 const viteConfigSource = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
+const signalReconciliationSource = await readFile(new URL("../src/lib/tradingSignalReconciliation.ts", import.meta.url), "utf8");
+const signalReconcileFunctionSource = await readFile(
+  new URL("../supabase/functions/trading-signal-reconcile/index.ts", import.meta.url),
+  "utf8"
+);
 
 test("trading signal UI no longer renders Creation Price", () => {
   assert.doesNotMatch(adminSource, /Creation price/i);
@@ -45,6 +50,25 @@ test("trading signal card renders live title and updated stop loss state", () =>
   assert.match(dashboardSource, /signal-stop-loss-level updated/);
   assert.match(dashboardSource, /<s>\{formatSignalPrice\(originalValue\)\}<\/s>/);
   assert.match(dashboardSource, /<strong>\{formatSignalPrice\(currentValue\)\}<\/strong>/);
+});
+
+test("trading signals have backend-only reconciliation instead of frontend price polling", () => {
+  assert.match(signalReconciliationSource, /reconcileTradingSignalWithCandles/);
+  assert.match(signalReconciliationSource, /isStopLossHit/);
+  assert.match(signalReconciliationSource, /isTakeProfitHit/);
+  assert.match(signalReconciliationSource, /SL wins over new TP hits in the same candle/);
+  assert.match(signalReconcileFunctionSource, /Deno\.serve/);
+  assert.match(signalReconcileFunctionSource, /requireServiceRole/);
+  assert.match(signalReconcileFunctionSource, /\.from\("trading_signals"\)/);
+  assert.match(signalReconcileFunctionSource, /\.eq\("status", "active"\)/);
+  assert.match(signalReconcileFunctionSource, /\.eq\("is_active", true\)/);
+  assert.match(signalReconcileFunctionSource, /fetchHistoricalCandles/);
+  assert.match(signalReconcileFunctionSource, /api\.binance\.us\/api\/v3\/klines/);
+  assert.match(signalReconcileFunctionSource, /api\.binance\.com\/api\/v3\/klines/);
+  assert.match(signalReconcileFunctionSource, /save_reconciled_trading_signal/);
+  assert.match(signalReconcileFunctionSource, /base_update_count/);
+  assert.doesNotMatch(dashboardSource, /setInterval\([^)]*fetchTradingSignals|WebSocket|new EventSource|reconcileTradingSignalWithCandles/);
+  assert.doesNotMatch(adminSource, /setInterval\([^)]*fetchTradingSignals|WebSocket|new EventSource|reconcileTradingSignalWithCandles/);
 });
 
 test("past trades render as a compact expandable table with reusable details", () => {

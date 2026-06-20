@@ -105,6 +105,9 @@ const MIN_DEMO_CHART_PRICE_SCALE = 0.16;
 const MAX_DEMO_CHART_PRICE_SCALE = 8;
 const DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY = 150;
 const DEMO_CHART_PRICE_SCALE_WHEEL_SENSITIVITY = 420;
+const DEMO_CHART_DRAG_ACTIVATION_PX = 4;
+const DEMO_CHART_AXIS_SCALE_VERTICAL_BIAS = 1.15;
+const DEMO_CHART_BOUNDARY_DRAG_RESISTANCE = 0.22;
 const DEMO_TRADE_LOAD_ERROR_MESSAGE = "Demo trade progress could not be loaded from your account. Cross-device sync is paused until the account connection recovers.";
 const DEMO_TRADE_SAVE_ERROR_MESSAGE = "Demo trade progress could not be saved to your account. Keep this tab open and try again.";
 
@@ -1887,9 +1890,18 @@ function DemoTradeChart({
   const [isPriceScaling, setIsPriceScaling] = useState(false);
   const [priceScale, setPriceScale] = useState(1);
   const [pricePan, setPricePan] = useState(0);
+  const [dragPreviewX, setDragPreviewX] = useState(0);
   const [crosshair, setCrosshair] = useState<{ x: number; y: number; price: number } | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; offset: number; pricePan: number; pointerId: number } | null>(null);
-  const priceScaleStartRef = useRef<{ y: number; scale: number; pointerId: number } | null>(null);
+  const priceScaleStartRef = useRef<{
+    x: number;
+    y: number;
+    scale: number;
+    offset: number;
+    pricePan: number;
+    pointerId: number;
+    isActive: boolean;
+  } | null>(null);
   const wheelPanRemainderRef = useRef(0);
   const maxOffset = Math.max(0, candles.length - visibleCount);
   const futurePaddingCandles = Math.min(90, Math.max(24, Math.floor(visibleCount * 0.5)));
@@ -1941,7 +1953,10 @@ function DemoTradeChart({
     setOffset(0);
     setPriceScale(1);
     setPricePan(0);
+    setDragPreviewX(0);
     wheelPanRemainderRef.current = 0;
+    dragStartRef.current = null;
+    priceScaleStartRef.current = null;
   }, [timeframe]);
 
   useEffect(() => {
@@ -1963,11 +1978,20 @@ function DemoTradeChart({
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     setCrosshair(null);
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const axisStart = bounds.left + (axisX / width) * bounds.width;
-    if (event.clientX >= axisStart) {
-      priceScaleStartRef.current = { y: event.clientY, scale: priceScale, pointerId: event.pointerId };
-      setIsPriceScaling(true);
+    setDragPreviewX(0);
+    const pointer = getSvgPointer(event, width, height);
+    if (pointer.x >= axisX) {
+      priceScaleStartRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        scale: priceScale,
+        offset: safeOffset,
+        pricePan,
+        pointerId: event.pointerId,
+        isActive: false
+      };
+      setIsRightDragging(false);
+      setIsPriceScaling(false);
       return;
     }
     dragStartRef.current = { x: event.clientX, y: event.clientY, offset: safeOffset, pricePan, pointerId: event.pointerId };
@@ -1986,22 +2010,63 @@ function DemoTradeChart({
   };
 
   const moveRightDrag = (event: PointerEvent<SVGSVGElement>) => {
-    if (priceScaleStartRef.current) {
-      event.preventDefault();
-      const deltaY = event.clientY - priceScaleStartRef.current.y;
-      setPriceScale(clamp(
-        priceScaleStartRef.current.scale * Math.exp(deltaY / DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY),
-        MIN_DEMO_CHART_PRICE_SCALE,
-        MAX_DEMO_CHART_PRICE_SCALE
-      ));
+    if (event.pointerType === "mouse" && event.buttons === 0) {
+      stopRightDrag(event);
       return;
     }
+
+    if (priceScaleStartRef.current) {
+      event.preventDefault();
+      const scaleStart = priceScaleStartRef.current;
+      const deltaX = event.clientX - scaleStart.x;
+      const deltaY = event.clientY - scaleStart.y;
+      const absDeltaX = Math.abs(deltaX);
+      const absDeltaY = Math.abs(deltaY);
+      if (!scaleStart.isActive) {
+        if (Math.hypot(deltaX, deltaY) < DEMO_CHART_DRAG_ACTIVATION_PX) return;
+
+        if (absDeltaX > absDeltaY * DEMO_CHART_AXIS_SCALE_VERTICAL_BIAS) {
+          dragStartRef.current = {
+            x: scaleStart.x,
+            y: scaleStart.y,
+            offset: scaleStart.offset,
+            pricePan: scaleStart.pricePan,
+            pointerId: scaleStart.pointerId
+          };
+          priceScaleStartRef.current = null;
+          setIsRightDragging(true);
+        } else {
+          scaleStart.isActive = true;
+          setIsPriceScaling(true);
+        }
+      }
+
+      if (priceScaleStartRef.current) {
+        setCrosshair(null);
+        const activeScaleStart = priceScaleStartRef.current;
+        const activeDeltaY = event.clientY - activeScaleStart.y;
+        setPriceScale(clamp(
+          activeScaleStart.scale * Math.exp(activeDeltaY / DEMO_CHART_PRICE_SCALE_DRAG_SENSITIVITY),
+          MIN_DEMO_CHART_PRICE_SCALE,
+          MAX_DEMO_CHART_PRICE_SCALE
+        ));
+        return;
+      }
+    }
+
     if (!dragStartRef.current) return;
     event.preventDefault();
-    const deltaCandles = Math.round((event.clientX - dragStartRef.current.x) / Math.max(5, candleGap));
+    setCrosshair(null);
+    const rawDeltaX = event.clientX - dragStartRef.current.x;
+    const deltaCandles = Math.round(rawDeltaX / Math.max(5, candleGap));
+    const nextOffset = clamp(dragStartRef.current.offset + deltaCandles, -futurePaddingCandles, Math.max(0, candles.length - visibleCount));
+    const committedDeltaCandles = nextOffset - dragStartRef.current.offset;
+    const rawPreviewX = rawDeltaX - committedDeltaCandles * candleGap;
+    const didHitBoundary = nextOffset !== dragStartRef.current.offset + deltaCandles;
     const pricePerPixel = visiblePriceRange / Math.max(1, chartHeight);
     const deltaY = event.clientY - dragStartRef.current.y;
-    setOffset(clamp(dragStartRef.current.offset + deltaCandles, -futurePaddingCandles, Math.max(0, candles.length - visibleCount)));
+    setOffset(nextOffset);
+    setDragPreviewX(didHitBoundary ? rawPreviewX * DEMO_CHART_BOUNDARY_DRAG_RESISTANCE : rawPreviewX);
     setPricePan(dragStartRef.current.pricePan + deltaY * pricePerPixel);
   };
 
@@ -2048,6 +2113,7 @@ function DemoTradeChart({
     }
     dragStartRef.current = null;
     priceScaleStartRef.current = null;
+    setDragPreviewX(0);
     setIsRightDragging(false);
     setIsPriceScaling(false);
   };
@@ -2128,37 +2194,39 @@ function DemoTradeChart({
             return <line className="chart-grid-line vertical" x1={x} x2={x} y1={padding.top} y2={height - padding.bottom} key={x} />;
           })}
           <g clipPath="url(#demo-trade-chart-plot)">
-            {visibleCandles.map((candle, index) => {
-              const candleX = snapSvgCoordinate(padding.left + index * candleGap + (candleGap - candleWidth) / 2);
-              const x = candleX + candleWidth / 2;
-              const openY = yForPrice(candle.open);
-              const closeY = yForPrice(candle.close);
-              const highY = yForPrice(candle.high);
-              const lowY = yForPrice(candle.low);
-              const previousClose = visibleCandles[index - 1]?.close ?? candle.open;
-              const isUp = isBullishCandle(candle, previousClose);
-              const candleShape = buildCandleShape({
-                openY,
-                closeY,
-                highY,
-                lowY,
-                minBodyHeight,
-                minWickHeight
-              });
-              return (
-                <g className={isUp ? "candle up" : "candle down"} key={`${candle.timestamp}-${index}`}>
-                  <line className="candle-wick" x1={x} x2={x} y1={candleShape.wickY1} y2={candleShape.wickY2} />
-                  <rect
-                    className="candle-body"
-                    x={candleX}
-                    y={candleShape.bodyY}
-                    width={candleWidth}
-                    height={candleShape.bodyHeight}
-                    rx="1.5"
-                  />
-                </g>
-              );
-            })}
+            <g className="chart-candle-layer" transform={dragPreviewX ? `translate(${dragPreviewX} 0)` : undefined}>
+              {visibleCandles.map((candle, index) => {
+                const candleX = snapSvgCoordinate(padding.left + index * candleGap + (candleGap - candleWidth) / 2);
+                const x = candleX + candleWidth / 2;
+                const openY = yForPrice(candle.open);
+                const closeY = yForPrice(candle.close);
+                const highY = yForPrice(candle.high);
+                const lowY = yForPrice(candle.low);
+                const previousClose = visibleCandles[index - 1]?.close ?? candle.open;
+                const isUp = isBullishCandle(candle, previousClose);
+                const candleShape = buildCandleShape({
+                  openY,
+                  closeY,
+                  highY,
+                  lowY,
+                  minBodyHeight,
+                  minWickHeight
+                });
+                return (
+                  <g className={isUp ? "candle up" : "candle down"} key={`${candle.timestamp}-${index}`}>
+                    <line className="candle-wick" x1={x} x2={x} y1={candleShape.wickY1} y2={candleShape.wickY2} />
+                    <rect
+                      className="candle-body"
+                      x={candleX}
+                      y={candleShape.bodyY}
+                      width={candleWidth}
+                      height={candleShape.bodyHeight}
+                      rx="1.5"
+                    />
+                  </g>
+                );
+              })}
+            </g>
           </g>
           {overlayLineLayouts.map(({ line, lineY, markerY }) => {
             const hasPriceMarker = isOverlayPriceMarker(line.tone);
