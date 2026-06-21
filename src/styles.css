@@ -296,6 +296,10 @@ p {
     border-color 160ms ease;
 }
 
+.primary-nav a {
+  white-space: nowrap;
+}
+
 .primary-nav a.active,
 .primary-nav a:hover,
 .account-chip:hover {
@@ -561,7 +565,7 @@ p {
   inset: 0;
   z-index: -2;
   content: "";
-  background-image: url("/assets/aseke-trade-hero.png");
+  background-image: url("/assets/aseke-trade-home.png");
   background-position: center right;
   background-size: cover;
 }
@@ -7923,7 +7927,7 @@ select:focus {
   }
 }
 
-@media (min-width: 981px) and (max-width: 1180px) {
+@media (min-width: 981px) and (max-width: 1600px) {
   .site-header {
     grid-template-columns: minmax(180px, 1fr) auto auto;
     grid-template-areas:
