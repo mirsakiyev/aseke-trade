@@ -56,14 +56,12 @@ export function Home() {
           <p className="eyebrow">Structured Crypto Trading Education</p>
           <h1>From Zero to Disciplined Trader</h1>
           <p className="hero-lede">
-            ASEKE TRADE helps you learn crypto from the ground up: wallet safety, market foundations,
-            chart reading, technical analysis, risk management, trading psychology, futures,
-            derivatives, and practical strategy development.
+            ASEKE TRADE teaches you crypto from the ground up — foundations, charts, risk, 
+			strategy, futures, and the mindset required to become a disciplined and profitable trader.
           </p>
           <div className="hero-actions" aria-label="Primary actions">
             <Link className="primary-button" to="/trading-academy">
               Join Trading Academy
-              <ArrowRight size={18} />
             </Link>
             <Link className="ghost-button" to="/guides">
               Start Learning Free

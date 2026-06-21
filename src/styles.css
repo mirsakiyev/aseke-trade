@@ -605,6 +605,11 @@ p {
   margin-top: 1.6rem;
 }
 
+.hero-actions .primary-button,
+.hero-actions .primary-button:hover {
+  box-shadow: none;
+}
+
 .market-showcase {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
@@ -660,17 +665,7 @@ p {
   align-content: center;
   gap: 0.8rem;
   padding: clamp(1.2rem, 4vw, 2rem);
-}
-
-.market-copy::after {
-  position: absolute;
-  right: 1.2rem;
-  bottom: -1.2rem;
-  content: "Ξ";
-  color: rgba(229, 228, 226, 0.1);
-  font-size: clamp(6rem, 18vw, 12rem);
-  font-weight: 900;
-  line-height: 1;
+  background: linear-gradient(180deg, rgba(21, 25, 31, 0.94), rgba(10, 12, 15, 0.96));
 }
 
 .market-copy > * {
