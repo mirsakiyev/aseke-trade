@@ -371,6 +371,9 @@ export function AdminTradingAcademy() {
           <p className="muted">Manage Academy signals and AML check requests.</p>
         </div>
         <div className="inline-actions">
+          <Link className="ghost-button" to="/admin/trading-academy/ai-futures-analyst">
+            AI Futures monitor
+          </Link>
           <Link className="ghost-button" to="/admin">
             Content admin
           </Link>

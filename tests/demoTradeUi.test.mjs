@@ -4,7 +4,9 @@ import { test } from "node:test";
 
 const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 const layoutSource = await readFile(new URL("../src/components/Layout.tsx", import.meta.url), "utf8");
-const pageSource = await readFile(new URL("../src/pages/DemoTrade.tsx", import.meta.url), "utf8");
+const demoTradePageSource = await readFile(new URL("../src/pages/DemoTrade.tsx", import.meta.url), "utf8");
+const sharedChartSource = await readFile(new URL("../src/components/FuturesCandlestickChart.tsx", import.meta.url), "utf8");
+const pageSource = `${demoTradePageSource}\n${sharedChartSource}`;
 const stylesSource = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 const persistenceSource = await readFile(new URL("../src/lib/demoTradePersistence.ts", import.meta.url), "utf8");
 const reconciliationSource = await readFile(new URL("../src/lib/demoTradeReconciliation.ts", import.meta.url), "utf8");
@@ -19,9 +21,9 @@ const serviceRoleGrantsMigrationSource = await readFile(new URL("../supabase/mig
 const terminalCloseGuardMigrationSource = await readFile(new URL("../supabase/migrations/202606190004_demo_trade_terminal_close_guard.sql", import.meta.url), "utf8");
 
 test("Demo Trade page renders as a public route", () => {
-  assert.match(appSource, /import \{ DemoTrade \} from "\.\/pages\/DemoTrade"/);
-  assert.match(appSource, /path="demo-trade" element=\{<DemoTrade \/>\}/);
-  assert.doesNotMatch(appSource, /path="demo-trade"[\s\S]{0,120}ProtectedRoute/);
+  assert.match(appSource, /const DemoTrade = lazy\(\(\) => import\("\.\/pages\/DemoTrade"\)/);
+  assert.match(appSource, /path="demo-trade"[\s\S]{0,180}<DemoTrade \/>/);
+  assert.doesNotMatch(appSource, /path="demo-trade"[\s\S]{0,180}<ProtectedRoute/);
 });
 
 test("header contains Demo Trade link for all users", () => {
@@ -94,13 +96,15 @@ test("Demo Trade does not account-save ordinary market ticks over bracket edits"
 
 test("Demo Trade page includes custom chart and no TradingView widget", () => {
   assert.match(pageSource, /function DemoTradeChart/);
+  assert.match(demoTradePageSource, /FuturesCandlestickChart/);
   assert.match(pageSource, /chartClassName/);
   assert.match(pageSource, /buildOverlayLines/);
   assert.doesNotMatch(pageSource, /TradingViewChart|tradingview-widget|s3\.tradingview/);
 });
 
 test("Demo Trade chart has timeframe tabs, right price scale, and compact controls", () => {
-  assert.match(pageSource, /demoTradeTimeframes\.map/);
+  assert.match(demoTradePageSource, /timeframeOptions=\{demoTradeTimeframes\}/);
+  assert.match(sharedChartSource, /timeframeOptions\.map/);
   assert.doesNotMatch(marketDataSource, /\{ value: "1m", label: "1m" \}/);
   assert.match(pageSource, /chart-axis-panel/);
   assert.match(pageSource, /chart-price-label/);
@@ -146,10 +150,10 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /getSvgPointer/);
   assert.match(pageSource, /chart-crosshair-price/);
   assert.match(pageSource, /line\.tone !== "liquidation"/);
-  assert.match(pageSource, /label: "Entry", price: position\.entryPrice/);
+  assert.match(pageSource, /label: "Entry",[\s\S]{0,80}price: position\.entryPrice/);
   assert.match(pageSource, /pendingLimitOrder=\{demoState\.pendingLimitOrder\}/);
-  assert.match(pageSource, /buildOverlayLines\(position, pendingLimitOrder, currentPrice\)/);
-  assert.match(pageSource, /label: "Limit", price: pendingLimitOrder\.limitPrice, tone: "pending"/);
+  assert.match(pageSource, /buildOverlayLines\(position, pendingLimitOrder\)/);
+  assert.match(pageSource, /label: "Limit",[\s\S]{0,80}price: pendingLimitOrder\.limitPrice,[\s\S]{0,80}tone: "pending"/);
   assert.match(pageSource, /subscribeDemoTradePriceStream/);
   assert.match(pageSource, /applyLiveTicker/);
   assert.match(pageSource, /getCandleBucketStart/);
@@ -161,7 +165,7 @@ test("Demo Trade chart has timeframe tabs, right price scale, and compact contro
   assert.match(pageSource, /resolveOverlayMarkerLayouts/);
   assert.match(pageSource, /resolveOverlayMarkerCluster/);
   assert.match(pageSource, /a\.markerY - b\.markerY \|\| b\.line\.price - a\.line\.price \|\| a\.index - b\.index/);
-  assert.match(pageSource, /line\.tone === "entry" && position \? `side-\$\{position\.side\}` : ""/);
+  assert.match(pageSource, /line\.tone === "entry" && line\.side \? `side-\$\{line\.side\}` : ""/);
   assert.match(pageSource, /chart-marker-connector/);
   assert.match(pageSource, /isOverlayPriceMarker/);
   assert.match(pageSource, /chart-price-marker-label/);

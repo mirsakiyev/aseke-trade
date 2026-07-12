@@ -12,6 +12,7 @@ ASEKE TRADE is a Trading Academy for disciplined crypto market education. It is 
 - Admin-only panel for guides, courses, modules, lessons, users, and Trading Academy access
 - Supabase Row Level Security policies for role and purchase-based access
 - Secure Trading Academy memberships, crypto checkout, account balance deposits, and server-side on-chain verification
+- Protected AI Futures Analyst with deterministic risk controls, shared server-side market snapshots, shadow mode, and Demo Trade practice prefill
 
 ## Local Setup
 
@@ -62,6 +63,8 @@ ASEKE TRADE is a Trading Academy for disciplined crypto market education. It is 
 4. Run `supabase/seed.sql` for sample guides, courses, modules, and lessons.
 5. Configure crypto payment secrets and Edge Functions with the steps in
    [`docs/crypto-payments.md`](docs/crypto-payments.md).
+6. Configure the optional AI Futures Analyst migration, Edge Functions, Vault Cron jobs, and staged feature flags with
+   [`docs/ai-futures-analyst.md`](docs/ai-futures-analyst.md).
 
 With the Supabase CLI, the common flow is:
 
@@ -154,9 +157,10 @@ src/
   pages/             Public, auth, dashboard, Trading Academy, and admin pages
   types/             Shared TypeScript models
 docs/
+  ai-futures-analyst.md AI Futures architecture, deployment, security, and operations
   crypto-payments.md Crypto payment setup and testing guide
 supabase/
-  functions/         Crypto payment, deposit, and balance Edge Functions
+  functions/         Payments, market processing, and AI Futures Edge Functions
   migrations/        Schema, triggers, RLS policies
   seed.sql           Sample curriculum content
 public/assets/       Generated project visuals

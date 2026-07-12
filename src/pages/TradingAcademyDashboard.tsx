@@ -1,4 +1,5 @@
 import {
+  BrainCircuit,
   Calculator,
   ChevronDown,
   ChevronUp,
@@ -15,6 +16,7 @@ import {
   UserRound
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { LoadingState } from "../components/LoadingState";
 import { UserBadgePill } from "../components/UserBadgePill";
 import { useAuth } from "../contexts/AuthContext";
@@ -329,6 +331,21 @@ export function TradingAcademyDashboard() {
         <LoadingState label="Loading Trading Academy" />
       ) : (
         <>
+          <section className="section-panel no-hover-effect ai-analyst-entry-card">
+            <div>
+              <p className="eyebrow">New Academy Lab</p>
+              <h2 className="title-with-leading-icon">
+                <BrainCircuit size={28} aria-hidden="true" />
+                AI Futures Analyst
+              </h2>
+              <p className="muted">
+                Analyze BTCUSDT perpetual futures with closed-candle technicals, positioning data, deterministic risk controls, and an independent structured review.
+              </p>
+            </div>
+            <Link className="primary-button" to="/trading-academy/ai-futures-analyst">
+              Open Analyst
+            </Link>
+          </section>
           <section className="section-panel leaderboard-panel no-hover-effect">
             <div className="lesson-title-line">
               <div>

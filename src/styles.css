@@ -27,6 +27,371 @@
   --button-candlestick-chart-overlay: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 58' preserveAspectRatio='none'%3E%3Cg stroke-linecap='round'%3E%3Cpath d='M8 8V46M42 18V54M76 5V52M110 12V44M144 20V55M178 4V40M212 14V53M246 7V47' stroke='%237ee0a7' stroke-opacity='.6' stroke-width='1.25'/%3E%3Cg fill='%237ee0a7' fill-opacity='.16' stroke='%237ee0a7' stroke-opacity='.74' stroke-width='1.1'%3E%3Crect x='4.8' y='24' width='6.4' height='15' rx='1'/%3E%3Crect x='38.8' y='31' width='6.4' height='10' rx='1'/%3E%3Crect x='72.8' y='12' width='6.4' height='28' rx='1'/%3E%3Crect x='106.8' y='23' width='6.4' height='12' rx='1'/%3E%3Crect x='140.8' y='34' width='6.4' height='14' rx='1'/%3E%3Crect x='174.8' y='10' width='6.4' height='20' rx='1'/%3E%3Crect x='208.8' y='28' width='6.4' height='17' rx='1'/%3E%3Crect x='242.8' y='16' width='6.4' height='23' rx='1'/%3E%3C/g%3E%3Cpath d='M25 12V54M59 3V37M93 22V56M127 7V48M161 26V54M195 9V55M229 4V41M263 18V53' stroke='%23ff6b6b' stroke-opacity='.6' stroke-width='1.25'/%3E%3Cg fill='%23ff6b6b' fill-opacity='.16' stroke='%23ff6b6b' stroke-opacity='.74' stroke-width='1.1'%3E%3Crect x='21.8' y='16' width='6.4' height='29' rx='1'/%3E%3Crect x='55.8' y='9' width='6.4' height='18' rx='1'/%3E%3Crect x='89.8' y='30' width='6.4' height='20' rx='1'/%3E%3Crect x='123.8' y='14' width='6.4' height='24' rx='1'/%3E%3Crect x='157.8' y='38' width='6.4' height='11' rx='1'/%3E%3Crect x='191.8' y='17' width='6.4' height='30' rx='1'/%3E%3Crect x='225.8' y='11' width='6.4' height='22' rx='1'/%3E%3Crect x='259.8' y='27' width='6.4' height='16' rx='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
+/* AI Futures Analyst */
+.ai-futures-page,
+.admin-ai-page {
+  gap: 1.35rem;
+}
+
+.ai-futures-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-futures-hero::after {
+  position: absolute;
+  right: 2rem;
+  bottom: -3.5rem;
+  width: 13rem;
+  height: 13rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(112, 229, 255, 0.13), transparent 68%);
+  content: "";
+  pointer-events: none;
+}
+
+.ai-futures-hero h1,
+.admin-ai-page .page-title-row h1 {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.ai-futures-control-grid,
+.ai-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ai-analyst-entry-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.ai-analyst-entry-card .primary-button {
+  flex: 0 0 auto;
+}
+
+.ai-risk-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.ai-risk-profile-card small {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.ai-method-list,
+.ai-plan-grid {
+  display: grid;
+  gap: 0;
+  margin: 1rem 0;
+}
+
+.ai-method-list > div,
+.ai-plan-grid > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ai-method-list dt,
+.ai-plan-grid dt {
+  color: var(--muted);
+}
+
+.ai-method-list dd,
+.ai-plan-grid dd {
+  margin: 0;
+  font-weight: 800;
+  text-align: right;
+}
+
+.ai-futures-chart-panel {
+  padding-bottom: 1rem;
+}
+
+.ai-futures-chart {
+  min-height: 34rem;
+}
+
+.ai-chart-context {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.85rem 0 0;
+}
+
+.ai-chart-context > div {
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ai-chart-context dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.ai-chart-context dd {
+  margin: 0.3rem 0 0;
+  font-weight: 800;
+}
+
+.ai-analysis-results {
+  gap: 1rem;
+}
+
+.ai-verdict-card {
+  border-color: rgba(229, 228, 226, 0.22);
+  background:
+    linear-gradient(120deg, rgba(112, 229, 255, 0.07), transparent 48%),
+    var(--panel);
+}
+
+.ai-verdict-card.verdict-long_setup {
+  border-color: rgba(76, 217, 145, 0.38);
+}
+
+.ai-verdict-card.verdict-short_setup {
+  border-color: rgba(255, 112, 112, 0.38);
+}
+
+.ai-verdict-card.verdict-no_trade,
+.ai-verdict-card.verdict-wait_for_entry {
+  border-color: rgba(243, 190, 92, 0.36);
+}
+
+.ai-verdict-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.ai-verdict-icon {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ai-quality-score {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 8rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: rgba(0, 0, 0, 0.2);
+  text-align: right;
+}
+
+.ai-quality-score span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.ai-quality-score strong {
+  font-size: 1.45rem;
+}
+
+.ai-levels-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ai-levels-table th,
+.ai-levels-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ai-levels-table th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ai-plan-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1.25rem;
+}
+
+.ai-quality-list {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.ai-quality-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) minmax(8rem, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.ai-quality-row meter {
+  width: 100%;
+  height: 0.65rem;
+}
+
+.ai-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ai-evidence-card {
+  border-top-width: 3px;
+}
+
+.ai-evidence-card.support {
+  border-top-color: rgba(76, 217, 145, 0.65);
+}
+
+.ai-evidence-card.conflict {
+  border-top-color: rgba(255, 112, 112, 0.65);
+}
+
+.ai-evidence-card.neutral {
+  border-top-color: rgba(243, 190, 92, 0.65);
+}
+
+.ai-evidence-card ul,
+.ai-verdict-card ul,
+.ai-analysis-results .soft-notice ul {
+  margin: 0.7rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.ai-risk-disclosure {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+}
+
+.ai-risk-disclosure p {
+  margin: 0.3rem 0 0;
+}
+
+.ai-demo-prefill-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.ai-demo-prefill-banner p {
+  margin: 0.25rem 0 0;
+}
+
+.admin-ai-status-card svg {
+  float: right;
+}
+
+.admin-ai-status-card .positive {
+  color: #4cd991;
+}
+
+.admin-ai-status-card .negative,
+.danger-text {
+  color: #ff7070;
+}
+
+.admin-ai-switch-grid,
+.admin-ai-weight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.admin-ai-switch-grid .checkbox-row {
+  min-height: 3rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.admin-ai-json {
+  max-height: 34rem;
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: #07090c;
+  color: #cbd7e5;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .ai-futures-control-grid,
+  .ai-result-grid,
+  .ai-evidence-grid,
+  .ai-chart-context,
+  .admin-ai-switch-grid,
+  .admin-ai-weight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-analyst-entry-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ai-futures-chart {
+    min-height: 25rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .ai-verdict-heading {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ai-quality-score {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  .ai-plan-grid,
+  .ai-quality-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-quality-row {
+    gap: 0.35rem;
+  }
+
+  .ai-demo-prefill-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

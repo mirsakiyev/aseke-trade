@@ -12,7 +12,6 @@ import { Courses } from "./pages/Courses";
 import { CryptoCheckout } from "./pages/CryptoCheckout";
 import { CryptoPayment } from "./pages/CryptoPayment";
 import { Dashboard } from "./pages/Dashboard";
-import { DemoTrade } from "./pages/DemoTrade";
 import { GuideDetail } from "./pages/GuideDetail";
 import { Guides } from "./pages/Guides";
 import { Home } from "./pages/Home";
@@ -28,6 +27,13 @@ import { TradingAcademyDashboard } from "./pages/TradingAcademyDashboard";
 const Charts = lazy(() => import("./pages/Charts").then((module) => ({ default: module.Charts })));
 const CryptoGlossary = lazy(() => import("./pages/CryptoGlossary").then((module) => ({ default: module.CryptoGlossary })));
 const CryptoQuiz = lazy(() => import("./pages/CryptoQuiz").then((module) => ({ default: module.CryptoQuiz })));
+const DemoTrade = lazy(() => import("./pages/DemoTrade").then((module) => ({ default: module.DemoTrade })));
+const AiFuturesAnalyst = lazy(() =>
+  import("./pages/AiFuturesAnalyst").then((module) => ({ default: module.AiFuturesAnalyst }))
+);
+const AdminAiFuturesAnalyst = lazy(() =>
+  import("./pages/AdminAiFuturesAnalyst").then((module) => ({ default: module.AdminAiFuturesAnalyst }))
+);
 
 export default function App() {
   return (
@@ -63,7 +69,24 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="demo-trade" element={<DemoTrade />} />
+        <Route
+          path="trading-academy/ai-futures-analyst"
+          element={
+            <ProtectedRoute requireTradingAcademy>
+              <Suspense fallback={<LoadingState label="Loading AI Futures Analyst" />}>
+                <AiFuturesAnalyst />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="demo-trade"
+          element={
+            <Suspense fallback={<LoadingState label="Loading Demo Trade" />}>
+              <DemoTrade />
+            </Suspense>
+          }
+        />
         <Route path="premium" element={<Navigate to="/trading-academy" replace />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
@@ -131,6 +154,16 @@ export default function App() {
           element={
             <ProtectedRoute requireAdmin>
               <AdminTradingAcademy />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/trading-academy/ai-futures-analyst"
+          element={
+            <ProtectedRoute requireAdmin>
+              <Suspense fallback={<LoadingState label="Loading AI Futures monitoring" />}>
+                <AdminAiFuturesAnalyst />
+              </Suspense>
             </ProtectedRoute>
           }
         />

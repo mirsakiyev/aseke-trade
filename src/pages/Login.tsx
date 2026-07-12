@@ -6,6 +6,8 @@ import { useAuth } from "../contexts/AuthContext";
 interface LocationState {
   from?: {
     pathname?: string;
+    search?: string;
+    hash?: string;
   };
 }
 
@@ -17,7 +19,10 @@ export function Login() {
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const redirectTo = (location.state as LocationState | null)?.from?.pathname ?? "/dashboard";
+  const returnLocation = (location.state as LocationState | null)?.from;
+  const redirectTo = returnLocation?.pathname
+    ? `${returnLocation.pathname}${returnLocation.search ?? ""}${returnLocation.hash ?? ""}`
+    : "/dashboard";
 
   if (user) return <Navigate to={redirectTo} replace />;
 
