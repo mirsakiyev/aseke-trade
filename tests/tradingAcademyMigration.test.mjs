@@ -18,6 +18,11 @@ const leaderboardAvatarMigration = await readFile(
   new URL("../supabase/migrations/202606120005_public_leaderboard_avatars.sql", import.meta.url),
   "utf8"
 );
+const adminSubscriptionRepairMigration = await readFile(
+  new URL("../supabase/migrations/202607120001_repair_admin_subscription_update.sql", import.meta.url),
+  "utf8"
+);
+const adminSource = await readFile(new URL("../src/pages/Admin.tsx", import.meta.url), "utf8");
 
 test("migration defines Trading Academy access, leaderboard, signals, AML, and support models", () => {
   for (const expected of [
@@ -44,6 +49,23 @@ test("leaderboard avatar migration exposes only public avatar URLs", () => {
   assert.match(leaderboardAvatarMigration, /avatar_url text/i);
   assert.match(leaderboardAvatarMigration, /nullif\(p\.avatar_url, ''\) as avatar_url/i);
   assert.doesNotMatch(leaderboardAvatarMigration, /p\.email|wallet|premium_until/i);
+});
+
+test("admin subscription edits avoid the admin_note parameter and column name collision", () => {
+  assert.match(
+    adminSubscriptionRepairMigration,
+    /admin_note\s*=\s*nullif\(trim\(coalesce\(\$4,\s*ps\.admin_note,\s*''\)\),\s*''\)/i
+  );
+  assert.doesNotMatch(
+    adminSubscriptionRepairMigration,
+    /admin_note\s*=\s*nullif\(trim\(coalesce\(admin_note,\s*ps\.admin_note/i
+  );
+  assert.match(adminSubscriptionRepairMigration, /perform public\.sync_user_trading_academy_profile\(target_user_id\)/i);
+  assert.match(adminSubscriptionRepairMigration, /notify pgrst, 'reload schema'/i);
+});
+
+test("admin subscription save failures expose the database error", () => {
+  assert.match(adminSource, /Trading Academy subscription could not be saved: \$\{result\.error\.message\}/);
 });
 
 test("AML RPC locks balance, checks funds, writes fee ledger, and creates the request", () => {

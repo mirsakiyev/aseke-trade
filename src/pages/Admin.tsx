@@ -335,7 +335,11 @@ export function Admin() {
           admin_note: sanitizePlainText(subscriptionForm.admin_note, 500) || null
         });
 
-    setMessage(result.error ? "Trading Academy subscription could not be saved." : "Trading Academy subscription saved.");
+    setMessage(
+      result.error
+        ? `Trading Academy subscription could not be saved: ${result.error.message}`
+        : "Trading Academy subscription saved."
+    );
     if (!result.error) {
       setSubscriptionForm(blankSubscriptionForm);
       setEditingSubscriptionId(null);
