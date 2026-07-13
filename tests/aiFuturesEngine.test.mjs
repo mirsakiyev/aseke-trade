@@ -127,6 +127,7 @@ function marketSnapshot(overrides = {}) {
     candles,
     futures: {
       markPrice: candles["15m"].at(-1).close,
+      priceKind: "exchange_mark",
       indexPrice: candles["15m"].at(-1).close - 0.02,
       fundingRate: 0,
       nextFundingAt: null,
@@ -153,6 +154,7 @@ function marketSnapshot(overrides = {}) {
     },
     sourceTimestamps: [sourceTimestamp()],
     source: "Binance USD-M Futures",
+    marketDataTransport: "binance_direct",
     ...overrides
   };
 }

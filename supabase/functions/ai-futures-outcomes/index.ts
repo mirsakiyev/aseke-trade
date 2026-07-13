@@ -16,10 +16,27 @@ import {
 } from "../_shared/ai-futures-http.ts";
 
 const binanceKlinesEndpoint = "https://fapi.binance.com/fapi/v1/klines";
+const coinGlassFuturesPriceHistoryEndpoint = "https://open-api-v4.coinglass.com/api/futures/price/history";
 const requestTimeoutMs = 8_000;
 const defaultBatchLimit = 100;
 const maximumCandlePagesPerSetup = 5;
 const maximumProviderAttempts = 2;
+const oneMinuteMs = 60_000;
+
+type OutcomeMarketTransport = "binance_direct" | "coinglass";
+type ConfiguredOutcomeMarketTransport = "auto" | "direct" | "coinglass";
+
+interface OutcomeCandleResult {
+  candles: AiFuturesCandle[];
+  transport: OutcomeMarketTransport;
+  fellBackFromBinance451: boolean;
+}
+
+interface OutcomeCandlePage {
+  rows: unknown[];
+  transport: OutcomeMarketTransport;
+  fellBackFromBinance451: boolean;
+}
 
 Deno.serve(async (request) => {
   const options = handleAiOptions(request);
@@ -48,7 +65,7 @@ Deno.serve(async (request) => {
     const rows = (data ?? []) as OutcomeRow[];
     const results = [];
     for (const row of rows) {
-      try { results.push(await reconcileRow(supabase, row)); }
+      try { results.push(await reconcileRow(supabase, row, runId)); }
       catch (error) {
         await releaseLease(supabase, row);
         results.push({ setupId: row.setup_id, status: "error", error: readCode(error) });
@@ -79,7 +96,7 @@ interface OutcomeRow {
   processing_lease_token: string;
 }
 
-async function reconcileRow(supabase: SupabaseClient, row: OutcomeRow) {
+async function reconcileRow(supabase: SupabaseClient, row: OutcomeRow, runId: string | null) {
   const { data: setup, error } = await supabase
     .from("ai_market_setups")
     .select("id,deterministic_candidate,created_at,setup_expires_at")
@@ -89,7 +106,15 @@ async function reconcileRow(supabase: SupabaseClient, row: OutcomeRow) {
   const candidate = setup.deterministic_candidate as AiCandidateSetup;
   const startMs = Date.parse(row.last_checked_at ?? row.entry_triggered_at ?? setup.created_at) + 1;
   const endMs = Date.now();
-  const candles = await fetchClosedOneMinuteCandles(startMs, endMs);
+  let candleResult: OutcomeCandleResult;
+  try {
+    candleResult = await fetchClosedOneMinuteCandles(startMs, endMs);
+    await logOutcomeProviderSuccess(supabase, runId, row.setup_id, candleResult, startMs, endMs);
+  } catch (providerError) {
+    await logOutcomeProviderFailure(supabase, runId, row.setup_id, providerError);
+    throw providerError;
+  }
+  const { candles } = candleResult;
   const previous = await buildPreviousState(supabase, row, candidate);
   const reconciliation = reconcileAiSetupOutcome(candidate, previous, candles);
   const dbStatus = toDatabaseStatus(reconciliation.state);
@@ -117,10 +142,16 @@ async function reconcileRow(supabase: SupabaseClient, row: OutcomeRow) {
       last_checked_at: reconciliation.checkedThrough ?? row.last_checked_at,
       finalized_at: terminalStatus(dbStatus) ? reconciliation.state.completedAt ?? new Date().toISOString() : null
     },
-    p_events: buildEventRows(reconciliation.events, candles)
+    p_events: buildEventRows(reconciliation.events, candles, candleResult.transport)
   });
   if (updateError) throw new AiHttpError(500, "outcome_save_failed", "AI setup outcome could not be saved.");
-  return { setupId: row.setup_id, status: dbStatus, events: reconciliation.events.length, checkedThrough: reconciliation.checkedThrough };
+  return {
+    setupId: row.setup_id,
+    status: dbStatus,
+    events: reconciliation.events.length,
+    checkedThrough: reconciliation.checkedThrough,
+    marketDataTransport: candleResult.transport
+  };
 }
 
 async function buildPreviousState(supabase: SupabaseClient, row: OutcomeRow, candidate: AiCandidateSetup): Promise<AiOutcomeState> {
@@ -150,31 +181,81 @@ async function buildPreviousState(supabase: SupabaseClient, row: OutcomeRow, can
   return state;
 }
 
-async function fetchClosedOneMinuteCandles(startMs: number, endMs: number): Promise<AiFuturesCandle[]> {
-  if (!Number.isFinite(startMs) || startMs >= endMs) return [];
+async function fetchClosedOneMinuteCandles(startMs: number, endMs: number): Promise<OutcomeCandleResult> {
+  const configuredTransport = configuredOutcomeMarketTransport();
+  let activeTransport: OutcomeMarketTransport = configuredTransport === "coinglass" ? "coinglass" : "binance_direct";
+  if (!Number.isFinite(startMs) || startMs >= endMs) {
+    return { candles: [], transport: activeTransport, fellBackFromBinance451: false };
+  }
   const candles: AiFuturesCandle[] = [];
+  let fellBackFromBinance451 = false;
   let cursor = Math.max(0, startMs);
   for (let page = 0; page < maximumCandlePagesPerSetup && cursor < endMs; page += 1) {
-    const payload = await fetchOutcomeCandlePage(cursor, endMs);
-    const parsed = payload.map(parseCandle);
+    const payload = await fetchOutcomeCandlePage(cursor, endMs, configuredTransport, activeTransport);
+    activeTransport = payload.transport;
+    fellBackFromBinance451 ||= payload.fellBackFromBinance451;
+    const parsed = payload.rows.map(payload.transport === "coinglass" ? parseCoinGlassCandle : parseCandle);
     if (parsed.some((candle) => candle === null)) {
-      throw new AiHttpError(502, "outcome_provider_invalid", "Binance USD-M outcome candles are malformed.");
+      throw new OutcomeProviderError(
+        "outcome_provider_invalid",
+        `${outcomeProviderLabel(payload.transport)} outcome candles are malformed.`,
+        payload.transport
+      );
     }
     const pageCandles = (parsed as AiFuturesCandle[])
-      .filter((candle) => candle.closeTime < endMs)
+      .filter((candle) => candle.openTime >= cursor && candle.closeTime < endMs)
       .sort((left, right) => left.openTime - right.openTime);
     for (const candle of pageCandles) {
-      if (!candles.length || candle.openTime > candles[candles.length - 1].openTime) candles.push(candle);
+      const previous = candles[candles.length - 1];
+      if (!previous || candle.openTime > previous.openTime) {
+        if (previous && candle.openTime !== previous.closeTime + 1) {
+          throw new OutcomeProviderError(
+            "outcome_provider_gap",
+            `${outcomeProviderLabel(activeTransport)} returned a gap in 1-minute outcome candles.`,
+            activeTransport
+          );
+        }
+        candles.push(candle);
+      }
     }
-    if (payload.length < 1000 || !pageCandles.length) break;
+    if (payload.rows.length < 1000 || !pageCandles.length) break;
     const nextCursor = pageCandles[pageCandles.length - 1].closeTime + 1;
-    if (nextCursor <= cursor) throw new AiHttpError(502, "outcome_provider_cursor", "Binance USD-M outcome pagination did not advance.");
+    if (nextCursor <= cursor) {
+      throw new OutcomeProviderError(
+        "outcome_provider_cursor",
+        `${outcomeProviderLabel(activeTransport)} outcome pagination did not advance.`,
+        activeTransport
+      );
+    }
     cursor = nextCursor;
   }
-  return candles;
+  assertCompleteClosedCandleRange(candles, startMs, endMs, activeTransport);
+  return { candles, transport: activeTransport, fellBackFromBinance451 };
 }
 
-async function fetchOutcomeCandlePage(startMs: number, endMs: number): Promise<unknown[]> {
+async function fetchOutcomeCandlePage(
+  startMs: number,
+  endMs: number,
+  configuredTransport: ConfiguredOutcomeMarketTransport,
+  activeTransport: OutcomeMarketTransport
+): Promise<OutcomeCandlePage> {
+  if (activeTransport === "coinglass") {
+    return { rows: await fetchCoinGlassOutcomeCandlePage(startMs, endMs), transport: "coinglass", fellBackFromBinance451: false };
+  }
+  try {
+    return { rows: await fetchBinanceOutcomeCandlePage(startMs, endMs), transport: "binance_direct", fellBackFromBinance451: false };
+  } catch (error) {
+    if (configuredTransport !== "auto" || !(error instanceof OutcomeProviderError) || error.upstreamStatus !== 451) throw error;
+    try {
+      return { rows: await fetchCoinGlassOutcomeCandlePage(startMs, endMs), transport: "coinglass", fellBackFromBinance451: true };
+    } catch (fallbackError) {
+      if (fallbackError instanceof OutcomeProviderError) fallbackError.fellBackFromBinance451 = true;
+      throw fallbackError;
+    }
+  }
+}
+
+async function fetchBinanceOutcomeCandlePage(startMs: number, endMs: number): Promise<unknown[]> {
   const params = new URLSearchParams({
     symbol: "BTCUSDT",
     interval: "1m",
@@ -194,20 +275,102 @@ async function fetchOutcomeCandlePage(startMs: number, endMs: number): Promise<u
           await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
           continue;
         }
-        throw new AiHttpError(502, "outcome_provider_error", `Binance USD-M returned HTTP ${response.status}.`);
+        if (response.status === 401 || response.status === 403) {
+          throw new OutcomeProviderError(
+            "outcome_coinglass_interval_unavailable",
+            "CoinGlass rejected required 1-minute history; verify the API key and a Standard plan or higher.",
+            "coinglass",
+            response.status,
+            503
+          );
+        }
+        throw new OutcomeProviderError(
+          "outcome_provider_error",
+          `Binance USD-M returned HTTP ${response.status}.`,
+          "binance_direct",
+          response.status
+        );
       }
       const payload = await response.json();
-      if (!Array.isArray(payload)) throw new AiHttpError(502, "outcome_provider_invalid", "Binance USD-M outcome candles are malformed.");
+      if (!Array.isArray(payload)) {
+        throw new OutcomeProviderError("outcome_provider_invalid", "Binance USD-M outcome candles are malformed.", "binance_direct");
+      }
       return payload;
     } catch (error) {
       lastError = error;
-      if (error instanceof AiHttpError || attempt === maximumProviderAttempts) break;
+      if (error instanceof OutcomeProviderError || attempt === maximumProviderAttempts) break;
     } finally {
       clearTimeout(timeout);
     }
   }
-  if (lastError instanceof AiHttpError) throw lastError;
-  throw new AiHttpError(502, "outcome_provider_unavailable", "Binance USD-M outcome candles are unavailable.");
+  if (lastError instanceof OutcomeProviderError) throw lastError;
+  throw new OutcomeProviderError("outcome_provider_unavailable", "Binance USD-M outcome candles are unavailable.", "binance_direct");
+}
+
+async function fetchCoinGlassOutcomeCandlePage(startMs: number, endMs: number): Promise<unknown[]> {
+  const apiKey = Deno.env.get("COINGLASS_API_KEY")?.trim();
+  if (!apiKey) {
+    throw new OutcomeProviderError(
+      "missing_coinglass_key",
+      "COINGLASS_API_KEY is required when CoinGlass provides Binance USD-M market data.",
+      "coinglass",
+      null,
+      503
+    );
+  }
+  const params = new URLSearchParams({
+    exchange: "Binance",
+    symbol: "BTCUSDT",
+    interval: "1m",
+    limit: "1000",
+    start_time: String(startMs),
+    end_time: String(endMs)
+  });
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= maximumProviderAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+    try {
+      const response = await fetch(`${coinGlassFuturesPriceHistoryEndpoint}?${params}`, {
+        headers: { Accept: "application/json", "CG-API-KEY": apiKey },
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        const retryable = response.status === 429 || response.status >= 500;
+        if (retryable && attempt < maximumProviderAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+          continue;
+        }
+        throw new OutcomeProviderError(
+          "outcome_coinglass_http_error",
+          `CoinGlass returned HTTP ${response.status} for Binance BTCUSDT futures history.`,
+          "coinglass",
+          response.status
+        );
+      }
+      const payload: unknown = await response.json();
+      if (!isRecord(payload) || payload.code !== "0" || !Array.isArray(payload.data)) {
+        const responseCode = isRecord(payload) && typeof payload.code === "string" ? payload.code.slice(0, 40) : "invalid";
+        throw new OutcomeProviderError(
+          "outcome_coinglass_invalid",
+          `CoinGlass rejected or malformed the Binance BTCUSDT 1-minute futures request (code ${responseCode}); verify the API plan supports 1m history.`,
+          "coinglass"
+        );
+      }
+      return payload.data;
+    } catch (error) {
+      lastError = error;
+      if (error instanceof OutcomeProviderError || attempt === maximumProviderAttempts) break;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  if (lastError instanceof OutcomeProviderError) throw lastError;
+  throw new OutcomeProviderError(
+    "outcome_coinglass_unavailable",
+    "CoinGlass Binance BTCUSDT futures history is unavailable.",
+    "coinglass"
+  );
 }
 
 function parseCandle(row: unknown): AiFuturesCandle | null {
@@ -222,7 +385,33 @@ function parseCandle(row: unknown): AiFuturesCandle | null {
   return candle;
 }
 
-function buildEventRows(events: AiOutcomeEvent[], candles: AiFuturesCandle[]) {
+function parseCoinGlassCandle(row: unknown): AiFuturesCandle | null {
+  if (!isRecord(row)) return null;
+  const openTime = providerNumber(row.time);
+  const open = providerNumber(row.open);
+  const high = providerNumber(row.high);
+  const low = providerNumber(row.low);
+  const close = providerNumber(row.close);
+  const quoteVolume = providerNumber(row.volume_usd);
+  if (![openTime, open, high, low, close, quoteVolume].every(Number.isFinite) ||
+    !Number.isInteger(openTime) || openTime < 0 || openTime % oneMinuteMs !== 0 ||
+    open <= 0 || high <= 0 || low <= 0 || close <= 0 || quoteVolume < 0 ||
+    high < Math.max(open, close) || low > Math.min(open, close) || high < low) return null;
+  return {
+    openTime,
+    open,
+    high,
+    low,
+    close,
+    volume: quoteVolume / close,
+    closeTime: openTime + oneMinuteMs - 1,
+    quoteVolume,
+    takerBuyBaseVolume: 0,
+    takerBuyQuoteVolume: 0
+  };
+}
+
+function buildEventRows(events: AiOutcomeEvent[], candles: AiFuturesCandle[], transport: OutcomeMarketTransport) {
   return events.map((event) => {
     const index = event.targetLabel?.match(/\d+/)?.[0];
     const candle = candles.find((item) => new Date(item.closeTime).toISOString() === event.occurredAt);
@@ -242,7 +431,12 @@ function buildEventRows(events: AiOutcomeEvent[], candles: AiFuturesCandle[]) {
       candle_open_at: candle ? new Date(candle.openTime).toISOString() : null,
       candle_close_at: candle ? new Date(candle.closeTime).toISOString() : null,
       was_ambiguous: event.wasAmbiguous,
-      metadata: { realized_r: event.realizedR }
+      metadata: {
+        realized_r: event.realizedR,
+        venue: "binance_usdm",
+        market_data_transport: transport,
+        source: outcomeProviderLabel(transport)
+      }
     };
   });
 }
@@ -256,6 +450,126 @@ function toDatabaseStatus(state: AiOutcomeState): string {
 
 function terminalStatus(status: string): boolean {
   return ["tp_hit", "sl_hit", "expired", "invalidated"].includes(status);
+}
+
+function configuredOutcomeMarketTransport(): ConfiguredOutcomeMarketTransport {
+  const value = Deno.env.get("AI_BINANCE_DATA_TRANSPORT")?.trim().toLowerCase() || "auto";
+  if (value === "auto" || value === "direct" || value === "coinglass") return value;
+  throw new AiHttpError(
+    503,
+    "invalid_market_data_transport",
+    "AI_BINANCE_DATA_TRANSPORT must be auto, direct, or coinglass."
+  );
+}
+
+function outcomeProviderLabel(transport: OutcomeMarketTransport): string {
+  return transport === "coinglass" ? "CoinGlass API · Binance USD-M Futures" : "Binance USD-M Futures";
+}
+
+function assertCompleteClosedCandleRange(
+  candles: AiFuturesCandle[],
+  startMs: number,
+  endMs: number,
+  transport: OutcomeMarketTransport
+): void {
+  const expectedFirstOpen = Math.ceil(startMs / oneMinuteMs) * oneMinuteMs;
+  const expectedLastOpen = Math.floor(endMs / oneMinuteMs) * oneMinuteMs - oneMinuteMs;
+  if (expectedFirstOpen > expectedLastOpen) return;
+  if (!candles.length || candles[0].openTime !== expectedFirstOpen || candles[candles.length - 1].openTime !== expectedLastOpen) {
+    throw new OutcomeProviderError(
+      "outcome_provider_incomplete",
+      `${outcomeProviderLabel(transport)} returned an incomplete closed 1-minute outcome-candle range.`,
+      transport
+    );
+  }
+}
+
+async function logOutcomeProviderSuccess(
+  supabase: SupabaseClient,
+  runId: string | null,
+  setupId: string,
+  result: OutcomeCandleResult,
+  startMs: number,
+  endMs: number
+) {
+  await supabase.from("ai_provider_events").insert({
+    pipeline_run_id: runId,
+    provider: result.transport === "coinglass" ? "coinglass" : "binance_usdm",
+    data_category: "outcome_candles_1m",
+    status: "success",
+    source_timestamp: result.candles.length
+      ? new Date(result.candles[result.candles.length - 1].closeTime).toISOString()
+      : null,
+    retry_count: 0,
+    metadata: {
+      setup_id: setupId,
+      venue: "binance_usdm",
+      transport: result.transport,
+      source: outcomeProviderLabel(result.transport),
+      fallback_from_binance_http_451: result.fellBackFromBinance451,
+      candle_count: result.candles.length,
+      requested_start_at: new Date(startMs).toISOString(),
+      requested_end_at: new Date(endMs).toISOString()
+    }
+  });
+}
+
+async function logOutcomeProviderFailure(
+  supabase: SupabaseClient,
+  runId: string | null,
+  setupId: string,
+  error: unknown
+) {
+  const transport = error instanceof OutcomeProviderError ? error.transport : null;
+  const upstreamStatus = error instanceof OutcomeProviderError ? error.upstreamStatus : null;
+  await supabase.from("ai_provider_events").insert({
+    pipeline_run_id: runId,
+    provider: transport === "coinglass" ? "coinglass" : transport === "binance_direct" ? "binance_usdm" : "market_data_transport",
+    data_category: "outcome_candles_1m",
+    status: upstreamStatus === 429
+      ? "rate_limited"
+      : error instanceof OutcomeProviderError && error.code.includes("interval_unavailable")
+        ? "error"
+      : error instanceof OutcomeProviderError && error.code.includes("invalid")
+        ? "invalid_response"
+        : error instanceof OutcomeProviderError && error.code.includes("unavailable")
+          ? "timeout"
+          : "error",
+    http_status: upstreamStatus,
+    retry_count: 0,
+    error_code: readCode(error),
+    error_detail: error instanceof Error ? error.message.slice(0, 900) : "Outcome market-data provider failed.",
+    metadata: {
+      setup_id: setupId,
+      venue: "binance_usdm",
+      transport,
+      fallback_from_binance_http_451: error instanceof OutcomeProviderError && error.fellBackFromBinance451
+    }
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function providerNumber(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string" || !value.trim()) return Number.NaN;
+  return Number(value);
+}
+
+class OutcomeProviderError extends AiHttpError {
+  constructor(
+    code: string,
+    message: string,
+    public readonly transport: OutcomeMarketTransport,
+    public readonly upstreamStatus: number | null = null,
+    responseStatus = 502,
+    public fellBackFromBinance451 = false
+  ) {
+    super(responseStatus, code, message);
+    this.name = "OutcomeProviderError";
+  }
 }
 
 async function releaseLease(supabase: SupabaseClient, row: OutcomeRow) {

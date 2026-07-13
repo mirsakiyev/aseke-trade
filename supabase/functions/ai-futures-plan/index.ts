@@ -74,25 +74,25 @@ Deno.serve(async (request) => {
         maximumLeverage: Number(config.maximum_leverage)
       });
     } catch {
-      throw new AiHttpError(503, "live_mark_unavailable", "The current Binance USD-M mark price is unavailable. Request the plan again later.");
+      throw new AiHttpError(503, "live_price_unavailable", "The current Binance BTCUSDT futures price is unavailable. Request the plan again later.");
     }
     const markTimestamp = Date.parse(liveMark.timestamp);
     const markAgeMs = now - markTimestamp;
     if (!Number.isFinite(markTimestamp) || markAgeMs < -5_000 || markAgeMs > Number(config.live_price_stale_after_seconds) * 1_000) {
-      throw new AiHttpError(503, "live_mark_stale", "The current Binance USD-M mark price is stale or invalid.");
+      throw new AiHttpError(503, "live_price_stale", "The current Binance BTCUSDT futures price is stale or invalid.");
     }
     const setupLevels = readSetupLevels(setup);
     if (!setupLevels || setupLevels.direction !== plan.direction) {
       throw new AiHttpError(503, "invalid_setup_levels", "The source setup levels are invalid.");
     }
     if (liveMark.price < setupLevels.entryLow || liveMark.price > setupLevels.entryHigh) {
-      throw new AiHttpError(409, "setup_not_at_entry", "The live mark price moved outside the approved entry zone. Request a fresh analysis.");
+      throw new AiHttpError(409, "setup_not_at_entry", "The current futures price moved outside the approved entry zone. Request a fresh analysis.");
     }
     if (
       (setupLevels.direction === "long" && (liveMark.price <= setupLevels.invalidation || liveMark.price >= setupLevels.finalTarget)) ||
       (setupLevels.direction === "short" && (liveMark.price >= setupLevels.invalidation || liveMark.price <= setupLevels.finalTarget))
     ) {
-      throw new AiHttpError(409, "setup_no_longer_valid", "The live mark price invalidated or completed this setup. Request a fresh analysis.");
+      throw new AiHttpError(409, "setup_no_longer_valid", "The current futures price invalidated or completed this setup. Request a fresh analysis.");
     }
     const targets = Array.isArray(setup.take_profits) ? setup.take_profits : [];
     return aiJsonResponse(request, {
@@ -112,7 +112,13 @@ Deno.serve(async (request) => {
           closePercent: String(target.allocation_percent)
         })),
         expiresAt: setup.setup_expires_at,
-        source: "ASEKE TRADE AI Futures Analyst"
+        source: "ASEKE TRADE AI Futures Analyst",
+        priceValidation: {
+          source: liveMark.source,
+          transport: liveMark.transport,
+          priceKind: liveMark.priceKind,
+          observedAt: liveMark.timestamp
+        }
       }
     });
   } catch (error) {

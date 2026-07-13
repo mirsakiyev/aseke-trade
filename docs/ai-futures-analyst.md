@@ -17,14 +17,15 @@ Applying the migration therefore does not expose analysis to users or start paid
 ## V1 scope
 
 - Symbol: `BTCUSDT` perpetual only
-- Market provider: Binance USD-M Futures only
+- Market venue: Binance USD-M Futures only
+- Server transport: direct Binance public API or CoinGlass delivery of the exact Binance BTCUSDT instrument
 - Entry timeframe: closed 15-minute candles
 - Context timeframes: closed 1-hour and 4-hour candles
 - Style: intraday
 - Margin model: isolated only
 - Contextual sentiment: Alternative.me Bitcoin Fear & Greed Index
 - No news or social-media sentiment
-- No spot-price or alternate-exchange fallback
+- No spot-price, aggregate-market, or alternate-exchange fallback
 - No automatic or real trading
 
 The possible user-facing states are `NO_TRADE`, `WAIT_FOR_ENTRY`, `LONG_SETUP`, `SHORT_SETUP`, `DATA_UNAVAILABLE`, and `RISK_LIMIT_EXCEEDED`. The engine is expected to return no trade when its evidence or risk constraints are insufficient.
@@ -37,7 +38,7 @@ The request path is:
 2. `ai-futures-analyze` verifies the bearer token with Supabase Auth. It then calls the service-only Academy access helper; it does not trust client profile fields.
 3. The database atomically applies the feature state, emergency switch, idempotency key, minimum refresh period, and per-user rate limit.
 4. The shared orchestrator reuses the market snapshot and setup for the current closed 15-minute candle and engine/config version. A lease prevents concurrent duplicate setup generation.
-5. The server-only market adapter fetches normalized Binance USD-M data and Alternative.me sentiment. It rejects missing, malformed, or stale required data and never substitutes spot data.
+5. The server-only market adapter fetches normalized Binance USD-M data and Alternative.me sentiment. It can use CoinGlass only as an explicitly attributed delivery transport for the exact Binance BTCUSDT instrument. It rejects missing, malformed, mismatched, or stale required data and never substitutes spot or another exchange.
 6. Pure TypeScript engines calculate indicators and market features, score deterministic long and short candidates, and produce entry, stop, targets, invalidation, and expiration.
 7. If enabled, the OpenAI Responses API reviews the deterministic candidate with a strict Structured Outputs JSON schema. The model receives common market features and the candidate, not exchange credentials or a chart screenshot. It cannot introduce prices or position sizing.
 8. The final deterministic validator rechecks freshness, snapshot identity, price ordering, reward-to-risk, target allocations, leverage, margin, fees/slippage, quantity rounding, maximum loss, estimated liquidation safety, and Academy access.
@@ -47,7 +48,7 @@ The request path is:
 Two server-only background functions support shared generation and honest outcome tracking:
 
 - `ai-futures-pipeline` checks for the newest closed analysis candle and creates or reuses one shared snapshot/setup.
-- `ai-futures-outcomes` leases active setup outcomes, reads subsequent closed one-minute Binance USD-M candles, and saves transitions/events atomically and idempotently. Historical data before setup creation is not used for scoring an outcome.
+- `ai-futures-outcomes` leases active setup outcomes, reads subsequent closed one-minute Binance USD-M candles through the configured transport, and saves transitions/events atomically and idempotently. Historical data before setup creation is not used for scoring an outcome.
 
 The reusable chart component remains read-only on the Analyst page. Demo Trade and AI analysis are lazy-loaded so the regular application bundle does not eagerly load the chart or analyst code.
 
@@ -80,7 +81,21 @@ The market adapter uses public endpoints under `https://fapi.binance.com` for:
 - taker buy/sell ratio
 - exchange price, quantity, and notional filters
 
-No Binance API key is required or supported in v1. Requests run server-side with an 8-second timeout and at most two attempts. Required responses are structurally validated. There is no silent Binance spot, Binance.US, Coinbase, or other-exchange fallback.
+No Binance API key is required or supported in v1. Requests run server-side with an 8-second timeout and at most two attempts. Required responses are structurally validated. There is no silent Binance spot, Binance.US, Coinbase, aggregate-market, or other-exchange fallback.
+
+### CoinGlass transport for restricted Edge regions
+
+Some hosted Edge regions receive Binance HTTP `451` because direct access is not legally available from that region. The adapter supports CoinGlass as a server-only **transport for Binance BTCUSDT futures data**, not as a different market venue:
+
+- `AI_BINANCE_DATA_TRANSPORT=direct` uses only `fapi.binance.com` and fails closed on any provider failure.
+- `AI_BINANCE_DATA_TRANSPORT=auto` tries direct Binance and falls back to CoinGlass only after HTTP `451`. It does not mask `403`, `429`, `5xx`, network, or malformed-response failures.
+- `AI_BINANCE_DATA_TRANSPORT=coinglass` skips the restricted direct request. This is the recommended production setting after confirming that the Supabase Edge region consistently receives `451`.
+
+Every CoinGlass request uses the server-side `CG-API-KEY` header, requires response `code = "0"`, and validates the exact Binance `BTCUSDT` instrument. Responses and provider logs say `CoinGlass API · Binance USD-M Futures`; the browser never receives the key. CoinGlass 15-minute analysis and one-minute outcome history require a **Standard plan or higher**. Hobbyist and Startup interval limits are insufficient for this feature. See the official [authentication](https://docs.coinglass.com/reference/authentication), [futures OHLC history](https://docs.coinglass.com/reference/price-ohlc-history), and [pair markets](https://docs.coinglass.com/reference/pairs-markets) references.
+
+CoinGlass documents `current_price`, not Binance's native mark price. The application therefore labels it as a current futures price and stores `priceKind = current_futures_price`. CoinGlass OHLC exposes USD volume, so the adapter derives base volume as `volume_usd / close` and leaves unavailable candle taker-volume fields at zero. CoinGlass instrument metadata supplies the price tick and maximum leverage but not quantity step, minimum quantity, or minimum notional; the fallback uses the audited `binance-btcusdt-2026-07-12` safety defaults (`0.001` BTC step/minimum and `100` USDT minimum notional). Revalidate these constants and CoinGlass funding-rate units against live provider data before production rollout.
+
+CoinGlass is an Edge Function secret/configuration only. It is **not** a Supabase Vault Cron secret, so the existing three Vault entries and Cron schedules do not change.
 
 ### Alternative.me Fear & Greed
 
@@ -118,19 +133,24 @@ VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
 | `AI_CRON_SECRET` | For both Cron functions | Independent high-entropy value checked in `x-ai-cron-secret`. Do not reuse the service-role key. |
 | `AI_ALLOWED_ORIGINS` | Recommended | Comma-separated browser origins, with no trailing paths. Example: `https://aseketrade.com,https://www.aseketrade.com`. |
 | `AI_OUTCOME_BATCH_LIMIT` | No | Positive outcome batch size; defaults to `100` and the database claim caps it at `500`. |
+| `COINGLASS_API_KEY` | When transport is `coinglass`, or when `auto` must recover from HTTP 451 | Server-only CoinGlass credential. The required 15m/1m history needs Standard tier or higher. |
+| `AI_BINANCE_DATA_TRANSPORT` | Recommended | `auto` (default), `direct`, or `coinglass`. Use `coinglass` in a confirmed HTTP-451 Edge region. |
 
-Binance and Alternative.me use public data, so there is no `BINANCE_API_KEY` or sentiment-provider key.
+Binance and Alternative.me use public data, so there is no `BINANCE_API_KEY` or sentiment-provider key. CoinGlass is authenticated only when that transport is selected.
 
 Set hosted secrets without putting literal values in source control:
 
 ```bash
 export SUPABASE_SERVICE_ROLE_KEY_VALUE='copy-from-Supabase-dashboard'
 export OPENAI_API_KEY_VALUE='copy-from-OpenAI'
+export COINGLASS_API_KEY_VALUE='copy-from-CoinGlass'
 export AI_CRON_SECRET_VALUE="$(openssl rand -hex 32)"
 
 npx supabase@latest secrets set \
   SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY_VALUE" \
   OPENAI_API_KEY="$OPENAI_API_KEY_VALUE" \
+  COINGLASS_API_KEY="$COINGLASS_API_KEY_VALUE" \
+  AI_BINANCE_DATA_TRANSPORT='coinglass' \
   AI_CRON_SECRET="$AI_CRON_SECRET_VALUE" \
   AI_ALLOWED_ORIGINS='https://aseketrade.com,https://www.aseketrade.com' \
   AI_OUTCOME_BATCH_LIMIT='100'
@@ -139,10 +159,10 @@ npx supabase@latest secrets set \
 Keep the generated Cron value available long enough to store the identical value in Supabase Vault. Clear the shell variables afterward:
 
 ```bash
-unset SUPABASE_SERVICE_ROLE_KEY_VALUE OPENAI_API_KEY_VALUE AI_CRON_SECRET_VALUE
+unset SUPABASE_SERVICE_ROLE_KEY_VALUE OPENAI_API_KEY_VALUE COINGLASS_API_KEY_VALUE AI_CRON_SECRET_VALUE
 ```
 
-Use separate secrets for local, staging, and production projects. Rotate `OPENAI_API_KEY` and `AI_CRON_SECRET` immediately if either is exposed.
+Use separate secrets for local, staging, and production projects. Rotate `OPENAI_API_KEY`, `COINGLASS_API_KEY`, and `AI_CRON_SECRET` immediately if any is exposed.
 
 ## Production migration and deployment
 
@@ -189,6 +209,20 @@ npx supabase@latest functions deploy ai-futures-outcomes --no-verify-jwt
 ```
 
 Do not deploy `ai-futures-analyze` or `ai-futures-plan` with `--no-verify-jwt`.
+
+For a Supabase Edge region that has already been confirmed to receive Binance HTTP `451`, pin the explicit CoinGlass transport and redeploy all four functions so analysis, plan validation, cached-price refresh, and outcome reconciliation use the same setting:
+
+```bash
+npx supabase@latest secrets set AI_BINANCE_DATA_TRANSPORT=coinglass
+npx supabase@latest secrets list
+
+npx supabase@latest functions deploy ai-futures-analyze
+npx supabase@latest functions deploy ai-futures-plan
+npx supabase@latest functions deploy ai-futures-pipeline --no-verify-jwt
+npx supabase@latest functions deploy ai-futures-outcomes --no-verify-jwt
+```
+
+The secrets list must contain both `AI_BINANCE_DATA_TRANSPORT` and `COINGLASS_API_KEY`. Supabase displays digests, not secret values. Do not create or update a Vault entry for either value.
 
 ### 5. Create the named Vault entries
 
@@ -376,6 +410,8 @@ Create `supabase/.env.ai-futures.local` with local-only values. The repository's
 ```bash
 SERVICE_ROLE_KEY=YOUR_LOCAL_SERVICE_ROLE_KEY_FROM_SUPABASE_STATUS
 OPENAI_API_KEY=YOUR_DEVELOPMENT_OPENAI_KEY
+COINGLASS_API_KEY=YOUR_DEVELOPMENT_COINGLASS_KEY
+AI_BINANCE_DATA_TRANSPORT=coinglass
 AI_CRON_SECRET=YOUR_LOCAL_RANDOM_CRON_SECRET
 AI_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 AI_OUTCOME_BATCH_LIMIT=25
@@ -629,7 +665,7 @@ Recommended order:
 5. Apply a forward migration for schema corrections; do not edit a migration already applied to production.
 6. Restore first in shadow mode, observe, then deliberately return live.
 
-Rotate the Cron or OpenAI secret as part of rollback whenever credential exposure is suspected. Updating `AI_CRON_SECRET` requires updating the matching `ai_futures_cron_secret` Vault value before re-enabling jobs.
+Rotate the Cron, OpenAI, or CoinGlass secret as part of rollback whenever credential exposure is suspected. Updating `AI_CRON_SECRET` requires updating the matching `ai_futures_cron_secret` Vault value before re-enabling jobs; rotating `COINGLASS_API_KEY` does not require a Vault change.
 
 ## Safety notes
 

@@ -122,6 +122,8 @@ Deno.serve(async (request) => {
       freshness: common.snapshot.sourceTimestamps,
       deterministicOnly: final.deterministicOnly,
       scoreWeights: normalizeScoreWeights(finalConfig.score_weights),
+      source: common.snapshot.source,
+      marketDataTransport: common.snapshot.marketDataTransport,
       message: messageForStatus(final.status, final.errors, final.deterministicOnly)
     });
     await supabase.from("ai_analysis_requests").update({
@@ -239,12 +241,11 @@ function blockedResponse(request: Request, requestId: string, status: string, re
   return aiJsonResponse(request, { error: code, message, requestId, retryAfterSeconds: Number.isFinite(retryAfter) ? retryAfter : null }, status === "rate_limited" ? 429 : 503);
 }
 
-function responsePayload(input: Omit<AiAnalysisResponse, "source" | "sentimentAttribution" | "shadowMode" | "setupExpiration">): AiAnalysisResponse {
+function responsePayload(input: Omit<AiAnalysisResponse, "sentimentAttribution" | "shadowMode" | "setupExpiration">): AiAnalysisResponse {
   return {
     ...input,
     setupExpiration: input.candidate?.expiresAt ?? null,
     shadowMode: false,
-    source: "Binance USD-M Futures",
     sentimentAttribution: {
       label: "Alternative.me Crypto Fear & Greed Index",
       url: "https://alternative.me/crypto/fear-and-greed-index/"

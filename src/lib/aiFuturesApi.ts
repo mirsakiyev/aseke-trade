@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { AiAnalysisResponse, AiRiskProfileInput } from "./aiFuturesTypes.ts";
+import type { AiAnalysisResponse, AiMarketDataSource, AiMarketDataTransport, AiRiskProfileInput } from "./aiFuturesTypes.ts";
 
 export interface AiDemoTradePrefill {
   id: string;
@@ -15,6 +15,12 @@ export interface AiDemoTradePrefill {
   takeProfits: Array<{ price: string; closePercent: string }>;
   expiresAt: string;
   source: string;
+  priceValidation: {
+    source: AiMarketDataSource;
+    transport: AiMarketDataTransport;
+    priceKind: "exchange_mark" | "current_futures_price";
+    observedAt: string;
+  };
 }
 
 export interface AiAdminConfig {

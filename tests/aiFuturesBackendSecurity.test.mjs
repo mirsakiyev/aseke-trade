@@ -275,7 +275,7 @@ test("invalid, refused, or numerically embellished AI output cannot become a sig
   assert.match(orchestratorSource, /throw new AiReviewError\("ai_calls_disabled"/);
 });
 
-test("provider outages and malformed futures responses fail closed without spot or exchange fallback", async () => {
+test("provider outages and malformed futures responses fail closed without spot or alternate-exchange fallback", async () => {
   let calls = 0;
   await assert.rejects(
     marketModule.fetchCurrentMarkPrice(async () => {
@@ -312,15 +312,268 @@ test("provider outages and malformed futures responses fail closed without spot 
   assert.match(planSource, /outcome\.status !== "awaiting_entry"/);
   assert.match(planSource, /fetchCurrentMarkPrice\(fetch,/);
   assert.match(planSource, /liveMark\.price < setupLevels\.entryLow \|\| liveMark\.price > setupLevels\.entryHigh/);
+  assert.match(analyzeSource, /source:\s*common\.snapshot\.source/);
+  assert.match(analyzeSource, /marketDataTransport:\s*common\.snapshot\.marketDataTransport/);
+  assert.doesNotMatch(analyzeSource, /source:\s*"Binance USD-M Futures"/);
+  assert.match(planSource, /priceValidation:[\s\S]*source:\s*liveMark\.source[\s\S]*transport:\s*liveMark\.transport/);
+});
+
+test("the direct Binance transport never calls CoinGlass when Binance succeeds", async () => {
+  const calls = [];
+  const mark = await marketModule.fetchCurrentMarkPrice(async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).startsWith("https://fapi.binance.com/fapi/v1/premiumIndex")) {
+      return jsonResponse(binancePremiumFixture());
+    }
+    throw new Error(`Unexpected provider URL: ${url}`);
+  }, {
+    transport: "auto",
+    coinglassApiKey: "coinglass-server-key",
+    retryCount: 0
+  });
+
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /^https:\/\/fapi\.binance\.com\//);
+  assert.equal(mark.price, 63_842);
+  assert.equal(mark.indexPrice, 63_840);
+  assert.equal(mark.source, "Binance USD-M Futures");
+  assert.equal(mark.transport, "binance_direct");
+});
+
+test("auto transport falls back to CoinGlass only for Binance HTTP 451", async () => {
+  const calls = [];
+  const mark = await marketModule.fetchCurrentMarkPrice(async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).startsWith("https://fapi.binance.com/")) return jsonResponse({}, 451);
+    if (String(url).includes("/api/futures/pairs-markets")) return jsonResponse(coinglassMarketsFixture());
+    throw new Error(`Unexpected provider URL: ${url}`);
+  }, {
+    transport: "auto",
+    coinglassApiKey: "coinglass-server-key",
+    retryCount: 0
+  });
+
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].url, /^https:\/\/fapi\.binance\.com\//);
+  assert.match(calls[1].url, /^https:\/\/open-api-v4\.coinglass\.com\/api\/futures\/pairs-markets\?/);
+  assert.equal(mark.price, 63_842);
+  assert.equal(mark.indexPrice, 63_840);
+  assert.equal(mark.source, "CoinGlass API · Binance USD-M Futures");
+  assert.equal(mark.transport, "coinglass");
+  assert.equal(mark.priceKind, "current_futures_price");
+});
+
+test("auto transport does not mask Binance 403, rate limits, outages, network errors, or malformed data", async (t) => {
+  for (const status of [403, 429, 500]) {
+    await t.test(`HTTP ${status}`, async () => {
+      const calls = [];
+      await assert.rejects(
+        marketModule.fetchCurrentMarkPrice(async (url) => {
+          calls.push(String(url));
+          return jsonResponse({}, status);
+        }, {
+          transport: "auto",
+          coinglassApiKey: "coinglass-server-key",
+          retryCount: 0
+        }),
+        (error) => error?.code === "provider_http_error"
+      );
+      assert.equal(calls.length, 1);
+      assert.ok(calls.every((url) => url.startsWith("https://fapi.binance.com/")));
+    });
+  }
+
+  await t.test("network failure", async () => {
+    const calls = [];
+    await assert.rejects(
+      marketModule.fetchCurrentMarkPrice(async (url) => {
+        calls.push(String(url));
+        throw new Error("offline");
+      }, {
+        transport: "auto",
+        coinglassApiKey: "coinglass-server-key",
+        retryCount: 0
+      }),
+      (error) => error?.code === "provider_unavailable"
+    );
+    assert.equal(calls.length, 1);
+    assert.ok(calls.every((url) => url.startsWith("https://fapi.binance.com/")));
+  });
+
+  await t.test("malformed premium payload", async () => {
+    const calls = [];
+    await assert.rejects(
+      marketModule.fetchCurrentMarkPrice(async (url) => {
+        calls.push(String(url));
+        return jsonResponse({});
+      }, {
+        transport: "auto",
+        coinglassApiKey: "coinglass-server-key",
+        retryCount: 0
+      }),
+      (error) => error?.code === "malformed_premium"
+    );
+    assert.equal(calls.length, 1);
+    assert.ok(calls.every((url) => url.startsWith("https://fapi.binance.com/")));
+  });
+});
+
+test("CoinGlass transport is explicit, server-authenticated, and pinned to Binance BTCUSDT", async () => {
+  const calls = [];
+  const mark = await marketModule.fetchCurrentMarkPrice(async (url, options) => {
+    calls.push({ url: String(url), options });
+    return jsonResponse(coinglassMarketsFixture());
+  }, {
+    transport: "coinglass",
+    coinglassApiKey: "coinglass-server-key",
+    retryCount: 0
+  });
+
+  assert.equal(calls.length, 1, "explicit CoinGlass mode must skip the restricted direct Binance request");
+  const request = calls[0];
+  const requestUrl = new URL(request.url);
+  assert.equal(requestUrl.origin, "https://open-api-v4.coinglass.com");
+  assert.equal(requestUrl.pathname, "/api/futures/pairs-markets");
+  assert.equal(requestUrl.searchParams.get("symbol"), "BTC");
+  assert.equal(requestUrl.searchParams.has("apiKey"), false);
+  assert.equal(requestUrl.searchParams.has("api_key"), false);
+  assert.equal(new Headers(request.options?.headers).get("CG-API-KEY"), "coinglass-server-key");
+  assert.equal(mark.source, "CoinGlass API · Binance USD-M Futures");
+  assert.equal(mark.transport, "coinglass");
+  assert.doesNotMatch(request.url, /coinbase|kraken|bybit|spot/i);
+});
+
+test("CoinGlass transport fails explicitly without a key and makes no provider request", async () => {
+  let calls = 0;
+  await assert.rejects(
+    marketModule.fetchCurrentMarkPrice(async () => {
+      calls += 1;
+      throw new Error("must not be called");
+    }, {
+      transport: "coinglass",
+      coinglassApiKey: "",
+      retryCount: 0
+    }),
+    (error) => error?.code === "missing_coinglass_key" && error?.status === 503
+  );
+  assert.equal(calls, 0);
+});
+
+test("a CoinGlass snapshot stays complete and explicitly attributes Binance BTCUSDT transport", async () => {
+  const now = Date.parse("2026-07-12T12:00:00.000Z");
+  const calls = [];
+  const snapshot = await marketModule.fetchAiFuturesMarketSnapshot({
+    now,
+    transport: "coinglass",
+    coinglassApiKey: "coinglass-server-key",
+    retryCount: 0,
+    fetchImpl: async (url, options) => {
+      const requestUrl = new URL(String(url));
+      calls.push({ url: requestUrl, options });
+      if (requestUrl.origin === "https://api.alternative.me") {
+        return jsonResponse({
+          data: [{ value: "48", value_classification: "Neutral", timestamp: String(now / 1000) }]
+        });
+      }
+      assert.equal(requestUrl.origin, "https://open-api-v4.coinglass.com");
+      switch (requestUrl.pathname) {
+        case "/api/futures/price/history": {
+          assert.equal(requestUrl.searchParams.get("exchange"), "Binance");
+          assert.equal(requestUrl.searchParams.get("symbol"), "BTCUSDT");
+          const interval = requestUrl.searchParams.get("interval");
+          const intervalMs = interval === "15m" ? 900_000 : interval === "1h" ? 3_600_000 : 14_400_000;
+          return jsonResponse(coinglassEnvelope(coinglassCandleHistory(now, intervalMs)));
+        }
+        case "/api/futures/pairs-markets":
+          assert.equal(requestUrl.searchParams.get("symbol"), "BTC");
+          return jsonResponse(coinglassMarketsFixture());
+        case "/api/futures/open-interest/history":
+          return jsonResponse(coinglassEnvelope([
+            { time: now - 900_000, open: 600_000, high: 605_000, low: 599_000, close: 602_000 },
+            { time: now - 1, open: 602_000, high: 611_000, low: 601_000, close: 610_000 }
+          ]));
+        case "/api/futures/global-long-short-account-ratio/history":
+          return jsonResponse(coinglassEnvelope([
+            { time: now - 900_000, global_account_long_short_ratio: 1.02 },
+            { time: now - 1, global_account_long_short_ratio: 1.04 }
+          ]));
+        case "/api/futures/top-long-short-position-ratio/history":
+          return jsonResponse(coinglassEnvelope([
+            { time: now - 900_000, top_position_long_short_ratio: 1.1 },
+            { time: now - 1, top_position_long_short_ratio: 1.12 }
+          ]));
+        case "/api/futures/v2/taker-buy-sell-volume/history":
+          return jsonResponse(coinglassEnvelope([
+            { time: now - 900_000, taker_buy_volume_usd: 2_000_000, taker_sell_volume_usd: 1_900_000 },
+            { time: now - 1, taker_buy_volume_usd: 2_100_000, taker_sell_volume_usd: 2_000_000 }
+          ]));
+        case "/api/futures/supported-exchange-pairs":
+          assert.equal(requestUrl.searchParams.get("exchange"), "Binance");
+          return jsonResponse(coinglassEnvelope({
+            Binance: [{ exchange_name: "Binance", instrument_id: "BTCUSDT", price_tick_size: "0.1", max_leverage: 125 }]
+          }));
+        default:
+          throw new Error(`Unexpected provider URL: ${requestUrl}`);
+      }
+    }
+  });
+
+  assert.equal(snapshot.symbol, "BTCUSDT");
+  assert.equal(snapshot.source, "CoinGlass API · Binance USD-M Futures");
+  assert.equal(snapshot.marketDataTransport, "coinglass");
+  assert.equal(snapshot.futures.priceKind, "current_futures_price");
+  assert.equal(snapshot.futures.markPrice, 63_842);
+  assert.equal(snapshot.futures.indexPrice, 63_840);
+  assert.equal(snapshot.candles["15m"].length, 260);
+  assert.equal(snapshot.candles["1h"].length, 260);
+  assert.equal(snapshot.candles["4h"].length, 260);
+  assert.ok(snapshot.sourceTimestamps
+    .filter((timestamp) => timestamp.category !== "fear_greed")
+    .every((timestamp) => timestamp.source === "CoinGlass API · Binance USD-M Futures"));
+  assert.ok(calls.every(({ url }) => !url.href.startsWith("https://fapi.binance.com/")));
+  for (const { url, options } of calls.filter(({ url }) => url.origin === "https://open-api-v4.coinglass.com")) {
+    assert.equal(url.searchParams.has("apiKey"), false);
+    assert.equal(url.searchParams.has("api_key"), false);
+    assert.equal(new Headers(options?.headers).get("CG-API-KEY"), "coinglass-server-key");
+  }
+});
+
+test("CoinGlass rejects unsuccessful envelopes and responses without the exact Binance BTCUSDT pair", async (t) => {
+  await t.test("non-success envelope", async () => {
+    await assert.rejects(
+      marketModule.fetchCurrentMarkPrice(
+        async () => jsonResponse({ code: "40001", msg: "API key invalid", data: [] }),
+        { transport: "coinglass", coinglassApiKey: "coinglass-server-key", retryCount: 0 }
+      ),
+      (error) => typeof error?.code === "string" && error.code.includes("coinglass")
+    );
+  });
+
+  for (const [label, data] of [
+    ["wrong exchange", [{ ...coinglassMarketRow(), exchange_name: "Bybit" }]],
+    ["wrong instrument", [{ ...coinglassMarketRow(), instrument_id: "ETHUSDT" }]],
+    ["aggregate-only payload", [{ symbol: "BTC", current_price: 63_842, index_price: 63_840 }]]
+  ]) {
+    await t.test(label, async () => {
+      await assert.rejects(
+        marketModule.fetchCurrentMarkPrice(
+          async () => jsonResponse({ code: "0", msg: "success", data }),
+          { transport: "coinglass", coinglassApiKey: "coinglass-server-key", retryCount: 0 }
+        ),
+        (error) => typeof error?.code === "string" && error.code.includes("coinglass")
+      );
+    });
+  }
 });
 
 test("outcome reconciliation paginates closed futures candles with bounded retry and atomic leases", () => {
   assert.match(outcomesSource, /const maximumCandlePagesPerSetup = 5/);
   assert.match(outcomesSource, /const maximumProviderAttempts = 2/);
   assert.match(outcomesSource, /for \(let page = 0; page < maximumCandlePagesPerSetup && cursor < endMs; page \+= 1\)/);
-  assert.match(outcomesSource, /\.filter\(\(candle\) => candle\.closeTime < endMs\)/);
+  assert.match(outcomesSource, /candle\.closeTime < endMs/);
+  assert.match(outcomesSource, /candle\.openTime >= cursor/);
   assert.match(outcomesSource, /const nextCursor = pageCandles\[pageCandles\.length - 1\]\.closeTime \+ 1/);
-  assert.match(outcomesSource, /if \(nextCursor <= cursor\) throw new AiHttpError\(502, "outcome_provider_cursor"/);
+  assert.match(outcomesSource, /if \(nextCursor <= cursor\)[\s\S]{0,240}"outcome_provider_cursor"/);
   assert.match(outcomesSource, /const controller = new AbortController\(\)/);
   assert.match(outcomesSource, /response\.status === 429 \|\| response\.status >= 500/);
   assert.match(outcomesSource, /claim_ai_setup_outcomes_for_reconciliation/);
@@ -363,8 +616,8 @@ test("AI secrets and provider calls never enter the Vite client bundle", async (
     await source("../src/pages/AiFuturesAnalyst.tsx"),
     await source("../src/pages/AdminAiFuturesAnalyst.tsx")
   ].join("\n");
-  assert.doesNotMatch(clientSource, /SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE_KEY|OPENAI_API_KEY|AI_CRON_SECRET/);
-  assert.doesNotMatch(aiClientSource, /api\.openai\.com|fapi\.binance\.com|api\.alternative\.me/);
+  assert.doesNotMatch(clientSource, /SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE_KEY|OPENAI_API_KEY|COINGLASS_API_KEY|AI_CRON_SECRET/);
+  assert.doesNotMatch(aiClientSource, /api\.openai\.com|fapi\.binance\.com|open-api-v4\.coinglass\.com|api\.alternative\.me/);
   assert.doesNotMatch(clientSource, /\bsk-[A-Za-z0-9_-]{16,}/);
   assert.match(clientApiSource, /supabase\.functions\.invoke\("ai-futures-analyze"/);
   assert.match(clientApiSource, /supabase\.functions\.invoke\("ai-futures-plan"/);
@@ -403,6 +656,58 @@ function compactFeatureFixture() {
     takerFlow: "buyers",
     timeframes: {}
   };
+}
+
+function binancePremiumFixture(overrides = {}) {
+  return {
+    symbol: "BTCUSDT",
+    markPrice: "63842.0",
+    indexPrice: "63840.0",
+    lastFundingRate: "0.00002007",
+    nextFundingTime: 1_784_000_000_000,
+    time: 1_783_840_000_000,
+    ...overrides
+  };
+}
+
+function coinglassMarketRow(overrides = {}) {
+  return {
+    exchange_name: "Binance",
+    instrument_id: "BTCUSDT",
+    current_price: 63_842,
+    index_price: 63_840,
+    funding_rate: 0.002007,
+    next_funding_time: 1_784_000_000_000,
+    open_interest_quantity: 612_345.25,
+    open_interest_usd: 39_087_000_000,
+    open_interest_change_percent_24h: 1.25,
+    long_volume_usd: 2_000_000,
+    short_volume_usd: 1_800_000,
+    ...overrides
+  };
+}
+
+function coinglassMarketsFixture(rows = [coinglassMarketRow()]) {
+  return { code: "0", msg: "success", data: rows };
+}
+
+function coinglassEnvelope(data) {
+  return { code: "0", msg: "success", data };
+}
+
+function coinglassCandleHistory(now, intervalMs, count = 260) {
+  const firstOpenTime = now - (count * intervalMs);
+  return Array.from({ length: count }, (_, index) => {
+    const open = 60_000 + index;
+    return {
+      time: firstOpenTime + (index * intervalMs),
+      open,
+      high: open + 25,
+      low: open - 20,
+      close: open + 5,
+      volume_usd: 1_000_000 + index
+    };
+  });
 }
 
 function requestWithOutput(text) {

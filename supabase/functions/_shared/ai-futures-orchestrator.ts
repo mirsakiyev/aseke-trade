@@ -373,25 +373,47 @@ function normalizeScoreWeights(value: Record<string, number>): AiScoreWeights {
 
 async function logProviderSuccess(supabase: SupabaseClient, snapshot: AiNormalizedMarketSnapshot) {
   await supabase.from("ai_provider_events").insert(snapshot.sourceTimestamps.map((item) => ({
-    provider: item.source === "Alternative.me" ? "alternative_me" : "binance_usdm",
+    provider: item.source === "Alternative.me" ? "alternative_me" : item.source.includes("CoinGlass") ? "coinglass" : "binance_usdm",
     data_category: item.category,
     status: item.stale ? "stale" : "success",
     source_timestamp: item.sourceAt,
     retry_count: 0,
-    metadata: { age_seconds: item.ageSeconds }
+    metadata: {
+      age_seconds: item.ageSeconds,
+      venue: item.source === "Alternative.me" ? undefined : "binance_usdm",
+      transport: item.source === "Alternative.me" ? undefined : snapshot.marketDataTransport,
+      fallback_from_http_status: snapshot.transportFallback?.httpStatus ?? null
+    }
   })));
 }
 
 async function logProviderFailure(supabase: SupabaseClient, error: unknown) {
   const code = readErrorCode(error);
+  const upstreamStatus = readProviderStatus(error);
   await supabase.from("ai_provider_events").insert({
-    provider: code.includes("sentiment") ? "alternative_me" : "binance_usdm",
+    provider: code.includes("sentiment") ? "alternative_me" : code.includes("coinglass") ? "coinglass" : "binance_usdm",
     data_category: "market_snapshot",
-    status: code.includes("timeout") || code === "provider_unavailable" ? "timeout" : "error",
+    status: upstreamStatus === 429
+      ? "rate_limited"
+      : code.includes("interval_unavailable") || code.includes("missing_coinglass")
+        ? "error"
+        : code.includes("timeout") || code.includes("unavailable")
+        ? "timeout"
+        : code.includes("malformed") || code.includes("mismatch") || code.includes("api_error")
+          ? "invalid_response"
+          : "error",
+    http_status: upstreamStatus,
     retry_count: 0,
     error_code: code,
-    error_detail: error instanceof Error ? error.message.slice(0, 900) : "Required provider failed."
+    error_detail: error instanceof Error ? error.message.slice(0, 900) : "Required provider failed.",
+    metadata: { venue: "binance_usdm" }
   });
+}
+
+function readProviderStatus(error: unknown): number | null {
+  if (!error || typeof error !== "object" || !("upstreamStatus" in error)) return null;
+  const status = Number(error.upstreamStatus);
+  return Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
 }
 
 async function refreshCachedMarketView(
@@ -410,11 +432,12 @@ async function refreshCachedMarketView(
     });
     const markTimestamp = Date.parse(mark.timestamp);
     if (!Number.isFinite(markTimestamp) || markTimestamp > now + 5_000) {
-      throw new AiHttpError(503, "invalid_mark_timestamp", "Binance USD-M returned an invalid current-price timestamp.");
+      throw new AiHttpError(503, "invalid_current_price_timestamp", "The Binance BTCUSDT current-price transport returned an invalid timestamp.");
     }
     const updatedTimestamps = snapshot.sourceTimestamps.map((item) => item.category === "mark_index_funding"
       ? {
           ...item,
+          source: mark.source,
           observedAt: new Date(now).toISOString(),
           sourceAt: mark.timestamp,
           ageSeconds: Math.max(0, (now - markTimestamp) / 1000),
@@ -425,21 +448,33 @@ async function refreshCachedMarketView(
       .filter((item) => item.stale)
       .map((item) => `${item.category} is stale (${Math.round(item.ageSeconds)}s old).`);
     await supabase.from("ai_provider_events").insert({
-      provider: "binance_usdm",
+      provider: mark.transport === "coinglass" ? "coinglass" : "binance_usdm",
       data_category: "mark_index_funding",
       status: updatedTimestamps.find((item) => item.category === "mark_index_funding")?.stale ? "stale" : "success",
       source_timestamp: mark.timestamp,
       retry_count: 0,
-      metadata: { cached_snapshot: true }
+      metadata: {
+        cached_snapshot: true,
+        venue: "binance_usdm",
+        transport: mark.transport,
+        price_kind: mark.priceKind,
+        fallback_from_http_status: mark.fallbackFromBinanceStatus
+      }
     });
     return {
       snapshot: {
         ...snapshot,
         capturedAt: new Date(now).toISOString(),
         currentPrice: mark.price,
+        source: mark.source,
+        marketDataTransport: mark.transport,
+        ...(mark.fallbackFromBinanceStatus === 451
+          ? { transportFallback: { from: "binance_direct" as const, httpStatus: 451 as const } }
+          : { transportFallback: undefined }),
         futures: {
           ...snapshot.futures,
           markPrice: mark.price,
+          priceKind: mark.priceKind,
           indexPrice: mark.indexPrice,
           basisPercent: ((mark.price - mark.indexPrice) / mark.indexPrice) * 100
         },

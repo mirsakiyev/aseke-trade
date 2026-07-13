@@ -292,7 +292,7 @@ export function AiFuturesAnalyst() {
           error={error}
           emptyLabel={analysis?.status === "NO_TRADE" ? "No setup overlay" : "Run market analysis"}
           emptyDescription="A protected Binance USD-M snapshot will appear after a successful analysis."
-          currentPriceLabel="Mark"
+          currentPriceLabel={analysis?.marketDataTransport === "coinglass" ? "Current futures price" : "Mark"}
           readOnly
           className="ai-futures-chart"
         />

@@ -3,6 +3,8 @@ export const AI_FUTURES_TIMEFRAMES = ["15m", "1h", "4h"] as const;
 
 export type AiFuturesSymbol = typeof AI_FUTURES_SYMBOL;
 export type AiFuturesTimeframe = (typeof AI_FUTURES_TIMEFRAMES)[number];
+export type AiMarketDataTransport = "binance_direct" | "coinglass";
+export type AiMarketDataSource = "Binance USD-M Futures" | "CoinGlass API · Binance USD-M Futures";
 export type AiMarketRegime = "trending" | "ranging" | "high_volatility";
 export type AiTrendDirection = "bullish" | "bearish" | "neutral";
 export type AiStructureDirection = "uptrend" | "downtrend" | "mixed";
@@ -39,6 +41,7 @@ export interface AiSourceTimestamp {
 
 export interface AiFuturesMetrics {
   markPrice: number;
+  priceKind: "exchange_mark" | "current_futures_price";
   indexPrice: number;
   fundingRate: number;
   nextFundingAt: string | null;
@@ -77,7 +80,9 @@ export interface AiNormalizedMarketSnapshot {
   sentiment: AiSentimentMetrics;
   filters: AiSymbolFilters;
   sourceTimestamps: AiSourceTimestamp[];
-  source: "Binance USD-M Futures";
+  source: AiMarketDataSource;
+  marketDataTransport: AiMarketDataTransport;
+  transportFallback?: { from: "binance_direct"; httpStatus: 451 };
 }
 
 export interface AiPriceZone {
@@ -255,7 +260,8 @@ export interface AiAnalysisResponse {
   deterministicOnly: boolean;
   scoreWeights: AiScoreWeights;
   shadowMode: boolean;
-  source: "Binance USD-M Futures";
+  source: AiMarketDataSource;
+  marketDataTransport: AiMarketDataTransport;
   sentimentAttribution: {
     label: "Alternative.me Crypto Fear & Greed Index";
     url: string;
